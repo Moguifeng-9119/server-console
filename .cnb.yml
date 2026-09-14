@@ -1,0 +1,73 @@
+# 桌面端构建流水线
+#
+# 签名（可选，不配置则出未签名包，不影响构建）：
+#   在组织/仓库的保密变量中配置后，electron-builder 会自动签名：
+#   - Windows：CSC_LINK（.pfx 证书 base64 或 URL）、CSC_KEY_PASSWORD
+#   - macOS：CSC_LINK（.p12）、CSC_KEY_PASSWORD，公证另需 APPLE_ID、
+#     APPLE_APP_SPECIFIC_PASSWORD、APPLE_TEAM_ID
+#   建议建一个私有 secrets 仓库，用 imports 引入（示例）：
+#   imports:
+#     - https://cnb.cool/<org>/<secrets-repo>/-/blob/main/signing.yml
+#
+# macOS 构建机：CNB 托管机构建机仅有 Linux，dmg 需要自托管 Mac 构建机
+# （根组织准入接入），runner.tags 按接入时实际标签修改。
+
+main:
+  push:
+    # Windows 包：托管 Linux 构建机 + wine 容器交叉编译，出 portable exe + NSIS 安装版
+    - name: windows-exe
+      docker:
+        image: electronuserland/builder:wine
+      env:
+        ELECTRON_BUILDER_CACHE: /tmp/electron-builder-cache
+      stages:
+        - name: 安装依赖
+          script: npm ci
+        - name: 打包 Windows
+          script: npm run dist:win
+        - name: 产物清单
+          script: ls -lh release
+
+    # Linux 包：托管构建机，出 AppImage
+    - name: linux-appimage
+      docker:
+        image: node:20
+      stages:
+        - name: 安装依赖
+          script: npm ci
+        - name: 打包 Linux
+          script: npm run dist:linux
+        - name: 产物清单
+          script: ls -lh release
+
+    # macOS 包：需要自托管 Mac 构建机（无 Docker 环境，脚本直接跑在宿主机，需预装 Node）。
+    # 当前没有对应构建机，接入前先注释掉，否则流水线会一直等待 runner。
+    # - name: macos-dmg
+    #   runner:
+    #     tags: os:macos
+    #   stages:
+    #     - name: 安装依赖
+    #       script: npm ci
+    #     - name: 打包 macOS
+    #       script: npm run dist:mac
+    #     - name: 产物清单
+    #       script: ls -lh release
+
+$:
+  tag_push:
+    - name: release-build
+      docker:
+        image: electronuserland/builder:wine
+      stages:
+        - name: 安装依赖
+          script: npm ci
+        - name: 打包 Linux
+          script: npm run dist:linux
+        - name: 打包 Windows
+          script: npm run dist:win
+        # macOS 产物需自托管 Mac 构建机，接入后把上面 push 里的 macos-dmg job 复制过来
+        - name: 发布 Release
+          type: git:release
+          options:
+            tag: $CNB_BRANCH
+            description: Server Console $CNB_BRANCH

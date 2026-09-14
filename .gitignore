@@ -1,0 +1,19 @@
+node_modules/
+dist/
+release/
+tsconfig.tsbuildinfo
+*.log
+.DS_Store
+
+# 打包产物
+*.exe
+*.dmg
+*.AppImage
+*.tar.gz
+
+# 本地临时/测试文件
+_t/
+_stage*
+_cdp_*
+.env
+.env.*

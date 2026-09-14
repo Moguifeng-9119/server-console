@@ -1,0 +1,78 @@
+{
+  "name": "server-console",
+  "private": true,
+  "version": "0.3.0",
+  "description": "本地服务器 GPU / 进程监控管理桌面软件（占位名，后续可全局替换）",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "dist:linux": "npm run build && electron-builder --linux AppImage",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:win:lite": "npm run build && electron-builder --win --x64 -c.win.target=portable -c.win.signAndEditExecutable=false",
+    "dist:win:nsis": "npm run build && electron-builder --win --x64 -c.win.target=nsis",
+    "icon": "node scripts/make-icon.mjs",
+    "mock:ssh": "node scripts/fake-sshd.cjs",
+    "dist:mac": "npm run build && electron-builder --mac --universal"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.2.4",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.35.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.lab.serverconsole",
+    "productName": "ServerConsole",
+    "files": [
+      "dist/**",
+      "electron/**"
+    ],
+    "asarUnpack": [
+      "**/node_modules/ssh2/**",
+      "**/node_modules/cpu-features/**",
+      "**/*.node"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon_512.png",
+      "category": "System"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
