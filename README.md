@@ -1,150 +1,222 @@
-# ServerConsole
+<div align="center">
 
-一个本地运行的**多服务器 SSH 管理桌面工具**：在一个界面里集中完成多台 Linux/GPU 服务器的 **GPU 与进程监控、SFTP 文件管理、本机↔服务器上传下载、以及服务器↔服务器之间的高速直传互传**。
+# 🖥️ ServerConsole
 
-基于 Electron + React + TypeScript + ssh2，所有连接与数据都在本机完成，不经过任何第三方服务器。
+### One desktop to monitor your GPU fleet, browse files, and move data **between servers at full speed** — all over SSH, fully local.
 
----
+![license](https://img.shields.io/badge/license-MIT-22c55e)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
+![electron](https://img.shields.io/badge/Electron-31-47848F?logo=electron&logoColor=white)
+![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
 
-## 功能特性
+**ServerConsole** is a local-first desktop app that centralizes multiple Linux/GPU servers:
+live GPU & process monitoring, a dual-pane SFTP file manager, uploads/downloads, and
+**high-speed server-to-server direct transfer** — built with Electron, React and [`ssh2`](https://github.com/mscdex/ssh2).
+No cloud, no relay of your data: every connection runs straight from your machine.
 
-### 1. 多服务器集中管理
-- 支持**密码**与**私钥（含口令）**两种认证，可逐台测试连接（返回 GPU 数、进程数）。
-- 连接凭据通过系统安全能力（Windows DPAPI / libsecret）**加密保存在本机**，不上传、不外发。
-- 侧栏集中展示所有节点在线状态，支持自动周期刷新（1/2/5/10s 可调）。
-
-### 2. 一键导入 `~/.ssh/config`（真正的 React 组件，非脚本注入）
-- 图形化解析 OpenSSH `~/.ssh/config`，列出全部 Host、用户、端口、对应 IdentityFile。
-- 可手动浏览选择任意 config 文件、统一指定私钥或逐台选择密钥，已存在的主机自动跳过。
-- **自动监听 config 文件变化**：新增主机 / 端口或用户变更 / 主机移除时，顶部出现横幅提示，可一键导入或更新，移除的主机只提示、不自动删除本地配置。
-
-### 3. GPU 与进程监控（数据全部真实采集，不做算法估算）
-- 总览仪表盘：各节点在线状态、平均 GPU 利用率、显存、CPU、内存、负载、僵尸进程数等 KPI。
-- 单机详情：每张 GPU 的**利用率、显存、温度、功耗、风扇转速**，以及该卡上的进程与显存占用。
-- 进程列表：按 PID/用户/CPU/内存排序、关键字过滤、只看 GPU 进程、按用户筛选。
-- 右键进程：SIGTERM/SIGKILL、复制 PID/命令行、重启服务；危险操作有二次确认并写入**本地操作审计日志**。
-- **温度/风扇/功耗直接取自 `nvidia-smi` 真实输出**，驱动未上报的字段显示 `N/A`（例如无风扇的被动散热卡），绝不用算法编造数值。
-
-### 4. SFTP 文件管理（本地 / 远程双面板）
-- 左右双面板：**本机 ↔ 远程**，地址栏可手动输入路径，支持返回上级、家目录、刷新、新建文件夹。
-- **拖拽上传**、批量上传 / 下载、整目录递归传输；右键菜单：下载、查看文本、重命名、删除、压缩为 tar.gz、解压（tar/zip）、传到另一台服务器。
-- 远程当前目录**文件名搜索**；按名称/大小/时间排序；双击进入目录。
-- 大文件 / 大目录走**多任务队列**，支持全局并发上限（默认 15，1–15 可调）、暂停 / 继续 / 取消、断点续传与失败重试。
-
-### 5. 服务器 ↔ 服务器互传（可视化双面板 + 高速直传）
-- **左右双面板点选**源与目标目录，无需手动输入路径，所见即所得地确定“把哪些内容传到哪个路径”。
-- 优先走**服务器之间直传**，数据不经过本机：自动在两端探测 `rsync / tar / scp`，按 **rsync → tar → scp** 顺序择优并回退；两端都不具备时才兜底为本机中继。
-- 直传使用**一次性临时密钥**（运行时生成、注入目标 `authorized_keys`、传输结束立即删除，临时目录即焚），**不使用、不上传你的主私钥**。
-- 大目录**边遍历边传输**，不做阻塞式的前置统计；文件总数与总大小在后台异步采样回填，因此不会卡在“加入中”。
-- **互传始终是复制，永不删除源服务器文件。**
-
-### 6. 传输中心（右侧大抽屉）
-- 顶栏常驻「传输」入口并显示进行中数量角标；点击从右侧滑出大抽屉，可全屏，传输中自动钉住、Esc/遮罩不误关。
-- 顶部实时总瞬时速度（↑上传 / ↓下载 / ⇄互传）、进行中数量与整体进度。
-- 类型（全部/上传/下载/互传）与状态（全部/进行中/已完成/失败）双维度筛选。
-- 任务展开详情：
-  - **近 60 秒瞬时速度曲线**（只显示瞬时，不显示平均/峰值，不伪造）；
-  - 剩余时间 ETA（总量统计中会明确提示，不编造）；
-  - 完整**源路径 → 目标路径**，可一键复制；
-  - 互传任务的**直传/中继徽标**（rsync/tar/scp）与能力探测、回退诊断；
-  - **文件 x/y 计数**与**最近传输文件流**（直传由 rsync 逐文件真实回传，可本地搜索过滤）。
-- 队列管理：全部暂停/继续、勾选批量取消、失败一键全重试、清除已完成、排队任务 ↑/↓ 调序、全局并发调节、完成/失败系统通知与失败提示音开关。
-
-### 7. 界面
-- 现代仪表盘风格，**默认浅色清爽**（可跟随系统 / 浅色 / 深色），青蓝主色。
-- 三档信息密度（**默认紧凑** / 默认 / 宽松），主题与密度仅在手动切换后记忆。
-- 崩溃自恢复：传输记录异步原子写入并自动裁剪，避免超大记录文件导致黑屏。
+</div>
 
 ---
 
-## 技术栈
+## 📑 Table of Contents
+- [✨ Highlights](#-highlights)
+- [🧱 Tech Stack](#-tech-stack)
+- [🚀 Getting Started](#-getting-started)
+- [🏗️ Build & Package](#️-build--package)
+- [🧭 Usage](#-usage)
+- [🏛️ How it works](#️-how-it-works)
+- [🔐 Security & Privacy](#-security--privacy)
+- [📁 Data storage](#-data-storage)
+- [🧪 Development](#-development)
+- [⚠️ Limitations](#️-limitations)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
 
-| 层 | 技术 |
+---
+
+## ✨ Highlights
+
+### 🧩 Multi-server management
+- **Password & private-key** auth (passphrase supported), with per-server connection tests.
+- Credentials are encrypted at rest with the OS keychain (Windows DPAPI / libsecret) and **never leave your machine**.
+- Sidebar with live reachability and configurable auto-refresh (1 / 2 / 5 / 10 s).
+
+### 🔑 One-click `~/.ssh/config` import
+- A **real React dialog** (no script injection) parses OpenSSH config: hosts, users, ports and `IdentityFile`s.
+- Browse any config file, assign one shared key or a key per host; existing hosts are auto-skipped.
+- **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
+
+### 📊 Real GPU & process monitoring
+- Dashboard KPIs: average GPU utilization, VRAM, CPU, memory, load average and zombie-process count.
+- Per-GPU **utilization, VRAM, temperature, power and fan speed**, plus processes on each card.
+- Sortable / filterable process table (search by PID, user or command; GPU-only filter).
+- Right-click a process for `SIGTERM` / `SIGKILL`, copy PID/command or restart a service — with confirmation and a **local audit log**.
+- > Temperature, fan and power come **straight from `nvidia-smi`**. Fields the driver doesn't report show `N/A` — values are never estimated or fabricated.
+
+### 🗂️ Dual-pane SFTP file manager
+- **Local ⇄ remote** side-by-side panes: address bar, up / home / refresh, mkdir, sort by name/size/time.
+- **Drag-and-drop upload**, batch upload/download, recursive folder transfer.
+- Right-click menu: download, view as text, rename, delete, **compress to `.tar.gz`**, extract (tar/zip), send to another server.
+- Remote filename search in the current directory; double-click to descend.
+
+### ⚡ Server-to-server direct transfer
+- A **visual dual-pane picker** for source and destination — no manual path typing.
+- Prefers a **direct server-to-server path that never bounces through your machine**. It probes both ends for `rsync / tar / scp` and picks the best, falling back automatically; only when neither supports it does it relay locally.
+- Uses an **ephemeral one-time key pair** (generated at runtime, injected into `authorized_keys`, **shredded immediately after**). Your main private key is never used or uploaded.
+- Large trees are streamed while being walked — no blocking pre-scan, no stuck "adding…".
+- > A transfer is **always a copy**. Files on the source server are never deleted.
+
+### 🚦 Transfer Center drawer
+- A pinned **right-side drawer** (up to fullscreen) opened from a persistent top-bar button with a running-count badge; it stays open while tasks run.
+- Header shows **live aggregate instant speed** (↑ upload / ↓ download / ⇄ relay), active count and overall progress.
+- Filter by **type** (all/upload/download/relay) and **status** (all/active/done/failed).
+- Expand any task for:
+  - **60-second instant-speed sparkline** (instantaneous only — no averaged/peak numbers, no faking);
+  - **ETA**, with an explicit "sizing…" state instead of a guess;
+  - full **source → destination paths** with copy buttons;
+  - a **direct/relay · rsync/tar/scp badge** and capability/fallback diagnostics;
+  - **file x/y count** and a **recent-files stream** (rsync reports each finished file; locally filterable).
+- Queue controls: pause/resume all, multi-select cancel, retry all failed, clear finished, **reorder queued tasks ↑/↓**, global **concurrency 1–15 (default 15)**, system notifications and an optional failure beep.
+
+### 🎛️ Modern, calm UI
+- Dashboard styling with a **clean light theme by default** (follow-system / light / dark) and a cyan accent.
+- Three density levels (**compact by default** / comfortable / roomy); theme and density are remembered only *after* you change them.
+- Crash-safe persistence: transfer records are written atomically and trimmed to prevent oversized state files.
+
+---
+
+## 🧱 Tech Stack
+
+| Layer | Technology |
 | --- | --- |
-| 壳 | Electron 31（主进程 CommonJS，渲染进程打包） |
-| 前端 | React 18 + TypeScript（strict）+ Vite 5，纯 CSS 设计令牌，无重型 UI 框架 |
-| 连接 | [ssh2](https://github.com/mscdex/ssh2)（SSH 连接、SFTP、exec、密钥） |
-| 打包 | electron-builder（Windows portable/nsis、macOS dmg、Linux AppImage） |
+| Shell | **Electron 31** (CommonJS main process) |
+| Renderer | **React 18 + TypeScript (strict) + Vite 5**, hand-written CSS design tokens (no heavy UI kit) |
+| SSH / SFTP | [`ssh2`](https://github.com/mscdex/ssh2) — connections, SFTP, exec, keys |
+| Packaging | `electron-builder` — Windows portable/NSIS, macOS dmg, Linux AppImage |
 
-主进程负责所有 SSH/SFTP/本地文件与传输调度，渲染进程通过受控的 `preload` 桥（`window.api`）调用，不直接接触 Node。
+The main process owns all SSH/SFTP/local-file work and transfer scheduling; the renderer talks to it only through a controlled `preload` bridge (`window.api`) and never touches Node directly.
 
-## 目录结构
-
+### Project layout
 ```
 .
-├─ electron/              # Electron 主进程（不参与 tsc，CommonJS）
-│  ├─ main.cjs            # 应用入口、窗口、生命周期、崩溃自恢复
-│  ├─ preload.cjs         # 受控 IPC 桥，暴露 window.api
-│  ├─ ipc.cjs             # IPC 处理器：服务器、SFTP、传输、系统通知等
-│  ├─ ssh.cjs             # ssh2 连接封装：exec/execStream/SFTP/远程遍历
-│  ├─ sshconfig.cjs       # 解析与监听 ~/.ssh/config
-│  ├─ transfer.cjs        # 传输调度：队列/并发/直传(rsync/tar/scp)/中继/断点
-│  ├─ localfs.cjs         # 本机文件操作
-│  └─ store.cjs           # 凭据加密存储（safeStorage，含无 libsecret 兜底）
-├─ src/                   # 渲染进程（React + TS）
+├─ electron/            # Main process (CommonJS, not type-checked by tsc)
+│  ├─ main.cjs          #   app/window lifecycle, crash self-recovery
+│  ├─ preload.cjs       #   controlled IPC bridge -> window.api
+│  ├─ ipc.cjs           #   IPC handlers (servers, SFTP, transfers, notifications)
+│  ├─ ssh.cjs           #   ssh2 wrapper: exec/execStream/SFTP/walk
+│  ├─ sshconfig.cjs     #   parse & watch ~/.ssh/config
+│  ├─ transfer.cjs      #   queue/concurrency, direct(rsync/tar/scp), relay, resume
+│  ├─ localfs.cjs       #   local filesystem
+│  └─ store.cjs         #   encrypted credential store (safeStorage + fallback)
+├─ src/                 # Renderer (React + TS)
 │  ├─ App.tsx state.tsx transfers.tsx api.ts types.ts format.ts
-│  └─ components/         # 总览、单机面板、文件管理、互传、导入、传输抽屉等
-├─ scripts/               # make-icon 生成图标；fake-sshd 本地假 SSH 测试服务
-├─ build/ assets/         # 应用图标
+│  └─ components/       #   overview, server panel, file manager, relay, import, drawer…
+├─ scripts/             # icon generator + a local mock SSH server
+├─ build/ assets/       # app icons
 └─ package.json
 ```
 
-## 快速开始
+---
 
-### 环境要求
-- Node.js ≥ 18（开发于 Node 22）、npm
-- Windows / macOS / Linux 均可开发；Windows 下 PowerShell 命令请用 `;` 而非 `&&` 串联
+## 🚀 Getting Started
 
-### 安装与开发
+**Requirements:** Node.js ≥ 18 (developed on Node 22) and npm.
+
 ```bash
+# 1. Install dependencies
 npm install
 
-# 仅前端（浏览器中，无主进程能力，连接管理不可用）
+# 2a. Frontend only in the browser (no main-process capabilities)
 npm run dev
 
-# 完整桌面开发（启动 Vite 并打开 Electron）
+# 2b. Full desktop development (Vite + Electron)
 npm run electron:dev
 ```
 
-没有真实 GPU 服务器时，可用内置假 SSH 服务验证采集链路（返回伪造的 nvidia-smi / ps，只监听 127.0.0.1）：
+> On Windows PowerShell, chain commands with `;` instead of `&&`.
+
+---
+
+## 🏗️ Build & Package
+
 ```bash
-npm run mock:ssh        # 默认 2222 端口，任意用户名密码
+npm run build          # tsc strict type-check + Vite production build
+
+npm run dist:win:lite  # Windows single-file portable .exe
+npm run dist:win:nsis  # Windows NSIS installer
+npm run dist:mac       # macOS universal dmg
+npm run dist:linux     # Linux AppImage
 ```
 
-### 构建
-```bash
-npm run build           # tsc 严格类型检查 + vite 构建
+<sub>Behind a slow network, point `ELECTRON_MIRROR` and `ELECTRON_BUILDER_BINARIES_MIRROR` to a local mirror.</sub>
 
-# Windows 便携版（单 exe）
-npm run dist:win:lite
-# Windows 安装版（NSIS）
-npm run dist:win:nsis
-# macOS / Linux
-npm run dist:mac
-npm run dist:linux
+---
+
+## 🧭 Usage
+1. **Add a server** — enter host/port/user, choose password or key auth, optionally *Test connection*, then save. Or click **Import from `~/.ssh/config`**.
+2. Pick a node in the sidebar to open its **Overview / GPU / Processes / Files** tabs.
+3. In **Files**, upload/download between the two panes, or select remote items → **Server relay ⇄** and choose the destination server & folder in the dual-pane dialog.
+4. Open the top-bar **Transfers** button any time for live speed, file progress and queue management.
+
+---
+
+## 🏛️ How it works
+
 ```
-> 国内网络可设置 Electron 镜像环境变量 `ELECTRON_MIRROR` 与 `ELECTRON_BUILDER_BINARIES_MIRROR` 指向 npmmirror。
+┌────────────────────────────┐         IPC (window.api)        ┌──────────────────────────┐
+│  Renderer (React + TS)     │  ◀──────────────────────────▶   │  Main process (Node)     │
+│  dashboard / file manager  │                                 │  ssh2 · SFTP · scheduler │
+└────────────────────────────┘                                 └───────────┬──────────────┘
+                                                                             │ SSH
+                                              ┌──────────────────────────────┼──────────────────────────────┐
+                                              ▼                              ▼                              ▼
+                                        source server                  destination server              your local disk
+```
 
-## 使用流程
-1. 打开应用 →「添加服务器」，填写主机/端口/用户名，选择密码或私钥认证，可先「测试连接」再保存；或直接「从 ~/.ssh/config 一键导入」。
-2. 侧栏选择节点进入总览 / GPU / 进程 / 文件页签。
-3. 「文件」页在左右双面板间上传下载，或勾选远程文件点「服务器互传 ⇄」，在弹出的双面板中选择目标服务器与目录后开始。
-4. 顶栏「传输」按钮随时打开传输中心，查看进度、速度曲线、文件流并管理队列。
+**Server-to-server transfer decision**
 
-## 数据存放位置
-- 服务器配置与传输记录保存在当前用户数据目录（Windows 为 `%AppData%/server-console/`，含 `servers.json`、`transfers.json`、`error.log`）。
-- 密码使用系统 safeStorage 加密后落盘；私钥只保存其文件路径，私钥内容始终留在你本机。
-- 卸载/删除该目录即可清除全部本地数据。
+1. Probe source & destination capabilities (`rsync`, `tar`, `scp`).
+2. Prefer **direct** transfer in the order `rsync → tar → scp`; stream finished filenames back for the x/y counter and recent-file list.
+3. Fall back to a **local relay** only when direct transfer is impossible.
+4. Count files and total size **asynchronously in the background** so the transfer starts immediately.
 
-## 安全设计
-- 直传临时密钥**即用即焚**，不使用主私钥；互传只复制、不删源。
-- 所有破坏性操作（杀进程、删除文件）均有二次确认与本地审计记录。
-- 监控数值与传输进度全部来自真实命令回传，**不使用算法伪造温度、速度或单文件进度**。
+---
 
-## 已知限制 / 说明
-- 服务器直传要求两台机器网络互通；无法互通时自动回退为本机中继（速度受本机上下行限制）。
-- 逐文件精确进度依赖 rsync（或本机中继）；仅能使用 scp 兜底时展示字节级进度。
-- GPU 监控依赖目标机安装并可执行 `nvidia-smi`。
+## 🔐 Security & Privacy
+- Direct-transfer keys are **ephemeral and shredded after use**; the main private key is never copied or uploaded.
+- Relay is **copy-only** — source data is never deleted.
+- Destructive actions (kill process, delete files) require confirmation and are written to a local audit log.
+- Passwords are encrypted with the OS safe-storage; only the *path* of a private key is stored, never its contents.
+- Every metric and progress value comes from a real command response — **no fabricated temperature, speed or per-file progress**.
 
-## License
-[MIT](./LICENSE)
+---
+
+## 📁 Data storage
+All local data lives in the OS user-data directory (`%AppData%/server-console/` on Windows):
+`servers.json` (connections), `transfers.json` (trimmed history) and `error.log`.
+Delete that folder to wipe all local state.
+
+---
+
+## 🧪 Development
+Without a real GPU box, spin up the built-in **mock SSH server** — it returns fake `nvidia-smi` / `ps` output and listens on `127.0.0.1` only (any user/password):
+```bash
+npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
+```
+
+## ⚠️ Limitations
+- Direct transfer requires the two servers to be mutually reachable; otherwise it relays through your machine (bounded by your up/down bandwidth).
+- Precise per-file progress requires `rsync` (or local relay); an `scp`-only fallback reports byte-level progress.
+- GPU monitoring requires `nvidia-smi` to be installed and executable on the target host.
+
+---
+
+## 🤝 Contributing
+Issues and PRs are welcome. Please run `npm run build` (strict type-check) before opening a PR, and never commit real hosts, credentials or keys.
+
+## 📄 License
+Distributed under the **[MIT License](./LICENSE)**.
+
+<div align="center"><sub>Built for engineers who manage many GPU servers and just want transfers to be fast, honest and safe.</sub></div>
