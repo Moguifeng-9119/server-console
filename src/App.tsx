@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Terminal } from 'lucide-react';
 import { useStore, type Density, type ThemeMode } from './state';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
@@ -35,6 +35,9 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
+          <span className="brand-mark" title="ServerConsole">
+            <Terminal size={13} strokeWidth={2.6} />
+          </span>
           Server Console <small>v0.4.0</small>
         </div>
         <nav className="nav">

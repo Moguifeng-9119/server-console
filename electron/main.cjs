@@ -16,6 +16,8 @@ function logCrash(tag, detail) {
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  // 开发态没有 exe 资源可取，显式给窗口/任务栏一个图标；打包态回退到 exe 内嵌图标
+  const windowIcon = path.join(__dirname, '../build/icon_512.png');
   const win = new BrowserWindow({
     width: Math.min(1440, Math.round(width * 0.9)),
     height: Math.min(900, Math.round(height * 0.9)),
@@ -24,6 +26,7 @@ function createWindow() {
     title: 'Server Console',
     backgroundColor: '#0e1116',
     autoHideMenuBar: true,
+    ...(fs.existsSync(windowIcon) ? { icon: windowIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
