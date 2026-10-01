@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
+import { api } from '../api';
 import { useStore, type Density, type ThemeMode } from '../state';
+import type { TrustedHost } from '../types';
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const {
@@ -12,8 +15,18 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     setRefreshMs,
     alertsEnabled,
     setAlertsEnabled,
+    tempAlert,
+    setTempAlert,
     audit,
   } = useStore();
+  const [tofu, setTofu] = useState<boolean | null>(null);
+  const [hosts, setHosts] = useState<TrustedHost[]>([]);
+
+  useEffect(() => {
+    if (!api) return;
+    api.securityGet().then((o) => setTofu(o.tofu)).catch(() => {});
+    api.hostKeysList().then(setHosts).catch(() => {});
+  }, []);
 
   const themes: Array<[ThemeMode, string]> = [
     ['system', '跟随系统'],
@@ -115,9 +128,75 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
+          <label>
+            温度告警阈值：≥ {tempAlert}°C<span className="faint">（GPU 逐卡判定，驱动未上报温度的卡不参与）</span>
+          </label>
+          <div className="row">
+            <input
+              type="range"
+              min={50}
+              max={110}
+              value={tempAlert}
+              style={{ flex: 1 }}
+              onChange={(e) => setTempAlert(Number(e.target.value))}
+            />
+            <b className="num" style={{ width: 46, textAlign: 'right' }}>
+              {tempAlert}°C
+            </b>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>安全 · 主机指纹校验</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={tofu ?? true}
+              disabled={!api || tofu === null}
+              onChange={(e) => api?.securitySet({ tofu: e.target.checked }).then((o) => setTofu(o.tofu))}
+            />
+            首次连接自动信任（TOFU）
+          </label>
+          <div className="note" style={{ marginTop: 4 }}>
+            首次连接记录主机指纹；之后指纹不符将拒绝连接（防中间人）。关闭后，未记录指纹的主机一律拒绝。
+          </div>
+          {hosts.length > 0 && (
+            <div className="audit" style={{ marginTop: 8 }}>
+              <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
+                已信任主机（服务器重装/换钥后移除对应条目可重新连接）
+              </div>
+              {hosts.map((h) => (
+                <div className="e" key={h.keyId} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span className="mono">
+                    {h.host}:{h.port}
+                  </span>
+                  <span
+                    className="mono faint ellipsis"
+                    style={{ flex: 1 }}
+                    title={`${h.type} · ${h.fp}`}
+                  >
+                    {h.fp}
+                  </span>
+                  <button
+                    className="btn mini"
+                    onClick={() => {
+                      const a = api;
+                      if (!a) return;
+                      a.hostKeysRemove(h.keyId).then(() => a.hostKeysList().then(setHosts));
+                    }}
+                  >
+                    移除
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="field">
           <label>操作审计日志</label>
           <div className="audit">
-            {audit.length === 0 && <div style={{ color: 'var(--text-faint)' }}>暂无操作记录</div>}
+            {audit.length === 0 && <div className="faint">暂无操作记录</div>}
             {audit.map((e) => (
               <div className="e" key={e.id}>
                 {e.time} · {e.server} · {e.action} · {e.target}

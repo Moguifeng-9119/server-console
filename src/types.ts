@@ -181,3 +181,13 @@ export interface IpcResult<T> {
   data?: T;
   error?: string;
 }
+
+// 已信任的主机指纹（TOFU 信任库条目）
+export interface TrustedHost {
+  keyId: string; // 'host|port'
+  host: string;
+  port: number;
+  type: string; // 密钥算法，如 ssh-ed25519
+  fp: string; // SHA256:... 指纹
+  firstSeen: number;
+}

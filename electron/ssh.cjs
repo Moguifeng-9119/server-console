@@ -56,6 +56,8 @@ function section(out, marker, next) {
   return out.slice(from, end < 0 ? out.length : end);
 }
 
+const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+
 function parseSnapshot(out) {
   const gpuRaw = section(out, '', '__APPS__').trim();
   const appRaw = section(out, '__APPS__', '__SYS__').trim();
@@ -152,6 +154,14 @@ class Connection {
     this.pending = null;
     this.status = 'offline';
     this.error = '';
+    this._hostKeyError = '';
+    this._fails = 0; // 连续失败次数（指数退避）
+    this._nextRetryAt = 0;
+  }
+
+  // 退避窗口内跳过重连尝试，避免对宕机服务器每个采集周期都发起 10s 超时的连接
+  isBackedOff() {
+    return Date.now() < this._nextRetryAt;
   }
 
   authConfig() {
@@ -176,13 +186,22 @@ class Connection {
         .on('ready', () => {
           this.status = 'online';
           this.error = '';
+          this._fails = 0;
+          this._nextRetryAt = 0;
           this.pending = null;
           resolve();
         })
         .on('error', (err) => {
+          // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
+          if (this._hostKeyError) {
+            err.message = this._hostKeyError;
+            this._hostKeyError = '';
+          }
           this.status = /authentic/i.test(err.message) ? 'auth' : 'offline';
           this.error = err.message;
           this.pending = null;
+          this._fails += 1;
+          this._nextRetryAt = Date.now() + Math.min(30000, 1000 * 2 ** Math.min(this._fails, 5));
           this.dispose();
           reject(err);
         })
@@ -192,7 +211,24 @@ class Connection {
           this.dispose();
         });
       try {
-        client.connect({ host: this.cfg.host, port: this.cfg.port || 22, ...this.authConfig() });
+        /** @type {Record<string, any>} */
+        const connectOpts = { host: this.cfg.host, port: this.cfg.port || 22, ...this.authConfig() };
+        if (hostKeyCheck) {
+          // TOFU 指纹校验：注入的 checker 返回 true 放行，抛错则记下原因并让握手失败
+          connectOpts.hostVerifier = (hkey, cb) => {
+            Promise.resolve()
+              .then(() => hostKeyCheck(this.cfg.host, this.cfg.port || 22, hkey))
+              .then((ok) => {
+                if (!ok) this._hostKeyError = this._hostKeyError || '主机指纹校验未通过';
+                cb(ok !== false);
+              })
+              .catch((e) => {
+                this._hostKeyError = (e && e.message) || '主机指纹校验失败';
+                cb(false);
+              });
+          };
+        }
+        client.connect(connectOpts);
         this.client = client;
       } catch (e) {
         this.pending = null;
@@ -255,12 +291,18 @@ class Connection {
   }
 
   // 流式执行：过程中按行回调 stdout（用于实时解析 rsync 逐文件输出），结束时汇总
+  /**
+   * @param {string} cmd
+   * @param {{ onLine?: (line: string) => void; timeout?: number }=} opts
+   */
   execStream(cmd, { onLine, timeout = 0 } = {}) {
     return this.connect().then(
       () =>
         new Promise((resolve, reject) => {
           this.client.exec(cmd, (err, stream) => {
             if (err) return reject(err);
+            // 百万文件的 rsync 逐文件输出可能极大；stdout/stderr 只保留尾部用于诊断
+            const OUT_CAP = 256 * 1024;
             let out = '';
             let errOut = '';
             let buf = '';
@@ -277,6 +319,7 @@ class Connection {
             const feed = (chunk) => {
               const s = chunk.toString();
               out += s;
+              if (out.length > OUT_CAP * 2) out = out.slice(-OUT_CAP);
               if (!onLine) return;
               buf += s;
               let idx;
@@ -290,7 +333,7 @@ class Connection {
               .on('close', (code) => {
                 if (timer) clearTimeout(timer);
                 if (buf.trim() && onLine) onLine(buf.replace(/\r$/, ''));
-                resolve({ stdout: out, stderr: errOut, code });
+                resolve({ stdout: out, stderr: errOut.slice(-OUT_CAP), code });
               })
               .on('data', (d) => feed(d))
               .stderr.on('data', (d) => (errOut += d.toString()));
@@ -319,7 +362,7 @@ class Connection {
   }
 
   async restartService(name) {
-    const { stdout, stderr } = await this.exec(`systemctl restart ${name}`, 20000);
+    const { stdout, stderr } = await this.exec(`systemctl restart ${shq(name)}`, 20000);
     if (stderr && /access denied|not permitted/i.test(stderr)) return { ok: false, error: '权限不足' };
     return { ok: true, stdout: stdout || stderr };
   }
@@ -453,36 +496,12 @@ class Connection {
     await rm(target);
     return true;
   }
+}
 
-  // 递归枚举远程文件/文件夹（文件夹下载、服务器互传用），不跟随符号链接
-  async walkRemote(root) {
-    const sftp = await this.sftp();
-    const files = [];
-    let totalSize = 0;
-    const lstat = (p) =>
-      new Promise((res, rej) => {
-        sftp.lstat(p, (e, r) => (e ? rej(e) : res(r)));
-      });
-    const visit = async (abs, rel) => {
-      const st = await lstat(abs);
-      if (sftpType(st.mode) === 'dir') {
-        const items = await new Promise((res, rej) => {
-          sftp.readdir(abs, (e, r) => (e ? rej(e) : res(r)));
-        });
-        for (const it of items) await visit(posixJoin(abs, it.filename), posixJoin(rel, it.filename));
-      } else {
-        files.push({ abs, rel, size: st.size });
-        totalSize += st.size;
-      }
-    };
-    const rootStat = await lstat(root);
-    if (sftpType(rootStat.mode) === 'dir') await visit(root, '');
-    else {
-      files.push({ abs: root, rel: root.split('/').pop(), size: rootStat.size });
-      totalSize += rootStat.size;
-    }
-    return { root, files, totalSize, totalFiles: files.length };
-  }
+// 主机指纹校验器由主进程注入（依赖 electron 的 hostkeys 信任库），ssh.cjs 自身保持纯净可测试
+let hostKeyCheck = null;
+function setHostKeyChecker(fn) {
+  hostKeyCheck = typeof fn === 'function' ? fn : null;
 }
 
 class Pool {
@@ -519,4 +538,4 @@ class Pool {
   }
 }
 
-module.exports = { Pool, Connection, parseSnapshot, COLLECT_CMD };
+module.exports = { Pool, Connection, parseSnapshot, COLLECT_CMD, setHostKeyChecker };

@@ -1933,3 +1933,60 @@ table.proc tbody tr.sel,
 .relay-tag {
   border-radius: 6px;
 }
+
+/* ============ lucide 内联图标对齐（WS7 图标化） ============ */
+button svg,
+.transfer-entry-ico svg,
+.fm-ic svg,
+.rb-ic svg,
+.rb-check svg,
+.td-kind svg,
+.td-file-ok svg,
+.td-head-speed svg {
+  flex: none;
+  vertical-align: -0.18em;
+}
+.fm-pane-head .btn svg,
+.rb-bar .btn svg,
+.td-row-actions .btn svg {
+  display: block;
+  margin: auto;
+}
+.td-head-speed .up,
+.td-head-speed .down,
+.td-head-speed .relay {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.td-file-ok {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ============ 文字/布局工具类（WS8：去 inline style，接回密度系统） ============ */
+.faint {
+  color: var(--text-faint);
+}
+.dim {
+  color: var(--text-dim);
+}
+.note {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.metric-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.gpu-proc-line {
+  display: flex;
+  gap: 8px;
+  cursor: context-menu;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

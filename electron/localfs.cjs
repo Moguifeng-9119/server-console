@@ -73,33 +73,13 @@ async function rename(from, to) {
 }
 
 async function rmrf(target) {
-  await fsp.rm(target, { recursive: true, force: true });
+  // 护栏：拒绝删除盘根目录和用户主目录本身（UI 有确认框，这里是最后一道保险）
+  const abs = path.resolve(target);
+  if (abs === path.parse(abs).root) throw new Error('拒绝删除盘根目录：' + abs);
+  const home = path.resolve(homeDir());
+  if (home && abs === home) throw new Error('拒绝删除用户主目录：' + abs);
+  await fsp.rm(abs, { recursive: true, force: true });
   return true;
-}
-
-// 递归枚举一个本地文件/文件夹（文件夹上传用），不跟随符号链接
-async function walk(root) {
-  const rootAbs = path.resolve(root);
-  const rootStat = await fsp.lstat(rootAbs);
-  const files = [];
-  let totalSize = 0;
-  const visit = async (abs, rel) => {
-    const s = await fsp.lstat(abs);
-    if (s.isDirectory()) {
-      const names = await fsp.readdir(abs);
-      for (const n of names) await visit(path.join(abs, n), rel ? path.join(rel, n) : n);
-    } else if (s.isFile()) {
-      files.push({ abs, rel: rel || path.basename(abs), size: s.size });
-      totalSize += s.size;
-    }
-  };
-  if (rootStat.isFile()) {
-    files.push({ abs: rootAbs, rel: path.basename(rootAbs), size: rootStat.size });
-    totalSize += rootStat.size;
-  } else {
-    await visit(rootAbs, '');
-  }
-  return { root: rootAbs, files, totalSize, totalFiles: files.length };
 }
 
 async function exists(p) {
@@ -124,4 +104,4 @@ async function roots() {
   return ['/'];
 }
 
-module.exports = { homeDir, list, stat, mkdirp, rename, rmrf, walk, exists, roots, rightsOf };
+module.exports = { homeDir, list, stat, mkdirp, rename, rmrf, exists, roots, rightsOf };

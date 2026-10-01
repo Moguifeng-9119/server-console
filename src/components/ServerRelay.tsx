@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowRight, ArrowUp, CheckSquare, File as FileIcon, Folder, FolderPlus, Home, RefreshCw, Square } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
 import { useTransfers } from '../transfers';
@@ -106,10 +107,10 @@ function RemoteBrowser({
   return (
     <div className="rb">
       <div className="rb-bar">
-        <button className="btn mini" title="家目录" onClick={goHome}>⌂</button>
-        <button className="btn mini" title="上一级" onClick={goUp}>↑</button>
-        <button className="btn mini" title="刷新" onClick={() => load()}>⟳</button>
-        <button className="btn mini" title="在当前目录新建文件夹" onClick={() => setMkName((v) => (v ? '' : '新建文件夹'))}>＋</button>
+        <button className="btn mini" title="家目录" onClick={goHome}><Home size={13} /></button>
+        <button className="btn mini" title="上一级" onClick={goUp}><ArrowUp size={13} /></button>
+        <button className="btn mini" title="刷新" onClick={() => load()}><RefreshCw size={13} /></button>
+        <button className="btn mini" title="在当前目录新建文件夹" onClick={() => setMkName((v) => (v ? '' : '新建文件夹'))}><FolderPlus size={13} /></button>
         <input
           className="mini mono rb-addr"
           value={addr}
@@ -156,8 +157,14 @@ function RemoteBrowser({
                 onDoubleClick={() => enter(e)}
                 title={dir ? '双击进入目录' : mode === 'source' ? '勾选以传输' : '目标为当前所在目录'}
               >
-                {mode === 'source' && <span className="rb-check">{isSel ? '☑' : '☐'}</span>}
-                <span className={`rb-ic ${dir ? 'dir' : 'file'}`}>{dir ? '📁' : '📄'}</span>
+                {mode === 'source' && (
+                  <span className="rb-check">
+                    {isSel ? <CheckSquare size={13} strokeWidth={1.8} /> : <Square size={13} strokeWidth={1.8} />}
+                  </span>
+                )}
+                <span className={`rb-ic ${dir ? 'dir' : 'file'}`}>
+                  {dir ? <Folder size={14} strokeWidth={1.8} /> : <FileIcon size={14} strokeWidth={1.8} />}
+                </span>
                 <span className="rb-name">{e.name}</span>
                 <span className="rb-size">{dir ? '—' : formatBytes(e.size)}</span>
                 <span className="rb-time mono">{fmtDate(e.mtime)}</span>
@@ -239,7 +246,7 @@ export function RelayDialog({
     <div className="mask" onClick={onClose}>
       <div className="dialog relay-dialog" onClick={(e) => e.stopPropagation()}>
         <h3>服务器互传（左侧勾选内容，右侧选择落到哪个目录）</h3>
-        <div className="body" style={{ marginBottom: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+        <div className="body dim" style={{ marginBottom: 8, fontSize: 12 }}>
           数据经本机内存中继、不在本机落盘；两台服务器都需在线。单击勾选/选择，双击目录进入。
         </div>
         <div className="relay-dual">
@@ -258,7 +265,7 @@ export function RelayDialog({
               onCwdChange={() => {}}
             />
           </div>
-          <div className="relay-mid">→</div>
+          <div className="relay-mid"><ArrowRight size={18} strokeWidth={2} /></div>
           <div className="relay-col">
             <div className="relay-col-head">
               <span className="relay-tag">目标</span>

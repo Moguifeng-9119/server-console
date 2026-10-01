@@ -17,6 +17,7 @@ const EMIT_MS = 250;
 const KEEP_FINISHED = 200; // 已结束/暂停任务最多保留条数，超出按时间淘汰，防止任务无限累积撑爆内存与持久化文件
 const SAVE_DEBOUNCE = 1000; // 持久化防抖（毫秒）
 
+/** @type {Error & { aborted?: boolean }} */
 const ABORT = new Error('__ABORT__');
 ABORT.aborted = true;
 
@@ -126,10 +127,12 @@ function pump(rs, ws, onBytes, gate) {
 
 class TransferManager {
   // getConn(serverId) -> Promise<Connection>（由 ipc 注入，复用连接池）
-  constructor({ getConn, storeFile, notify }) {
+  // knownHostsLine(host, port) -> 目标机 known_hosts 行（由 ipc 注入 hostkeys 信任库；直传防中间人）
+  constructor({ getConn, storeFile, notify, knownHostsLine }) {
     this.getConn = getConn;
     this.storeFile = storeFile || null;
     this.notify = typeof notify === 'function' ? notify : null; // 任务完成/失败系统通知回调
+    this.knownHostsLine = typeof knownHostsLine === 'function' ? knownHostsLine : null;
     this.maxConcurrent = DEFAULT_CONCURRENCY;
     this.options = { notifyDone: true, notifyFail: true };
     this.tasks = new Map();
@@ -454,63 +457,145 @@ class TransferManager {
     return c;
   }
 
-  // ---- 上传：本地 → 远程 ----
+  // ---- 上传：本地 → 远程。文件直传；目录交给 _uploadTree 边遍历边传（不阻塞预扫描） ----
   async _runUpload(t, gate, onProgress) {
     const conn = await this._conn(t.serverId);
+    const localStat = await fsp.lstat(t.srcLocal);
+    if (localStat.isDirectory()) return this._uploadTree(t, gate);
     const sftp = await conn.sftp();
-    const localStat = await fsp.stat(t.srcLocal);
     t.size = localStat.size;
     await conn.mkdirpRemote(posixDir(t.dstRemote));
-    let offset = 0;
-    try {
-      const rs = await new Promise((res, rej) => sftp.stat(t.dstRemote, (e, r) => (e ? rej(e) : res(r))));
-      if (rs.size > 0 && rs.size < t.size) offset = rs.size;
-    } catch {
-      /* 远程不存在 → 全新 */
-    }
+    const offset = await remoteFileOffset(sftp, t.dstRemote, t.size);
     t._baseOffset = offset;
     t.transferred = offset;
-    if (t.size === 0 && offset === 0) {
-      await new Promise((res, rej) =>
-        sftp.writeFile(t.dstRemote, Buffer.alloc(0), (e) => (e ? rej(e) : res())),
-      );
+    this.emit(t);
+    await this._uploadOneFile(gate, sftp, t.srcLocal, t.dstRemote, t.size, offset, (abs) =>
+      onProgress(abs - offset, t.size),
+    );
+  }
+
+  // 上传单个文件：0 字节直接建空文件（避免空流触发 SFTP Failure）；offset 由调用方算好传入
+  async _uploadOneFile(gate, sftp, localAbs, remoteAbs, size, offset, onBytes) {
+    if (size === 0 && offset === 0) {
+      await new Promise((res, rej) => sftp.writeFile(remoteAbs, Buffer.alloc(0), (e) => (e ? rej(e) : res())));
+      if (onBytes) onBytes(0);
       return;
     }
-    const local = fs.createReadStream(t.srcLocal, { start: offset, highWaterMark: STREAM_CHUNK * 2 });
-    const remote = sftp.createWriteStream(t.dstRemote, {
+    const local = fs.createReadStream(localAbs, { start: offset, highWaterMark: STREAM_CHUNK * 2 });
+    const remote = sftp.createWriteStream(remoteAbs, {
       start: offset,
       flags: offset ? 'a' : 'w',
       chunkSize: STREAM_CHUNK,
     });
-    await pump(local, remote, (d) => onProgress(d, t.size), gate);
+    await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate);
   }
 
-  // ---- 下载：远程 → 本地（.scpart → 完成改名） ----
-  async _runDownload(t, gate, onProgress) {
+  // 目录上传：本地 readdir 渐进展开 + 有界文件并发，总量/文件数随遍历回填
+  async _uploadTree(t, gate) {
     const conn = await this._conn(t.serverId);
     const sftp = await conn.sftp();
+    const srcRoot = t.srcLocal;
+    await this._runTree(
+      t,
+      gate,
+      [{ key: srcRoot, isDir: true, size: 0, abs: srcRoot, remote: t.dstRemote }],
+      // 展开一个目录：建远程目录 + 列本地子项（符号链接按指向处理，悬空跳过）
+      async (j) => {
+        await conn.mkdirpRemote(j.remote);
+        const names = await fsp.readdir(j.abs, { withFileTypes: true });
+        const children = [];
+        for (const d of names) {
+          const abs = path.join(j.abs, d.name);
+          const remote = posixJoin(j.remote, d.name);
+          let isDir = false;
+          let size = 0;
+          try {
+            if (d.isSymbolicLink()) {
+              const s2 = await fsp.stat(abs);
+              isDir = s2.isDirectory();
+              size = s2.size;
+            } else if (d.isDirectory()) {
+              isDir = true;
+            } else {
+              size = (await fsp.lstat(abs)).size;
+            }
+          } catch {
+            continue; // 无权限/悬空链接：不进入任务队列
+          }
+          children.push({ key: abs, isDir, size, abs, remote });
+        }
+        return children;
+      },
+      // 传输一个文件：逐文件断点续传（远程已有部分则追加）
+      async (j, report) => {
+        const offset = await remoteFileOffset(sftp, j.remote, j.size);
+        await this._uploadOneFile(gate, sftp, j.abs, j.remote, j.size, offset, report);
+      },
+      (j) => j.abs.slice(srcRoot.length).split(path.sep).join('/').replace(/^\/+/, ''),
+    );
+  }
+
+  // ---- 下载：远程 → 本地（.scpart → 完成改名）。文件直传；目录交给 _downloadTree ----
+  async _runDownload(t, gate, onProgress) {
+    const conn = await this._conn(t.serverId);
     const rstat = await conn.statRemote(t.srcRemote);
+    if (rstat.type === 'dir') return this._downloadTree(t, gate);
+    const sftp = await conn.sftp();
     t.size = rstat.size;
     await fsp.mkdir(path.dirname(t.dstLocal), { recursive: true });
     const part = t.dstLocal + PART_SUFFIX;
-    let offset = 0;
-    try {
-      const ps = await fsp.stat(part);
-      if (ps.size > 0 && ps.size < t.size) offset = ps.size;
-    } catch {
-      /* 无半成品 → 全新 */
-    }
+    const offset = await partOffset(part, t.size);
     t._baseOffset = offset;
     t.transferred = offset;
-    if (t.size === 0 && offset === 0) {
+    this.emit(t);
+    await this._downloadOneFile(gate, sftp, t.srcRemote, t.dstLocal, t.size, offset, (abs) =>
+      onProgress(abs - offset, t.size),
+    );
+  }
+
+  // 下载单个文件：写 .scpart，完成后原子改名；offset 由调用方算好传入
+  async _downloadOneFile(gate, sftp, remoteAbs, localAbs, size, offset, onBytes) {
+    const part = localAbs + PART_SUFFIX;
+    if (size === 0 && offset === 0) {
       await fsp.writeFile(part, Buffer.alloc(0));
-      await fsp.rename(part, t.dstLocal);
+      await fsp.rename(part, localAbs);
+      if (onBytes) onBytes(0);
       return;
     }
-    const remote = sftp.createReadStream(t.srcRemote, { start: offset, chunkSize: STREAM_CHUNK });
+    const remote = sftp.createReadStream(remoteAbs, { start: offset, chunkSize: STREAM_CHUNK });
     const local = fs.createWriteStream(part, { flags: offset ? 'a' : 'w' });
-    await pump(remote, local, (d) => onProgress(d, t.size), gate);
-    await fsp.rename(part, t.dstLocal);
+    await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate);
+    await fsp.rename(part, localAbs);
+  }
+
+  // 目录下载：listDir 渐进展开（含 linkToDir 解析，不再把指向目录的符号链接当小文件）+ 有界文件并发
+  async _downloadTree(t, gate) {
+    const conn = await this._conn(t.serverId);
+    const sftp = await conn.sftp();
+    const srcRoot = t.srcRemote;
+    await this._runTree(
+      t,
+      gate,
+      [{ key: srcRoot, isDir: true, size: 0, remote: srcRoot, local: t.dstLocal }],
+      // 展开一个远程目录：建本地目录 + 列远程子项（readdir 自带属性，无额外往返）
+      async (j) => {
+        await fsp.mkdir(j.local, { recursive: true });
+        const listing = await withTimeout(conn.listDir(j.remote), DIR_LIST_TIMEOUT, '列举目录 ' + j.remote);
+        return listing.entries.map((e) => ({
+          key: posixJoin(j.remote, e.name),
+          isDir: e.type === 'dir' || !!e.linkToDir,
+          size: e.size || 0,
+          remote: posixJoin(j.remote, e.name),
+          local: path.join(j.local, e.name),
+        }));
+      },
+      // 传输一个文件：逐文件 .scpart 断点续传
+      async (j, report) => {
+        const offset = await partOffset(j.local + PART_SUFFIX, j.size);
+        await this._downloadOneFile(gate, sftp, j.remote, j.local, j.size, offset, report);
+      },
+      (j) => j.remote.slice(srcRoot.length).replace(/^\/+/, ''),
+    );
   }
 
   // ---- 中继：服务器 A → 服务器 B。优先服务器直传（数据不过本机，同机/同机房快数十倍），不可达自动回退本机内存中继 ----
@@ -552,6 +637,14 @@ class TransferManager {
     const top = await connA.statRemote(t.srcRemote);
     const isDir = top.type === 'dir';
 
+    // 0) 目标机指纹：必须已经通过本机连接并记录在信任库，写进源机临时 known_hosts（随临时目录即焚）。
+    //    取不到说明目标机从未成功连接过 —— 放弃直传，回退本机中继。
+    const khLine = this.knownHostsLine ? this.knownHostsLine(host, port) : null;
+    if (!khLine) throw new Error('无法获取目标主机指纹（目标机尚未连接过）');
+    const khfile = dir + '/known_hosts';
+    await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir}`); // 目录先建好，known_hosts 才有落点
+    await wf(sa, khfile, Buffer.from(khLine + '\n'));
+
     // 1) 源端生成一次性临时密钥（不使用用户主私钥）
     await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir} && ssh-keygen -t ed25519 -N '' -f ${key} -q`);
     let installed = false;
@@ -564,7 +657,7 @@ class TransferManager {
           `grep -qF ${q(marked)} ~/.ssh/authorized_keys || echo ${q(marked)} >> ~/.ssh/authorized_keys`,
       );
       installed = true;
-      const sshOpt = `-i ${key} -p ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=8`;
+      const sshOpt = `-i ${key} -p ${port} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${khfile} -o BatchMode=yes -o ConnectTimeout=8`;
       // 3) 探测源能否免密直连目标（连不通就直接回退，不浪费时间）
       const probe = await connA.exec(`timeout 15 ssh ${sshOpt} ${q(user + '@' + host)} 'echo DIRECT_OK'; echo "__P=$?"`, 20000);
       if (!/DIRECT_OK/.test(probe.stdout)) throw new Error('源到目标不可直连');
@@ -634,7 +727,7 @@ class TransferManager {
           `if ${tarCmd} >>${logf} 2>&1; then echo tar >${modefile}; echo 0 >${rcfile}; exit 0; ` +
           `else echo "tar:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       }
-      const scpOpt = `-i ${key} -P ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes`;
+      const scpOpt = `-i ${key} -P ${port} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${khfile} -o BatchMode=yes`;
       modeLines +=
         `if scp -r ${scpOpt} ${rsyncSrc} ${rsyncDst} >>${logf} 2>&1; then echo scp >${modefile}; echo 0 >${rcfile}; exit 0; ` +
         `else echo "scp:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
@@ -650,19 +743,22 @@ class TransferManager {
         offAbort();
         throw ABORT; // 取消发生在准备阶段：不启动远程传输，直接走中止流程（finally 仍会清理临时密钥）
       }
-      // 进度：每秒在目标端统计已落盘字节
+      // 进度：每秒在目标端统计已落盘字节；首次采样作为基线扣除（目标目录已有旧数据时进度不虚高）
       let lastBytes = 0;
       let lastTime = Date.now();
+      let baseline = null;
       const timer = setInterval(async () => {
         try {
           const cmd = isDir ? `du -sb ${q(t.dstRemote)} 2>/dev/null | cut -f1` : `stat -c %s ${q(t.dstRemote)} 2>/dev/null`;
           const n = parseInt((await connB.exec(cmd, 8000)).stdout) || 0;
+          if (baseline === null) baseline = n;
+          const effective = Math.max(0, n - baseline);
           const now = Date.now();
           const dt = (now - lastTime) / 1000;
-          if (dt > 0) t.speed = Math.max(0, (n - lastBytes) / dt);
-          lastBytes = n;
+          if (dt > 0) t.speed = Math.max(0, (effective - lastBytes) / dt);
+          lastBytes = effective;
           lastTime = now;
-          t.transferred = t.size ? Math.min(n, t.size) : n;
+          t.transferred = t.size ? Math.min(effective, t.size) : effective;
           this.emit(t);
         } catch {
           /* 进度采样失败不影响传输 */
@@ -771,9 +867,10 @@ class TransferManager {
     );
   }
 
-  // 目录中继：边遍历边传。readdir 自带文件属性（不再每文件多一次往返）、有界文件并发、单目录列举超时
-  async _relayTree(t, gate, connA, connB, sa, sb, srcRoot, dstRoot) {
-    const jobs = [{ src: srcRoot, dst: dstRoot, isDir: true, size: 0 }];
+  // 目录任务的通用骨架：BFS 边遍历边传 + 有界文件并发 + 节流进度/速度 + 单文件错误汇总。
+  // expand(j) 展开一个目录项为子项数组（含建目标目录）；transferFile(j, report) 传输单个文件，
+  // report(absInFile) 上报文件内绝对字节位置；relName(j) 生成最近文件流里的相对路径展示。
+  async _runTree(t, gate, jobs, expand, transferFile, relName) {
     let totalBytes = 0;
     let doneFilesBytes = 0;
     let filesTotal = 0;
@@ -807,38 +904,30 @@ class TransferManager {
     const handle = async (j) => {
       if (gate.canceled) throw ABORT;
       if (j.isDir) {
-        await connB.mkdirpRemote(j.dst);
-        const listing = await withTimeout(connA.listDir(j.src), DIR_LIST_TIMEOUT, '列举目录 ' + j.src);
-        const children = listing.entries.map((e) => ({
-          src: posixJoin(j.src, e.name),
-          dst: posixJoin(j.dst, e.name),
-          isDir: e.type === 'dir' || !!e.linkToDir,
-          size: e.size || 0,
-        }));
+        const children = await expand(j);
         for (const c of children) {
           if (!c.isDir) {
-            totalBytes += c.size;
+            totalBytes += c.size || 0;
             filesTotal += 1;
           }
           jobs.push(c);
         }
         emit(false);
       } else {
-        inflight.set(j.src, 0);
+        inflight.set(j.key, 0);
         try {
-          await this._relayOneFile(gate, sa, sb, j.src, j.dst, j.size, (absInFile) => {
-            inflight.set(j.src, absInFile);
+          await transferFile(j, (absInFile) => {
+            inflight.set(j.key, absInFile);
             emit(false);
           });
         } catch (e) {
           if (e && e.aborted) throw e;
-          errors.push(`${j.src}: ${e && e.message ? e.message : e}`);
+          errors.push(`${j.key}: ${e && e.message ? e.message : e}`);
         } finally {
-          inflight.delete(j.src);
-          doneFilesBytes += j.size;
+          inflight.delete(j.key);
+          doneFilesBytes += j.size || 0;
           filesDone += 1;
-          const rel = j.src.startsWith(srcRoot) ? j.src.slice(srcRoot.length).replace(/^\/+/, '') : j.src;
-          this._pushRecent(t, rel || j.src);
+          this._pushRecent(t, relName(j) || j.key);
           emit(false);
         }
       }
@@ -870,6 +959,30 @@ class TransferManager {
       schedule();
     });
     if (errors.length) throw new Error(`目录内 ${errors.length} 项失败，首个：${errors[0]}`);
+  }
+
+  // 目录中继：走通用树引擎；readdir 自带文件属性（不再每文件多一次往返）、单目录列举超时
+  async _relayTree(t, gate, connA, connB, sa, sb, srcRoot, dstRoot) {
+    await this._runTree(
+      t,
+      gate,
+      [{ key: srcRoot, isDir: true, size: 0, src: srcRoot, dst: dstRoot }],
+      async (j) => {
+        await connB.mkdirpRemote(j.dst);
+        const listing = await withTimeout(connA.listDir(j.src), DIR_LIST_TIMEOUT, '列举目录 ' + j.src);
+        return listing.entries.map((e) => ({
+          key: posixJoin(j.src, e.name),
+          isDir: e.type === 'dir' || !!e.linkToDir,
+          size: e.size || 0,
+          src: posixJoin(j.src, e.name),
+          dst: posixJoin(j.dst, e.name),
+        }));
+      },
+      async (j, report) => {
+        await this._relayOneFile(gate, sa, sb, j.src, j.dst, j.size, report);
+      },
+      (j) => (j.src.startsWith(srcRoot) ? j.src.slice(srcRoot.length).replace(/^\/+/, '') : j.src),
+    );
   }
 
   pause(id) {
@@ -905,7 +1018,8 @@ class TransferManager {
     return true;
   }
 
-  // 续传/重试：reset=true 则从头来
+  // 续传/重试：reset=true 则从头来（不做远程删除——offset=0 时 'w' flag 会整文件覆盖，
+  // 先删后传反而会在重传失败时丢掉目标端已有文件）
   resume(id, reset = false) {
     const t = this.tasks.get(id);
     if (!t) return false;
@@ -914,14 +1028,6 @@ class TransferManager {
       t.transferred = 0;
       t._baseOffset = 0;
       this._cleanup(t);
-      // upload/relay 的远程残留由下次 'w' 覆盖；这里尽力删除
-      if (t.kind === 'upload' || t.kind === 'relay') {
-        const rid = t.kind === 'upload' ? t.serverId : t.peerId;
-        const remote = t.kind === 'upload' ? t.dstRemote : t.dstRemote;
-        this._conn(rid)
-          .then((c) => c.removeRemote(remote).catch(() => {}))
-          .catch(() => {});
-      }
     }
     t.status = 'queued';
     t.speed = 0;
@@ -955,6 +1061,28 @@ class TransferManager {
 function posixDir(p) {
   const i = p.lastIndexOf('/');
   return i >= 0 ? p.slice(0, i) : '.';
+}
+
+// 远程目标已有内容时返回可续传的字节偏移（目标不存在/更大/为 0 一律从头）
+async function remoteFileOffset(sftp, remotePath, size) {
+  try {
+    const rs = await new Promise((res, rej) => sftp.stat(remotePath, (e, r) => (e ? rej(e) : res(r))));
+    if (rs.size > 0 && rs.size < size) return rs.size;
+  } catch {
+    /* 远程不存在 → 全新 */
+  }
+  return 0;
+}
+
+// 本地 .scpart 半成品可续传的字节偏移
+async function partOffset(partPath, size) {
+  try {
+    const ps = await fsp.stat(partPath);
+    if (ps.size > 0 && ps.size < size) return ps.size;
+  } catch {
+    /* 无半成品 → 全新 */
+  }
+  return 0;
 }
 
 module.exports = { TransferManager, MAX_CONCURRENT_TASKS };

@@ -180,4 +180,33 @@ function defaultInfo() {
   return result;
 }
 
-module.exports = { readConfig, parseText, buildEntries, expandPath, defaultInfo, homeDir };
+// ~/.ssh/config 条目与现有服务器列表的比对（纯函数，便于单测）。
+// 第一依据是别名（导入时 name 取的就是 config 别名）；没有同名时按 host+port+user 三元组去重。
+function diffConfig(entries, servers) {
+  const added = [];
+  const changed = [];
+  for (const e of entries) {
+    const byName = (servers || []).find((s) => s.name === e.alias);
+    if (byName) {
+      const portChg = byName.port !== e.port;
+      const keyChg = !!e.keyPath && e.keyPath !== (byName.keyPath || '');
+      if (portChg || keyChg) {
+        changed.push({
+          targetId: byName.id,
+          alias: e.alias,
+          host: e.host,
+          fromPort: byName.port,
+          toPort: e.port,
+          keyPath: e.keyPath,
+          entry: e,
+        });
+      }
+      continue;
+    }
+    const exact = (servers || []).find((s) => s.host === e.host && s.port === e.port && s.username === e.user);
+    if (!exact) added.push(e);
+  }
+  return { added, changed };
+}
+
+module.exports = { readConfig, parseText, buildEntries, expandPath, defaultInfo, homeDir, diffConfig };

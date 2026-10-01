@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark" data-density="default">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Server Console</title>
+    <script>
+      // 首帧前应用持久化主题/密度，避免浅色用户启动时闪一帧深色。
+      // 内容变更时需同步更新 vite.config.ts 中 CSP 的 script-src hash。
+      try {
+        var t = localStorage.getItem('sc.theme.user');
+        var dark = t === 'dark' || ((t === null || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        var d = localStorage.getItem('sc.density.user');
+        document.documentElement.dataset.density = d === 'comfy' || d === 'default' ? d : 'compact';
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

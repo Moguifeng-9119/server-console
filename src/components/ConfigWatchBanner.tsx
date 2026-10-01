@@ -50,10 +50,12 @@ export function ConfigWatchBanner() {
       authType: 'key',
       ...(item.keyPath ? { keyPath: item.keyPath } : {}), // config 未写密钥则保留原密钥
     });
-    if (r) {
+    if (r?.ok) {
       pushToast({ level: 'info', title: `已更新 ${cfg.name} 的连接信息` });
       setChanged((prev) => prev.filter((x) => x.alias !== item.alias));
       refresh();
+    } else {
+      pushToast({ level: 'error', title: `更新 ${cfg.name} 失败`, detail: r?.error });
     }
   };
 

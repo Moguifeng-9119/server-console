@@ -2,11 +2,13 @@
 
 # 🖥️ ServerConsole
 
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
 ### One desktop to monitor your GPU fleet, browse files, and move data **between servers at full speed** — all over SSH, fully local.
 
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
-![electron](https://img.shields.io/badge/Electron-31-47848F?logo=electron&logoColor=white)
+![electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)
 ![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
@@ -57,9 +59,9 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 ### 🗂️ Dual-pane SFTP file manager
 - **Local ⇄ remote** side-by-side panes: address bar, up / home / refresh, mkdir, sort by name/size/time.
-- **Drag-and-drop upload**, batch upload/download, recursive folder transfer.
+- **Drag-and-drop upload**, batch upload/download, recursive folder transfer — folders are enqueued as a single task and transferred **while being walked** (no blocking pre-scan, even for huge trees).
 - Right-click menu: download, view as text, rename, delete, **compress to `.tar.gz`**, extract (tar/zip), send to another server.
-- Remote filename search in the current directory; double-click to descend.
+- Remote filename search in the current directory; double-click to descend; Ctrl-click to multi-select, **Shift-click for range selection**, `Ctrl/Cmd+A` select all, `Esc` clear.
 
 ### ⚡ Server-to-server direct transfer
 - A **visual dual-pane picker** for source and destination — no manual path typing.
@@ -91,7 +93,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 | Layer | Technology |
 | --- | --- |
-| Shell | **Electron 31** (CommonJS main process) |
+| Shell | **Electron 44** (CommonJS main process) |
 | Renderer | **React 18 + TypeScript (strict) + Vite 5**, hand-written CSS design tokens (no heavy UI kit) |
 | SSH / SFTP | [`ssh2`](https://github.com/mscdex/ssh2) — connections, SFTP, exec, keys |
 | Packaging | `electron-builder` — Windows portable/NSIS, macOS dmg, Linux AppImage |
@@ -185,9 +187,10 @@ npm run dist:linux     # Linux AppImage
 ---
 
 ## 🔐 Security & Privacy
+- **Host key verification (TOFU)**: the first connection records the server's host-key fingerprint; every later connection is verified against it and a mismatch is rejected with a clear warning. Direct server-to-server transfers carry the destination fingerprint into a temporary `known_hosts` on the source (`StrictHostKeyChecking=yes`). The trust store is manageable in *Settings → Security*.
 - Direct-transfer keys are **ephemeral and shredded after use**; the main private key is never copied or uploaded.
-- Relay is **copy-only** — source data is never deleted.
-- Destructive actions (kill process, delete files) require confirmation and are written to a local audit log.
+- Relay is **copy-only** — source data is never deleted; **retry resumes from the breakpoint** instead of deleting the destination.
+- Destructive actions (kill process, delete files) require confirmation and are appended to a **persistent local audit log** (`audit.log`, survives restarts).
 - Passwords are encrypted with the OS safe-storage; only the *path* of a private key is stored, never its contents.
 - Every metric and progress value comes from a real command response — **no fabricated temperature, speed or per-file progress**.
 
@@ -195,13 +198,20 @@ npm run dist:linux     # Linux AppImage
 
 ## 📁 Data storage
 All local data lives in the OS user-data directory (`%AppData%/server-console/` on Windows):
-`servers.json` (connections), `transfers.json` (trimmed history) and `error.log`.
+`servers.json` (connections), `transfers.json` (trimmed history), `hostkeys.json` (TOFU trust store), `security.json` (security options), `audit.log` (operations) and `error.log`.
 Delete that folder to wipe all local state.
 
 ---
 
 ## 🧪 Development
-Without a real GPU box, spin up the built-in **mock SSH server** — it returns fake `nvidia-smi` / `ps` output and listens on `127.0.0.1` only (any user/password):
+```bash
+npm run typecheck   # tsc strict (src) + checkJs (electron main process)
+npm test            # vitest unit tests
+npm run smoke       # e2e smoke: 2 mock sshd instances, real SFTP — collect/upload/download/relay/queue
+```
+CI runs all three before packaging.
+
+Without a real GPU box, spin up the built-in **mock SSH server** — it returns fake `nvidia-smi` / `ps` output and serves a real SFTP root, listening on `127.0.0.1` only (any user/password):
 ```bash
 npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
 ```

@@ -1,8 +1,8 @@
 {
   "name": "server-console",
   "private": true,
-  "version": "0.3.0",
-  "description": "本地服务器 GPU / 进程监控管理桌面软件（占位名，后续可全局替换）",
+  "version": "0.4.0",
+  "description": "Local-first desktop console for GPU servers: SSH monitoring, dual-pane SFTP file manager and high-speed server-to-server transfers",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -10,6 +10,10 @@
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.cjs",
+    "typecheck": "tsc -b && tsc -p tsconfig.electron.json",
     "dist:linux": "npm run build && electron-builder --linux AppImage",
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:win:lite": "npm run build && electron-builder --win --x64 -c.win.target=portable -c.win.signAndEditExecutable=false",
@@ -19,21 +23,24 @@
     "dist:mac": "npm run build && electron-builder --mac --universal"
   },
   "dependencies": {
+    "lucide-react": "^1.49.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "concurrently": "^9.2.4",
-    "electron": "^31.7.7",
+    "electron": "^44.5.1",
     "electron-builder": "^24.13.3",
     "png2icons": "^2.0.1",
     "sharp": "^0.35.4",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
+    "vitest": "^2.1.9",
     "wait-on": "^8.0.5"
   },
   "build": {

@@ -49,21 +49,21 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
               <span className="nm">{g.name}</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <div className="metric-line">
               <span className="num" style={{ fontSize: 'calc(var(--fs-kpi) - 6px)', color: colorOf(g.util) }}>
                 {g.util}%
               </span>
-              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>利用率</span>
+              <span className="note">利用率</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
               <i style={{ width: `${g.util}%`, background: colorOf(g.util) }} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 10 }}>
+            <div className="metric-line" style={{ marginTop: 10 }}>
               <span className="num" style={{ fontSize: 15, color: colorOf(memPct) }}>
                 {(g.memUsed / 1024).toFixed(1)} / {(g.memTotal / 1024).toFixed(0)} GiB
               </span>
-              <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>显存 {memPct.toFixed(0)}%</span>
+              <span className="note">显存 {memPct.toFixed(0)}%</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
               <i style={{ width: `${memPct}%`, background: colorOf(memPct) }} />
@@ -82,7 +82,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
             </div>
 
             <div className="gpu-procs">
-              {g.procs.length === 0 && <span style={{ color: 'var(--text-faint)' }}>无进程占用</span>}
+              {g.procs.length === 0 && <span className="faint">无进程占用</span>}
               {g.procs.map((p) => (
                 <div
                   key={p.pid}
@@ -90,7 +90,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
                     e.preventDefault();
                     onMenu(p.pid, e.clientX, e.clientY);
                   }}
-                  style={{ display: 'flex', gap: 8, cursor: 'context-menu' }}
+                  className="gpu-proc-line"
                 >
                   <span className="mono" style={{ color: 'var(--text)' }}>
                     {p.pid}
@@ -168,11 +168,11 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
             </option>
           ))}
         </select>
-        <label style={{ color: 'var(--text-dim)', display: 'flex', gap: 5, alignItems: 'center' }}>
+        <label className="dim" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           <input type="checkbox" checked={onlyGpu} onChange={(e) => setOnlyGpu(e.target.checked)} />
           只看 GPU 进程
         </label>
-        <span style={{ color: 'var(--text-faint)' }}>
+        <span className="faint">
           {rows.length} / {s.processes.length} 条
         </span>
       </div>
@@ -221,13 +221,31 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
   );
 }
 
-export function ServerPanel({ s, onBack, initialTab }: { s: Server; onBack: () => void; initialTab?: 'gpu' | 'proc' | 'files' }) {
+export function ServerPanel({
+  s,
+  onBack,
+  tab,
+  onTab,
+}: {
+  s: Server;
+  onBack: () => void;
+  tab: 'gpu' | 'proc' | 'files';
+  onTab: (t: 'gpu' | 'proc' | 'files') => void;
+}) {
   const { kill, restartService } = useStore();
-  const [tab, setTab] = useState<'gpu' | 'proc' | 'files'>(initialTab ?? 'gpu');
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
+  const [restartAsk, setRestartAsk] = useState(false);
+  const [svcName, setSvcName] = useState('docker');
 
   const target = confirm ? s.processes.find((p) => p.pid === confirm.pid) : undefined;
+
+  const doRestart = () => {
+    const name = svcName.trim();
+    if (!name) return;
+    restartService(s.id, name);
+    setRestartAsk(false);
+  };
 
   return (
     <>
@@ -236,7 +254,7 @@ export function ServerPanel({ s, onBack, initialTab }: { s: Server; onBack: () =
           ← 总览
         </button>
         <span style={{ fontWeight: 600, fontSize: 'calc(var(--fs) + 2px)' }}>{s.name}</span>
-        <span className="mono" style={{ color: 'var(--text-faint)' }}>
+        <span className="mono faint">
           {s.host}
         </span>
       </div>
@@ -249,16 +267,16 @@ export function ServerPanel({ s, onBack, initialTab }: { s: Server; onBack: () =
         <>
           <KpiStrip s={s} />
           <div className="tabs">
-            <button className={tab === 'gpu' ? 'on' : ''} onClick={() => setTab('gpu')}>
+            <button className={tab === 'gpu' ? 'on' : ''} onClick={() => onTab('gpu')}>
               GPU（{s.gpus.length}）
             </button>
-            <button className={tab === 'proc' ? 'on' : ''} onClick={() => setTab('proc')}>
+            <button className={tab === 'proc' ? 'on' : ''} onClick={() => onTab('proc')}>
               进程（{s.processes.length}）
             </button>
-            <button className={tab === 'files' ? 'on' : ''} onClick={() => setTab('files')}>
+            <button className={tab === 'files' ? 'on' : ''} onClick={() => onTab('files')}>
               文件
             </button>
-            <span style={{ marginLeft: 'auto', alignSelf: 'center', color: 'var(--text-faint)', fontSize: 11 }}>
+            <span className="note" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
               {tab === 'files' ? '双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传' : '右键任意进程行可执行操作'}
             </span>
           </div>
@@ -313,11 +331,12 @@ export function ServerPanel({ s, onBack, initialTab }: { s: Server; onBack: () =
           <div className="sep" />
           <button
             onClick={() => {
-              restartService(s.id, 'docker');
+              setSvcName('docker');
+              setRestartAsk(true);
               setMenu(null);
             }}
           >
-            重启 docker 服务
+            重启服务…
           </button>
         </ContextMenu>
       )}
@@ -349,6 +368,36 @@ export function ServerPanel({ s, onBack, initialTab }: { s: Server; onBack: () =
                 }}
               >
                 确认执行
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restartAsk && (
+        <div className="mask" onClick={() => setRestartAsk(false)}>
+          <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3>重启 systemd 服务</h3>
+            <div className="field">
+              <label>服务名</label>
+              <input
+                className="mini"
+                style={{ width: '100%' }}
+                autoFocus
+                value={svcName}
+                onChange={(e) => setSvcName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && doRestart()}
+              />
+            </div>
+            <div className="body dim">
+              将在 <code>{s.name}</code> 上执行：<code>systemctl restart {svcName.trim() || '…'}</code>
+            </div>
+            <div className="foot">
+              <button className="btn" onClick={() => setRestartAsk(false)}>
+                取消
+              </button>
+              <button className="btn primary" disabled={!svcName.trim()} onClick={doRestart}>
+                确认重启
               </button>
             </div>
           </div>

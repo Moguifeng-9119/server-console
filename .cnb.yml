@@ -14,6 +14,20 @@
 
 main:
   push:
+    # 验证：类型检查 + 单测 + e2e 冒烟（打包前必须全绿）
+    - name: verify
+      docker:
+        image: node:20
+      stages:
+        - name: 安装依赖
+          script: npm ci
+        - name: 类型检查
+          script: npm run typecheck
+        - name: 单元测试
+          script: npm test
+        - name: 冒烟测试
+          script: npm run smoke
+
     # Windows 包：托管 Linux 构建机 + wine 容器交叉编译，出 portable exe + NSIS 安装版
     - name: windows-exe
       docker:
@@ -61,6 +75,8 @@ $:
       stages:
         - name: 安装依赖
           script: npm ci
+        - name: 类型检查与测试
+          script: npm run typecheck && npm test && npm run smoke
         - name: 打包 Linux
           script: npm run dist:linux
         - name: 打包 Windows

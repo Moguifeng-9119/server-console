@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
 import { useTransfers } from '../transfers';
@@ -34,6 +35,18 @@ export function FileManager({ serverId }: { serverId: string }) {
 
   const [ask, setAsk] = useState<{ title: string; label: string; value: string; onOk: (v: string) => void } | null>(null);
   const [askValue, setAskValue] = useState('');
+  const openAsk = (a: { title: string; label: string; value: string; onOk: (v: string) => void }) => {
+    setAskValue(a.value); // 受控初值；避免 value={askValue || a.value} 导致清空输入时弹回原值
+    setAsk(a);
+  };
+  const submitAsk = () => {
+    if (!ask) return;
+    const v = askValue.trim();
+    if (!v) return;
+    ask.onOk(v);
+    setAsk(null);
+    setAskValue('');
+  };
   const [confirm, setConfirm] = useState<{ title: string; body: string; onOk: () => void } | null>(null);
 
   const [searchKw, setSearchKw] = useState('');
@@ -85,14 +98,69 @@ export function FileManager({ serverId }: { serverId: string }) {
   };
 
   // ---------- 选中 ----------
-  const toggleSelect = (side: 'local' | 'remote', key: string, additive: boolean) => {
+  // 单击=单选、Ctrl/Cmd=加减选、Shift=从锚点范围选；Esc 清空、Ctrl+A 全选（见下方全局键盘）
+  const [anchor, setAnchor] = useState<{ local: string | null; remote: string | null }>({ local: null, remote: null });
+  const [lastPane, setLastPane] = useState<'local' | 'remote'>('remote');
+
+  const keyOfSide = (side: 'local' | 'remote', e: FileEntry) => (side === 'local' ? e.path || e.name : e.name);
+
+  const toggleSelect = (side: 'local' | 'remote', key: string, ev: Pick<React.MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>) => {
     const set = side === 'local' ? setLocal : setRemote;
+    setLastPane(side);
+    const sorted = side === 'local' ? sortedLocal : sortedRemote;
+    if (ev.shiftKey && anchor[side]) {
+      const keys = sorted.map((e) => keyOfSide(side, e));
+      const i1 = keys.indexOf(anchor[side] as string);
+      const i2 = keys.indexOf(key);
+      if (i1 >= 0 && i2 >= 0) {
+        const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1];
+        set((p) => {
+          const next = { ...p.selected };
+          for (let i = lo; i <= hi; i++) next[keys[i]] = true;
+          return { ...p, selected: next };
+        });
+        return;
+      }
+    }
+    if (!ev.ctrlKey && !ev.metaKey) {
+      set((p) => ({ ...p, selected: { [key]: true } }));
+      setAnchor((a) => ({ ...a, [side]: key }));
+      return;
+    }
     set((p) => {
-      const next = additive ? { ...p.selected } : {};
-      next[key] = additive ? !p.selected[key] : true;
+      const next = { ...p.selected };
+      if (next[key]) delete next[key];
+      else next[key] = true;
       return { ...p, selected: next };
     });
+    setAnchor((a) => ({ ...a, [side]: key }));
   };
+
+  const selectAll = (side: 'local' | 'remote') => {
+    const set = side === 'local' ? setLocal : setRemote;
+    const sorted = side === 'local' ? sortedLocal : sortedRemote;
+    set((p) => ({ ...p, selected: Object.fromEntries(sorted.map((e) => [keyOfSide(side, e), true])) }));
+  };
+  const clearSelection = (side: 'local' | 'remote') => {
+    (side === 'local' ? setLocal : setRemote)((p) => ({ ...p, selected: {} }));
+  };
+
+  // Ctrl+A 全选 / Esc 清空（输入框聚焦或弹窗打开时不劫持）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (results || ask || confirm || viewer || relay || menu) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        selectAll(lastPane);
+      } else if (e.key === 'Escape') {
+        clearSelection(lastPane);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const remoteFull = (e: FileEntry) => joinPosix(remote.cwd, e.name);
   // 注意：远程选中态的 key 与 FilePane 的 keyOf 保持一致，都用文件名 e.name
@@ -135,7 +203,7 @@ export function FileManager({ serverId }: { serverId: string }) {
 
   // ---------- 远程整理 ----------
   const remoteMkdir = () =>
-    setAsk({
+    openAsk({
       title: '新建远程文件夹', label: '名称', value: '',
       onOk: async (v) => {
         const r = await api?.sftpMkdir(serverId, joinPosix(remote.cwd, v));
@@ -143,7 +211,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       },
     });
   const remoteRename = (e: FileEntry) =>
-    setAsk({
+    openAsk({
       title: '重命名', label: '新名称', value: e.name,
       onOk: async (v) => {
         const r = await api?.sftpRename(serverId, remoteFull(e), joinPosix(remote.cwd, v));
@@ -155,12 +223,18 @@ export function FileManager({ serverId }: { serverId: string }) {
       title: `确认删除 ${sel.length} 项？`,
       body: sel.map((s) => s.name).join('、') + '\n服务器上删除不可恢复。',
       onOk: async () => {
-        for (const s of sel) await api?.sftpDelete(serverId, s.path || remoteFull(s));
+        const fails: string[] = [];
+        for (const s of sel) {
+          const r = await api?.sftpDelete(serverId, s.path || remoteFull(s));
+          if (r && !r.ok) fails.push(`${s.name}${r.error ? '：' + r.error : ''}`);
+        }
         loadRemote();
+        if (fails.length)
+          pushToast({ level: 'error', title: `删除失败 ${fails.length} 项`, detail: fails.slice(0, 3).join('\n') });
       },
     });
   const remoteArchive = (sel: FileEntry[]) =>
-    setAsk({
+    openAsk({
       title: '压缩为 tar.gz', label: '压缩包名', value: 'archive.tar.gz',
       onOk: async (v) => {
         const name = v.endsWith('.tar.gz') ? v : v + '.tar.gz';
@@ -179,7 +253,7 @@ export function FileManager({ serverId }: { serverId: string }) {
 
   // ---------- 本地整理 ----------
   const localMkdir = () =>
-    setAsk({
+    openAsk({
       title: '新建本地文件夹', label: '名称', value: '',
       onOk: async (v) => {
         const r = await api?.localMkdir(joinLocal(local.cwd, v));
@@ -190,8 +264,15 @@ export function FileManager({ serverId }: { serverId: string }) {
     setConfirm({
       title: `本地删除 ${sel.length} 项？`, body: sel.map((s) => s.name).join('、'),
       onOk: async () => {
-        for (const s of sel) if (s.path) await api?.localDelete(s.path);
+        const fails: string[] = [];
+        for (const s of sel) {
+          if (!s.path) continue;
+          const r = await api?.localDelete(s.path);
+          if (r && !r.ok) fails.push(`${s.name}${r.error ? '：' + r.error : ''}`);
+        }
         loadLocal();
+        if (fails.length)
+          pushToast({ level: 'error', title: `删除失败 ${fails.length} 项`, detail: fails.slice(0, 3).join('\n') });
       },
     });
 
@@ -209,12 +290,12 @@ export function FileManager({ serverId }: { serverId: string }) {
     else pushToast({ level: 'error', title: '搜索失败', detail: r.error });
   };
 
-  // 拖拽上传（Electron 31 的 File 带 path）
+  // 拖拽上传（Electron 32+ 经 webUtils.getPathForFile 取本地路径）
   const onDrop = (ev: React.DragEvent<HTMLDivElement>) => {
     ev.preventDefault();
     setDragOver(false);
     const paths = Array.from(ev.dataTransfer.files)
-      .map((f) => (f as File & { path?: string }).path || '')
+      .map((f) => (api?.pathForFile ? api.pathForFile(f) : (f as File & { path?: string }).path) || '')
       .filter(Boolean);
     if (paths.length) doUpload(paths);
   };
@@ -276,7 +357,7 @@ export function FileManager({ serverId }: { serverId: string }) {
             setRelay({ sel });
           }}
         >
-          服务器互传 ⇄
+          服务器互传 <ArrowLeftRight size={13} style={{ verticalAlign: '-2px' }} />
         </button>
       </div>
 
@@ -311,17 +392,17 @@ export function FileManager({ serverId }: { serverId: string }) {
             onReload={() => loadLocal()}
             onAddress={(v) => loadLocal(v)}
             onOpen={(e) => openEntry('local', e)}
-            onToggle={(k, add) => toggleSelect('local', k, add)}
+            onToggle={(k, ev) => toggleSelect('local', k, ev)}
             onMenu={(x, y, e) => setMenu({ x, y, side: 'local', entry: e })}
             onMkdir={localMkdir}
           />
 
           <div className="fm-arrows">
             <button className="btn primary" title="把左侧选中的本地文件上传到远程当前目录" onClick={() => doUpload(selectedLocal().map((e) => e.path || ''))}>
-              上传 →
+              上传 <ArrowRight size={13} />
             </button>
             <button className="btn primary" title="把右侧选中的远程文件下载到本地当前目录" onClick={() => doDownload(selectedRemote())}>
-              ← 下载
+              <ArrowLeft size={13} /> 下载
             </button>
           </div>
 
@@ -349,7 +430,7 @@ export function FileManager({ serverId }: { serverId: string }) {
               onReload={() => loadRemote()}
               onAddress={(v) => loadRemote(v)}
               onOpen={(e) => openEntry('remote', e)}
-              onToggle={(k, add) => toggleSelect('remote', k, add)}
+              onToggle={(k, ev) => toggleSelect('remote', k, ev)}
               onMenu={(x, y, e) => setMenu({ x, y, side: 'remote', entry: e })}
               onMkdir={remoteMkdir}
               remote
@@ -412,32 +493,13 @@ export function FileManager({ serverId }: { serverId: string }) {
                 className="mini"
                 style={{ width: '100%' }}
                 autoFocus
-                value={askValue || ask.value}
+                value={askValue}
                 onChange={(e) => setAskValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const v = (askValue || ask.value).trim();
-                    if (v) {
-                      ask.onOk(v);
-                      setAsk(null);
-                      setAskValue('');
-                    }
-                  }
-                }}
+                onKeyDown={(e) => e.key === 'Enter' && submitAsk()}
               />
             </div>
             <div className="foot">
-              <button
-                className="btn primary"
-                onClick={() => {
-                  const v = (askValue || ask.value).trim();
-                  if (v) {
-                    ask.onOk(v);
-                    setAsk(null);
-                    setAskValue('');
-                  }
-                }}
-              >
+              <button className="btn primary" onClick={submitAsk}>
                 确定
               </button>
               <button className="btn" onClick={() => setAsk(null)}>
@@ -495,7 +557,7 @@ function FilePane({
   onReload: () => void;
   onAddress: (v: string) => void;
   onOpen: (e: FileEntry) => void;
-  onToggle: (key: string, additive: boolean) => void;
+  onToggle: (key: string, ev: Pick<React.MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>) => void;
   onMenu: (x: number, y: number, e: FileEntry) => void;
   onMkdir: () => void;
   remote?: boolean;
@@ -516,16 +578,16 @@ function FilePane({
       <div className="fm-pane-head">
         <span className="fm-pane-title">{title}</span>
         <button className="btn mini" onClick={onHome} title="家目录">
-          ⌂
+          <Home size={13} />
         </button>
         <button className="btn mini" onClick={onUp} title="上一级">
-          ↑
+          <ArrowUp size={13} />
         </button>
         <button className="btn mini" onClick={onReload} title="刷新">
-          ⟳
+          <RefreshCw size={13} />
         </button>
         <button className="btn mini" onClick={onMkdir} title="新建文件夹">
-          ＋
+          <FolderPlus size={13} />
         </button>
       </div>
       <div className="fm-address">
@@ -557,16 +619,18 @@ function FilePane({
                   <tr
                     key={key}
                     className={sel ? 'sel' : ''}
-                    onClick={(ev) => onToggle(key, ev.ctrlKey || ev.metaKey)}
+                    onClick={(ev) => onToggle(key, ev)}
                     onDoubleClick={() => onOpen(e)}
                     onContextMenu={(ev) => {
                       ev.preventDefault();
-                      if (!sel) onToggle(key, false);
+                      if (!sel) onToggle(key, { ctrlKey: false, metaKey: false, shiftKey: false });
                       onMenu(ev.clientX, ev.clientY, e);
                     }}
                   >
                     <td>
-                      <span className={`fm-ic ${isDirLike(e) ? 'dir' : 'file'}`}>{isDirLike(e) ? '📁' : '📄'}</span>
+                      <span className={`fm-ic ${isDirLike(e) ? 'dir' : 'file'}`}>
+                        {isDirLike(e) ? <Folder size={14} strokeWidth={1.8} /> : <FileIcon size={14} strokeWidth={1.8} />}
+                      </span>
                       <span title={e.name}>{e.name}</span>
                     </td>
                     <td className="num">{isDirLike(e) ? '—' : formatBytes(e.size)}</td>

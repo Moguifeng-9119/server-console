@@ -20,6 +20,27 @@ export interface Thresholds {
   crit: number;
 }
 
+// localStorage 读取兜底：坏值/缺失一律回退默认（设置只在用户改动时写入，读到的一定是自己存的）
+function loadPref<T>(key: string, fallback: T, isValid: (v: unknown) => boolean): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const v = JSON.parse(raw);
+    return isValid(v) ? (v as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+const isThresholds = (v: unknown): boolean => {
+  const t = v as Thresholds;
+  return (
+    !!t &&
+    [t.warn, t.high, t.crit].every((n) => Number.isFinite(n) && n > 0 && n < 100) &&
+    t.warn < t.high &&
+    t.high < t.crit
+  );
+};
+
 type NewServer = Partial<ServerConfig> & { password?: string; passphrase?: string };
 
 export interface AddResult {
@@ -48,6 +69,8 @@ interface Store {
   setRefreshMs: (n: number) => void;
   alertsEnabled: boolean;
   setAlertsEnabled: (b: boolean) => void;
+  tempAlert: number;
+  setTempAlert: (n: number) => void;
   toasts: Toast[];
   pushToast: (t: Omit<Toast, 'id'>) => void;
   audit: AuditEntry[];
@@ -76,9 +99,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const v = localStorage.getItem('sc.density.user');
     return v === 'compact' || v === 'comfy' || v === 'default' ? v : 'compact';
   });
-  const [thresholds, setThresholds] = useState<Thresholds>({ warn: 50, high: 75, crit: 90 });
-  const [refreshMs, setRefreshMs] = useState(2000);
-  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const [thresholds, setThresholdsState] = useState<Thresholds>(() =>
+    loadPref('sc.thresholds', { warn: 50, high: 75, crit: 90 }, isThresholds),
+  );
+  const [refreshMs, setRefreshMsState] = useState<number>(() =>
+    loadPref('sc.refreshMs', 2000, (v) => [1000, 2000, 5000, 10000].includes(Number(v))),
+  );
+  const [alertsEnabled, setAlertsEnabledState] = useState<boolean>(() =>
+    loadPref('sc.alertsEnabled', true, (v) => typeof v === 'boolean'),
+  );
+  const [tempAlert, setTempAlertState] = useState<number>(() =>
+    loadPref('sc.tempAlert', 85, (v) => Number.isFinite(v) && Number(v) >= 40 && Number(v) <= 120),
+  );
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const seq = useRef(1);
@@ -110,6 +142,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('sc.density.user', d);
   }, []);
 
+  // 设置持久化：与主题/密度同策略，只信自己写入的值
+  const setThresholds = useCallback((t: Thresholds) => {
+    setThresholdsState(t);
+    localStorage.setItem('sc.thresholds', JSON.stringify(t));
+  }, []);
+  const setRefreshMs = useCallback((n: number) => {
+    setRefreshMsState(n);
+    localStorage.setItem('sc.refreshMs', JSON.stringify(n));
+  }, []);
+  const setAlertsEnabled = useCallback((b: boolean) => {
+    setAlertsEnabledState(b);
+    localStorage.setItem('sc.alertsEnabled', JSON.stringify(b));
+  }, []);
+  const setTempAlert = useCallback((n: number) => {
+    setTempAlertState(n);
+    localStorage.setItem('sc.tempAlert', JSON.stringify(n));
+  }, []);
+
   const pushToast = useCallback((t: Omit<Toast, 'id'>) => {
     const id = seq.current++;
     setToasts((prev) => [...prev.slice(-3), { ...t, id }]);
@@ -121,14 +171,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setConfigs(await api.listServers());
   }, []);
 
-  // 首次加载：有真实服务器配置就切到实数据，否则停在演示数据
+  // 首次加载：有真实服务器配置就切到实数据，否则停在演示数据；同时回读上次会话的审计日志
   useEffect(() => {
     if (!api) return;
     api.listServers().then((list) => {
       setConfigs(list);
       if (list.length) setDemo(false);
     });
+    api.auditList().then((list) => {
+      if (list.length) setAudit(list.map((e, i) => ({ ...e, id: -(i + 1) }))); // 负数 id 与本次会话的内存 id 区分
+    });
   }, []);
+
+  // 审计：写内存视图 + 落盘（userData/audit.log，重启不丢）
+  const logAudit = useCallback(
+    (entry: { server: string; action: string; target: string; result: 'ok' | 'failed' }) => {
+      const full: AuditEntry = { ...entry, id: seq.current++, time: nowTime() };
+      setAudit((prev) => [full, ...prev].slice(0, 50));
+      api?.auditAppend({ time: full.time, server: entry.server, action: entry.action, target: entry.target, result: entry.result });
+    },
+    [],
+  );
 
   // 订阅主进程采集结果
   useEffect(() => {
@@ -221,7 +284,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const keys = new Set<string>();
     for (const s of servers) {
       if (s.status !== 'online') continue;
-      if (s.gpus.some((g) => (g.temp ?? 0) >= 85)) keys.add(`temp:${s.id}`);
+      if (s.gpus.some((g) => (g.temp ?? 0) >= tempAlert)) keys.add(`temp:${s.id}`);
       if (s.gpus.some((g) => (g.memUsed / (g.memTotal || 1)) * 100 >= thresholds.crit)) keys.add(`vram:${s.id}`);
       if (s.processes.some((p) => p.state === 'Z')) keys.add(`zombie:${s.id}`);
     }
@@ -239,7 +302,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       api?.notify(label[type], `${s.name} · ${nowTime()}`);
     }
     knownAlerts.current = keys;
-  }, [servers, alertsEnabled, thresholds.crit, pushToast]);
+  }, [servers, alertsEnabled, thresholds.crit, tempAlert, pushToast]);
 
   const addServer = useCallback(async (cfg: NewServer): Promise<AddResult> => {
     if (!api) return { ok: false, error: '当前不在桌面端（无 Electron 主进程）' };
@@ -275,17 +338,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         api.kill(serverId, pid, signal).then((res) => {
           if (!res.ok) {
             pushToast({ level: 'error', title: `结束进程 ${pid} 失败`, detail: res.error });
-            setAudit((prev) => [
-              { id: seq.current++, time: nowTime(), server: s?.name ?? serverId, action, target: String(pid), result: 'failed' as const },
-              ...prev,
-            ].slice(0, 50));
+            logAudit({ server: s?.name ?? serverId, action, target: String(pid), result: 'failed' });
             return;
           }
           pushToast({ level: 'info', title: `已发送 SIG${signal} → ${pid}`, detail: s?.name ?? '' });
-          setAudit((prev) => [
-            { id: seq.current++, time: nowTime(), server: s?.name ?? serverId, action, target: `${pid} ${target?.command.slice(0, 40) ?? ''}`, result: 'ok' as const },
-            ...prev,
-          ].slice(0, 50));
+          logAudit({
+            server: s?.name ?? serverId,
+            action,
+            target: `${pid} ${target?.command.slice(0, 40) ?? ''}`,
+            result: 'ok',
+          });
         });
         return;
       }
@@ -300,17 +362,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ].slice(0, 50));
       pushToast({ level: 'info', title: `已发送 SIG${signal} → ${pid}`, detail: `${s.name} · ${target.user}` });
     },
-    [servers, demo, pushToast],
+    [servers, demo, pushToast, logAudit],
   );
 
   const restartService = useCallback(
     (serverId: string, service: string) => {
       const s = servers.find((x) => x.id === serverId);
       const log = (result: 'ok' | 'failed', detail?: string) => {
-        setAudit((prev) => [
-          { id: seq.current++, time: nowTime(), server: s?.name ?? serverId, action: 'systemctl restart', target: service, result },
-          ...prev,
-        ].slice(0, 50));
+        logAudit({ server: s?.name ?? serverId, action: 'systemctl restart', target: service, result });
         if (result === 'ok') pushToast({ level: 'info', title: `正在重启 ${service}`, detail: s?.name });
         else pushToast({ level: 'error', title: `重启 ${service} 失败`, detail });
       };
@@ -321,7 +380,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!s) return;
       log('ok');
     },
-    [servers, demo, pushToast],
+    [servers, demo, pushToast, logAudit],
   );
 
   const colorOf = useCallback(
@@ -355,6 +414,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRefreshMs,
       alertsEnabled,
       setAlertsEnabled,
+      tempAlert,
+      setTempAlert,
       toasts,
       pushToast,
       audit,
@@ -375,8 +436,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       density,
       selectDensity,
       thresholds,
+      setThresholds,
       refreshMs,
+      setRefreshMs,
       alertsEnabled,
+      setAlertsEnabled,
+      tempAlert,
+      setTempAlert,
       toasts,
       pushToast,
       audit,

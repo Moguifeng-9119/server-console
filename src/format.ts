@@ -1,7 +1,7 @@
 import type { TransferItem } from './types';
 
 export function formatBytes(n: number | undefined | null, fractionDigits = 1): string {
-  const v = Number(n) || 0;
+  const v = Math.max(0, Number(n) || 0);
   if (v < 1024) return `${v} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
   let x = v;

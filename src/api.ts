@@ -1,4 +1,5 @@
 import type {
+  AuditEntry,
   ConfigChange,
   DirListing,
   FileEntry,
@@ -8,15 +9,23 @@ import type {
   SshConfigInfo,
   SshHostEntry,
   TransferItem,
+  TrustedHost,
 } from './types';
 
 interface Api {
   platform: string;
+  pathForFile: (file: File) => string;
   notify: (title: string, body: string) => Promise<void>;
   storeInfo: () => Promise<{ encryptionAvailable: boolean }>;
+  auditList: () => Promise<AuditEntry[]>;
+  auditAppend: (entry: { time: string; server: string; action: string; target: string; result: 'ok' | 'failed' }) => Promise<boolean>;
+  hostKeysList: () => Promise<TrustedHost[]>;
+  hostKeysRemove: (keyId: string) => Promise<boolean>;
+  securityGet: () => Promise<{ tofu: boolean }>;
+  securitySet: (o: { tofu?: boolean }) => Promise<{ tofu: boolean }>;
   listServers: () => Promise<ServerConfig[]>;
   addServer: (cfg: Partial<ServerConfig> & { password?: string; passphrase?: string }) => Promise<{ ok: boolean; server?: ServerConfig; error?: string }>;
-  updateServer: (cfg: Partial<ServerConfig> & { id: string; password?: string }) => Promise<ServerConfig | null>;
+  updateServer: (cfg: Partial<ServerConfig> & { id: string; password?: string; passphrase?: string }) => Promise<{ ok: boolean; server?: ServerConfig; error?: string }>;
   removeServer: (id: string) => Promise<boolean>;
   testServer: (cfg: Partial<ServerConfig> & { password?: string; passphrase?: string }) => Promise<{ ok: boolean; error?: string; gpus?: number; processes?: number }>;
   setInterval: (ms: number) => Promise<number>;
@@ -45,7 +54,6 @@ interface Api {
   localMkdir: (p: string) => Promise<IpcResult<string>>;
   localRename: (from: string, to: string) => Promise<IpcResult<boolean>>;
   localDelete: (p: string) => Promise<IpcResult<boolean>>;
-  localWalk: (p: string) => Promise<IpcResult<{ root: string; files: Array<{ abs: string; rel: string; size: number }>; totalSize: number; totalFiles: number }>>;
 
   // 远程 SFTP
   sftpList: (id: string, p?: string) => Promise<IpcResult<DirListing>>;

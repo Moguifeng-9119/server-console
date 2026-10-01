@@ -1,4 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useTransfers } from '../transfers';
 import { formatBytes, formatDuration, formatSpeed, etaSeconds, pctOf } from '../format';
 import type { TransferItem, TransferKind, TransferStatus } from '../types';
@@ -12,10 +24,10 @@ const STATUS_TEXT: Record<TransferStatus, string> = {
   canceled: '已取消',
 };
 
-const KIND_META: Record<TransferKind, { icon: string; label: string; cls: string }> = {
-  upload: { icon: '↑', label: '上传', cls: 'up' },
-  download: { icon: '↓', label: '下载', cls: 'down' },
-  relay: { icon: '⇄', label: '互传', cls: 'relay' },
+const KIND_META: Record<TransferKind, { icon: LucideIcon; label: string; cls: string }> = {
+  upload: { icon: ArrowUp, label: '上传', cls: 'up' },
+  download: { icon: ArrowDown, label: '下载', cls: 'down' },
+  relay: { icon: ArrowLeftRight, label: '互传', cls: 'relay' },
 };
 
 // 瞬时速度曲线（按自身最大值自适应，不做百分比裁剪）
@@ -89,9 +101,9 @@ function TaskRow({ t, tf, picked, togglePick }: {
           onChange={() => togglePick(t.id)}
           title="选择以批量取消"
         />
-        <span className={`td-kind ${km.cls}`}>{km.icon}</span>
+        <span className={`td-kind ${km.cls}`}><km.icon size={13} strokeWidth={2.2} /></span>
         <button className="td-expand" onClick={() => setOpen((v) => !v)} title={open ? '收起' : '展开详情'}>
-          {open ? '▾' : '▸'}
+          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
         <span className="td-name mono" title={t.name}>
           {t.name}
@@ -112,8 +124,8 @@ function TaskRow({ t, tf, picked, togglePick }: {
         <span className="td-row-actions">
           {t.status === 'queued' && (
             <>
-              <button className="btn mini" onClick={() => tf.move(t.id, 'up')} title="提前">↑</button>
-              <button className="btn mini" onClick={() => tf.move(t.id, 'down')} title="置后">↓</button>
+              <button className="btn mini" onClick={() => tf.move(t.id, 'up')} title="提前"><ArrowUp size={12} /></button>
+              <button className="btn mini" onClick={() => tf.move(t.id, 'down')} title="置后"><ArrowDown size={12} /></button>
             </>
           )}
           {t.status === 'running' && <button className="btn mini" onClick={() => tf.pause(t.id)}>暂停</button>}
@@ -171,7 +183,7 @@ function TaskRow({ t, tf, picked, togglePick }: {
               {files.length === 0 && <div className="td-files-empty">暂无逐文件记录（rsync 直传与本机中继会实时回传，scp 兜底模式仅显示字节进度）</div>}
               {files.map((f, i) => (
                 <div key={`${f.at}-${i}`} className="td-file-line mono" title={f.name}>
-                  <span className="td-file-ok">✓</span>{f.name}
+                  <span className="td-file-ok"><Check size={12} strokeWidth={2.4} /></span>{f.name}
                 </div>
               ))}
             </div>
@@ -259,13 +271,13 @@ export function TransferDrawer() {
             {tf.runningCount > 0 && <span className="td-live"><i className="td-live-dot" />{tf.runningCount} 个传输中 · 总进度 {overall}%</span>}
           </div>
           <div className="td-head-speed num">
-            <span className="up">↑ {formatSpeed(upSpeed) || '0 B/s'}</span>
-            <span className="down">↓ {formatSpeed(downSpeed) || '0 B/s'}</span>
-            <span className="relay">⇄ {formatSpeed(relaySpeed) || '0 B/s'}</span>
+            <span className="up"><ArrowUp size={12} strokeWidth={2.2} /> {formatSpeed(upSpeed) || '0 B/s'}</span>
+            <span className="down"><ArrowDown size={12} strokeWidth={2.2} /> {formatSpeed(downSpeed) || '0 B/s'}</span>
+            <span className="relay"><ArrowLeftRight size={12} strokeWidth={2.2} /> {formatSpeed(relaySpeed) || '0 B/s'}</span>
           </div>
           <div className="td-head-btns">
-            <button className="btn icon-btn" title={full ? '还原' : '全屏'} onClick={() => setFull((v) => !v)}>{full ? '🗗' : '⛶'}</button>
-            <button className="btn icon-btn" title="关闭" onClick={() => setOpen(false)}>✕</button>
+            <button className="btn icon-btn" title={full ? '还原' : '全屏'} onClick={() => setFull((v) => !v)}>{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
+            <button className="btn icon-btn" title="关闭" onClick={() => setOpen(false)}><X size={13} /></button>
           </div>
         </header>
 

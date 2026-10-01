@@ -17,3 +17,4 @@ _stage*
 _cdp_*
 .env
 .env.*
+.zcode/

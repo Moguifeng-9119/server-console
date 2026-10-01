@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ArrowUpDown } from 'lucide-react';
 import { useStore, type Density, type ThemeMode } from './state';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
@@ -9,22 +10,32 @@ import { ConfigWatchBanner } from './components/ConfigWatchBanner';
 import { TransferDrawer } from './components/TransferDrawer';
 import { useTransfers } from './transfers';
 
+type ServerTab = 'gpu' | 'proc' | 'files';
+
 export default function App() {
   const { servers, theme, setTheme, density, setDensity, toasts, demo, configs } = useStore();
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
-  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'server'; id: string; tab?: 'gpu' | 'proc' | 'files' }>({ kind: 'overview' });
+  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab }>({ kind: 'overview' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
 
+  // 打开服务器：同一台保留当前 tab，换台回到 GPU；tab 状态提升到这里，避免切 tab 重挂载丢文件面板状态
+  const openServer = (id: string, tab?: ServerTab) =>
+    setView((v) => ({
+      kind: 'server',
+      id,
+      tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
+    }));
+
   return (
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          Server Console <small>v0.3.0</small>
+          Server Console <small>v0.4.0</small>
         </div>
         <nav className="nav">
           <button
@@ -34,7 +45,7 @@ export default function App() {
             <span>总览</span>
             <span className="sub">{servers.filter((s) => s.status === 'online').length}/{servers.length}</span>
           </button>
-          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: '10px 10px 4px' }}>服务器</div>
+          <div className="note" style={{ padding: '10px 10px 4px' }}>服务器</div>
           {servers.map((s) => {
             const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
             return (
@@ -43,8 +54,8 @@ export default function App() {
                 className={`nav-item ${view.kind === 'server' && view.id === s.id ? 'active' : ''}`}
                 style={{ cursor: 'pointer' }}
                 title="单击查看监控 · 双击或点右侧“文件”直达文件管理"
-                onClick={() => setView({ kind: 'server', id: s.id })}
-                onDoubleClick={() => setView({ kind: 'server', id: s.id, tab: 'files' })}
+                onClick={() => openServer(s.id)}
+                onDoubleClick={() => openServer(s.id, 'files')}
               >
                 <i className={`dot ${s.status}`} />
                 <span>{s.name}</span>
@@ -54,7 +65,7 @@ export default function App() {
                   title="打开文件管理"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setView({ kind: 'server', id: s.id, tab: 'files' });
+                    openServer(s.id, 'files');
                   }}
                 >
                   文件
@@ -90,7 +101,7 @@ export default function App() {
             onClick={() => window.dispatchEvent(new Event('sc:show-transfers'))}
             title="打开传输中心"
           >
-            <span className="transfer-entry-ico">⇅</span>
+            <span className="transfer-entry-ico"><ArrowUpDown size={13} strokeWidth={2.2} /></span>
             传输
             {activeTransferCount > 0 && <span className="transfer-entry-badge num">{activeTransferCount}</span>}
           </button>
@@ -135,13 +146,14 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <Overview onOpen={(id) => setView({ kind: 'server', id })} />
+              <Overview onOpen={(id) => openServer(id)} />
             )
           ) : current ? (
             <ServerPanel
-              key={`${current.id}:${view.kind === 'server' ? view.tab ?? 'gpu' : 'gpu'}`}
+              key={current.id}
               s={current}
-              initialTab={view.kind === 'server' ? view.tab : undefined}
+              tab={view.tab}
+              onTab={(tab) => setView((v) => (v.kind === 'server' ? { ...v, tab } : v))}
               onBack={() => setView({ kind: 'overview' })}
             />
           ) : (

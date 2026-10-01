@@ -1,10 +1,20 @@
 // 预加载：renderer 只能通过 window.api 访问主进程能力（SSH/SFTP/传输/文件对话框/凭据存储）
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   platform: process.platform,
+  // Electron 32+ 移除了 File.path，拖拽上传经此取本地绝对路径
+  pathForFile: (file) => webUtils.getPathForFile(file),
   notify: (title, body) => ipcRenderer.invoke('app:notify', { title, body }),
   storeInfo: () => ipcRenderer.invoke('store:info'),
+  auditList: () => ipcRenderer.invoke('audit:list'),
+  auditAppend: (entry) => ipcRenderer.invoke('audit:append', entry),
+
+  // 主机指纹信任库（TOFU）
+  hostKeysList: () => ipcRenderer.invoke('hostkeys:list'),
+  hostKeysRemove: (keyId) => ipcRenderer.invoke('hostkeys:remove', keyId),
+  securityGet: () => ipcRenderer.invoke('security:get'),
+  securitySet: (o) => ipcRenderer.invoke('security:set', o),
 
   // 服务器配置
   listServers: () => ipcRenderer.invoke('servers:list'),
@@ -52,7 +62,6 @@ contextBridge.exposeInMainWorld('api', {
   localMkdir: (p) => ipcRenderer.invoke('local:mkdir', p),
   localRename: (from, to) => ipcRenderer.invoke('local:rename', { from, to }),
   localDelete: (p) => ipcRenderer.invoke('local:delete', p),
-  localWalk: (p) => ipcRenderer.invoke('local:walk', p),
 
   // 远程 SFTP
   sftpList: (id, p) => ipcRenderer.invoke('sftp:list', { id, path: p }),

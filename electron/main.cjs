@@ -58,17 +58,31 @@ function createWindow() {
 
 app.on('child-process-gone', (_e, details) => logCrash('child-process-gone', details));
 process.on('uncaughtException', (e) => logCrash('uncaughtException', (e && e.stack) || String(e)));
-process.on('unhandledRejection', (e) => logCrash('unhandledRejection', (e && e.stack) || String(e)));
+process.on('unhandledRejection', (e) => logCrash('unhandledRejection', (e instanceof Error && e.stack) || String(e)));
 
-app.whenReady().then(() => {
-  ipc.init();
-  createWindow();
-});
+// 单实例锁：双开会互相覆盖 servers.json，第二个实例直接退出并唤起已有窗口
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.whenReady().then(() => {
+    ipc.init();
+    createWindow();
+  });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+}

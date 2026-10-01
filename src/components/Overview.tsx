@@ -70,7 +70,7 @@ export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
   const online = servers.filter((s) => s.status === 'online').length;
   return (
     <>
-      <div style={{ color: 'var(--text-dim)', marginBottom: 'var(--gap)' }}>
+      <div className="dim" style={{ marginBottom: 'var(--gap)' }}>
         共 {servers.length} 台 · <span style={{ color: 'var(--ok)' }}>{online} 在线</span> · {servers.length - online} 异常
       </div>
       <div className="grid">

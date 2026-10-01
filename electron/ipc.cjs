@@ -1,10 +1,12 @@
 const { ipcMain, BrowserWindow, Notification, dialog, app } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { Pool, Connection } = require('./ssh.cjs');
+const { Pool, Connection, setHostKeyChecker } = require('./ssh.cjs');
 const store = require('./store.cjs');
 const localfs = require('./localfs.cjs');
 const sshconfig = require('./sshconfig.cjs');
+const audit = require('./audit.cjs');
+const hostkeys = require('./hostkeys.cjs');
 const { TransferManager } = require('./transfer.cjs');
 
 const pool = new Pool();
@@ -31,9 +33,13 @@ function statusOfError(e) {
 async function tick() {
   if (ticking) return;
   ticking = true;
+  // 采集错峰：把各服务器的采集起点按索引摊开，避免同刻打满本机与对端
+  const stagger = Math.min(250, Math.floor((intervalMs * 0.8) / Math.max(1, servers.length)));
   await Promise.all(
-    servers.map(async (cfg) => {
+    servers.map(async (cfg, i) => {
+      await new Promise((r) => setTimeout(r, i * stagger));
       const conn = pool.get(cfg);
+      if (conn.isBackedOff()) return; // 退避窗口内不重试也不重复广播
       try {
         const snap = await conn.collect();
         broadcast('ssh:snapshot', { id: cfg.id, status: 'online', error: '', ...snap });
@@ -77,8 +83,20 @@ async function getConn(id) {
   return pool.get(getCfg(id));
 }
 
+// 服务器配置入库前校验/归一化（渲染进程传来的值不可尽信）
+function validateServerCfg(cfg) {
+  const host = String(cfg.host || '').trim();
+  const username = String(cfg.username || '').trim();
+  const port = Math.floor(Number(cfg.port) || 22);
+  const authType = cfg.authType === 'key' ? 'key' : 'password';
+  if (!host) throw new Error('主机地址不能为空');
+  if (!username) throw new Error('用户名不能为空');
+  if (port < 1 || port > 65535) throw new Error('端口必须是 1-65535 的整数');
+  if (authType === 'key' && !String(cfg.keyPath || '').trim()) throw new Error('私钥认证需要提供私钥文件路径');
+  return { host, username, port, authType };
+}
+
 const posixJoin = (dir, name) => (!dir || dir === '.' ? name : dir.replace(/\/$/, '') + '/' + name);
-const posixBase = (p) => p.split('/').filter(Boolean).pop() || p;
 const toLocalRel = (posixRel) => posixRel.split('/').join(path.sep);
 const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 function formatBytesHuman(n) {
@@ -95,40 +113,10 @@ function formatBytesHuman(n) {
 }
 
 // ===== ~/.ssh/config 变化检测 =====
-function diffConfig(entries) {
-  const added = [];
-  const changed = [];
-  for (const e of entries) {
-    // 关联“同一台”的第一依据：导入时 name 取的就是 config 别名
-    const byName = servers.find((s) => s.name === e.alias);
-    if (byName) {
-      // 同名主机：端口变化，或 config 明确指定了不同的密钥 → 提示可一键更新
-      const portChg = byName.port !== e.port;
-      const keyChg = !!e.keyPath && e.keyPath !== (byName.keyPath || '');
-      if (portChg || keyChg) {
-        changed.push({
-          targetId: byName.id,
-          alias: e.alias,
-          host: e.host,
-          fromPort: byName.port,
-          toPort: e.port,
-          keyPath: e.keyPath,
-          entry: e,
-        });
-      }
-      continue;
-    }
-    // 没有同名：按 host+port+user 三元组判定是否其实已存在（同一 IP 不同端口视为不同主机）
-    const exact = servers.find((s) => s.host === e.host && s.port === e.port && s.username === e.user);
-    if (!exact) added.push(e);
-  }
-  return { added, changed };
-}
-
 function inspectConfig(filePath) {
   try {
     const parsed = sshconfig.readConfig(filePath);
-    const { added, changed } = diffConfig(parsed.entries);
+    const { added, changed } = sshconfig.diffConfig(parsed.entries, servers);
     const removed = [];
     const curAliases = new Set(parsed.entries.map((e) => e.alias));
     if (knownAliases) {
@@ -164,11 +152,24 @@ function registerIpc() {
 
   ipcMain.handle('store:info', () => ({ encryptionAvailable: store.encryptionAvailable() }));
 
+  ipcMain.handle('audit:list', () => audit.loadRecent());
+  ipcMain.handle('audit:append', (_e, entry) => {
+    audit.append(entry);
+    return true;
+  });
+
+  // 主机指纹信任库（TOFU）
+  ipcMain.handle('hostkeys:list', () => hostkeys.list());
+  ipcMain.handle('hostkeys:remove', (_e, keyId) => hostkeys.remove(String(keyId)));
+  ipcMain.handle('security:get', () => hostkeys.getOpts());
+  ipcMain.handle('security:set', (_e, o) => hostkeys.setOpts(o || {}));
+
   ipcMain.handle('servers:list', () => servers.map(store.publicView));
 
   ipcMain.handle('servers:add', (_e, cfg) => {
     try {
-      const full = { id: `srv_${Date.now().toString(36)}`, port: 22, authType: 'password', ...cfg };
+      const v = validateServerCfg(cfg);
+      const full = { id: `srv_${Date.now().toString(36)}`, ...cfg, ...v };
       servers.push(full);
       persist();
       return { ok: true, server: store.publicView(full) };
@@ -181,7 +182,13 @@ function registerIpc() {
     const i = servers.findIndex((s) => s.id === cfg.id);
     if (i < 0) return { ok: false, error: '服务器不存在' };
     try {
-      servers[i] = { ...servers[i], ...cfg };
+      const patch = { ...cfg };
+      // 凭据键为 undefined/空串时视为“保持不变”，避免误覆盖已存凭据
+      for (const k of ['password', 'passphrase']) {
+        if (!patch[k]) delete patch[k];
+      }
+      const v = validateServerCfg({ ...servers[i], ...patch });
+      servers[i] = { ...servers[i], ...patch, ...v };
       persist();
       return { ok: true, server: store.publicView(servers[i]) };
     } catch (e) {
@@ -270,7 +277,6 @@ function registerIpc() {
   ipcMain.handle('local:mkdir', wrap((p) => localfs.mkdirp(p)));
   ipcMain.handle('local:rename', wrap(({ from, to }) => localfs.rename(from, to)));
   ipcMain.handle('local:delete', wrap((p) => localfs.rmrf(p)));
-  ipcMain.handle('local:walk', wrap((p) => localfs.walk(p)));
 
   // ============ 远程 SFTP ============
   ipcMain.handle(
@@ -362,6 +368,7 @@ function registerIpc() {
   transfers = new TransferManager({
     getConn,
     storeFile: path.join(app.getPath('userData'), 'transfers.json'),
+    knownHostsLine: hostkeys.knownHostsLine,
     notify: (t, isFail) => {
       if (!Notification.isSupported()) return;
       const kindText = t.kind === 'upload' ? '上传' : t.kind === 'download' ? '下载' : '服务器互传';
@@ -378,7 +385,7 @@ function registerIpc() {
   ipcMain.handle('transfer:pause', (_e, id) => transfers.pause(id));
   ipcMain.handle('transfer:cancel', (_e, id) => transfers.cancel(id));
   ipcMain.handle('transfer:resume', (_e, id) => transfers.resume(id, false));
-  ipcMain.handle('transfer:retry', (_e, id) => transfers.resume(id, true));
+  ipcMain.handle('transfer:retry', (_e, id) => transfers.resume(id, false)); // 重试=从断点续传，不删目标端文件
   ipcMain.handle('transfer:remove', (_e, id) => transfers.remove(id));
   ipcMain.handle('transfer:clear', () => transfers.clearFinished());
   ipcMain.handle('transfer:pause-all', () => transfers.pauseAll());
@@ -392,62 +399,49 @@ function registerIpc() {
     return true;
   });
 
-  // 上传：本地多个文件/文件夹 → 远程目录（递归展开）
+  // 上传：本地 → 远程。文件逐个建任务；目录建一个顶层任务，执行期边遍历边传（大目录不再阻塞入队）
   ipcMain.handle(
     'transfer:upload',
     wrap(async ({ id, localPaths, remoteDir, serverName }) => {
       const jobs = [];
+      const gid = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       for (const lp of localPaths) {
-        const w = await localfs.walk(lp);
-        const gid = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-        const top = path.basename(w.root);
-        for (const f of w.files) {
-          // 本地分隔符（Windows 为 \）统一转 POSIX；选中的是文件夹时保留顶层目录名
-          let rel = f.rel.split(path.sep).join('/');
-          const isRootFile = f.abs === w.root; // walk 单个文件时它就是 root
-          if (!isRootFile) rel = posixJoin(top, rel);
-          jobs.push({
-            kind: 'upload',
-            serverId: id,
-            serverName,
-            srcLocal: f.abs,
-            dstRemote: posixJoin(remoteDir, rel),
-            name: rel,
-            size: f.size,
-            groupId: gid,
-          });
-        }
+        const st = await fs.promises.lstat(lp);
+        const base = path.basename(lp);
+        jobs.push({
+          kind: 'upload',
+          serverId: id,
+          serverName,
+          srcLocal: lp,
+          dstRemote: posixJoin(remoteDir, base),
+          name: base,
+          size: st.isDirectory() ? 0 : st.size,
+          groupId: gid,
+        });
       }
       return transfers.addMany(jobs);
     }),
   );
 
-  // 下载：远程多个文件/文件夹 → 本地目录（递归展开）
+  // 下载：远程 → 本地。文件逐个建任务；目录建一个顶层任务，执行期边遍历边传
   ipcMain.handle(
     'transfer:download',
     wrap(async ({ id, items, localDir, serverName }) => {
-      const conn = await getConn(id);
+      await getConn(id);
       const jobs = [];
+      const gid = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       for (const item of items) {
         const isDir = item.type === 'dir' || item.linkToDir;
-        const w = isDir
-          ? await conn.walkRemote(item.path)
-          : { files: [{ abs: item.path, rel: item.name, size: item.size || 0 }] };
-        const gid = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-        const top = posixBase(item.path);
-        for (const f of w.files) {
-          const rel = isDir ? posixJoin(top, f.rel) : f.rel; // 文件夹保留顶层名
-          jobs.push({
-            kind: 'download',
-            serverId: id,
-            serverName,
-            srcRemote: f.abs,
-            dstLocal: path.join(localDir, toLocalRel(rel)),
-            name: rel,
-            size: f.size,
-            groupId: gid,
-          });
-        }
+        jobs.push({
+          kind: 'download',
+          serverId: id,
+          serverName,
+          srcRemote: item.path,
+          dstLocal: path.join(localDir, toLocalRel(item.name)),
+          name: item.name,
+          size: isDir ? 0 : item.size || 0,
+          groupId: gid,
+        });
       }
       return transfers.addMany(jobs);
     }),
@@ -482,6 +476,7 @@ function registerIpc() {
 }
 
 function init() {
+  setHostKeyChecker(hostkeys.makeVerifier()); // 所有出站 SSH 连接启用 TOFU 指纹校验
   servers = store.load();
   registerIpc();
   start();
