@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # 只做类型检查/测试/冒烟，不运行 Electron，跳过二进制下载提速
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查（src strict + electron checkJs）
+        run: npm run typecheck
+
+      - name: 单元测试
+        run: npm test
+
+      - name: e2e 冒烟（双假服务器，真实 SFTP）
+        run: npm run smoke
+
+      - name: 生产构建
+        run: npm run build
