@@ -5,6 +5,14 @@ contextBridge.exposeInMainWorld('api', {
   platform: process.platform,
   // Electron 32+ 移除了 File.path，拖拽上传经此取本地绝对路径
   pathForFile: (file) => webUtils.getPathForFile(file),
+  // 关窗确认：有活跃传输时主进程拦截 close 并通知渲染层弹框
+  onConfirmQuit: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on('app:confirm-quit', h);
+    return () => ipcRenderer.removeListener('app:confirm-quit', h);
+  },
+  backgroundContinue: () => ipcRenderer.send('app:background-continue'),
+  forceQuit: () => ipcRenderer.send('app:force-quit'),
   notify: (title, body) => ipcRenderer.invoke('app:notify', { title, body }),
   storeInfo: () => ipcRenderer.invoke('store:info'),
   auditList: () => ipcRenderer.invoke('audit:list'),

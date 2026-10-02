@@ -1311,6 +1311,24 @@ table.proc tbody tr.sel {
   color: var(--text-dim);
   background: var(--bg-elev2);
 }
+.td-badge.wait {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+/* 文件面板「继续加载」行 */
+.fm-more td {
+  text-align: center;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 8px 4px;
+  user-select: none;
+}
+.fm-more:hover td {
+  background: var(--bg-hover);
+}
 .td-peer {
   color: var(--text-faint);
   font-size: 11.5px;

@@ -136,6 +136,7 @@ export interface TransferItem {
   direct?: boolean; // 服务器互传是否走"服务器直传"（数据不过本机）
   directMode?: string; // 直传实际采用的方式：rsync / tar / scp
   directNote?: string; // 直传能力探测与回退诊断信息
+  waitConflict?: boolean; // 排队中且同目标任务正在传输（互斥保护，避免交错写入）
   serverName?: string;
   peerName?: string;
   startedAt?: number;

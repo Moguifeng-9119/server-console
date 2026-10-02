@@ -73,6 +73,41 @@ describe('TransferManager queue state machine', () => {
     expect(tm.tasks.get(b.id).status).toBe('paused');
   });
 
+  it('same-destination tasks are deferred until the conflict clears (同目标互斥)', () => {
+    const tm = makeTm().tm;
+    const [a, b, c] = tm.addMany([
+      job('a', { dstRemote: '/y/same.bin' }),
+      job('b', { dstRemote: '/y/same.bin' }),
+      job('c', { dstRemote: '/y/other.bin' }),
+    ]);
+    tm.tasks.get(a.id).status = 'running'; // 白盒模拟 a 已启动
+    tm.maxConcurrent = 3;
+    tm._schedule();
+
+    // b 与 a 同目标 → 必须留在队列并打上冲突标记；c 不同目标 → 正常启动
+    expect(tm.tasks.get(b.id).status).toBe('queued');
+    expect(tm.tasks.get(b.id)._waitConflict).toBe(true);
+    expect(tm.queue).toEqual([b.id]);
+    expect(tm.tasks.get(c.id).status).toBe('running');
+
+    // a 结束后，b 应可被调度启动
+    tm.tasks.get(a.id).status = 'done';
+    tm._schedule();
+    expect(tm.tasks.get(b.id).status).toBe('running');
+    expect(tm.tasks.get(b.id)._waitConflict).toBe(false);
+  });
+
+  it('hasActive reflects running/queued tasks (关窗确认依据)', () => {
+    const tm = makeTm().tm;
+    expect(tm.hasActive()).toBe(false);
+    const [a] = tm.addMany([job('a')]);
+    expect(tm.hasActive()).toBe(true); // queued
+    tm.tasks.get(a.id).status = 'paused';
+    expect(tm.hasActive()).toBe(false);
+    tm.tasks.get(a.id).status = 'running';
+    expect(tm.hasActive()).toBe(true);
+  });
+
   it('setConcurrency clamps to 1..15 (0/NaN 视为未设置回退默认)', () => {
     expect(tm.setConcurrency(99)).toBe(15);
     expect(tm.setConcurrency(0)).toBe(15);

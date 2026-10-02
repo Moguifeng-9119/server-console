@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Hourglass,
   Maximize2,
   Minimize2,
   X,
@@ -114,6 +115,11 @@ function TaskRow({ t, tf, picked, togglePick }: {
             title={t.direct ? `服务器直传${t.directMode ? ' · ' + t.directMode : ''}${t.directNote ? '\n' + t.directNote : ''}` : '经本机中继转发'}
           >
             {t.direct ? `直传${t.directMode ? '·' + t.directMode : ''}` : '中继'}
+          </span>
+        )}
+        {t.status === 'queued' && t.waitConflict && (
+          <span className="td-badge wait" title="同一目标有任务正在传输，为避免交错写入损坏文件，本任务暂缓启动">
+            <Hourglass size={11} /> 等待同目标
           </span>
         )}
         <span className="td-peer">{peer}</span>

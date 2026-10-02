@@ -566,6 +566,11 @@ function FilePane({
   useEffect(() => setAddr(state.cwd), [state.cwd]);
   const keyOf = (e: FileEntry) => (isRemote ? e.name : e.path || e.name);
 
+  // 大目录渐进渲染：几万行的 DOM 会冻结界面；数据仍是全量（排序/全选不受影响），只截断渲染
+  const [renderLimit, setRenderLimit] = useState(500);
+  useEffect(() => setRenderLimit(500), [state.cwd]);
+  const shown = sorted.slice(0, renderLimit);
+
   const th = (k: SortKey, label: string) => (
     <th onClick={() => setSort({ k, asc: sort.k === k ? !sort.asc : true })}>
       {label}
@@ -612,7 +617,7 @@ function FilePane({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((e) => {
+              {shown.map((e) => {
                 const key = keyOf(e);
                 const sel = !!state.selected[key];
                 return (
@@ -639,6 +644,11 @@ function FilePane({
                   </tr>
                 );
               })}
+              {sorted.length > renderLimit && (
+                <tr className="fm-more" onClick={() => setRenderLimit((v) => v + 2000)}>
+                  <td colSpan={4}>还有 {sorted.length - renderLimit} 项未显示 · 点击继续加载</td>
+                </tr>
+              )}
               {sorted.length === 0 && (
                 <tr>
                   <td colSpan={4} className="empty">

@@ -183,6 +183,7 @@ function registerIpc() {
     if (i < 0) return { ok: false, error: '服务器不存在' };
     try {
       const patch = { ...cfg };
+      delete patch.id; // id 不可被覆盖
       // 凭据键为 undefined/空串时视为“保持不变”，避免误覆盖已存凭据
       for (const k of ['password', 'passphrase']) {
         if (!patch[k]) delete patch[k];
@@ -483,4 +484,4 @@ function init() {
   watchDefaultConfig();
 }
 
-module.exports = { init };
+module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false) };

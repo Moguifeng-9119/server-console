@@ -15,6 +15,9 @@ import type {
 interface Api {
   platform: string;
   pathForFile: (file: File) => string;
+  onConfirmQuit: (cb: () => void) => () => void;
+  backgroundContinue: () => void;
+  forceQuit: () => void;
   notify: (title: string, body: string) => Promise<void>;
   storeInfo: () => Promise<{ encryptionAvailable: boolean }>;
   auditList: () => Promise<AuditEntry[]>;

@@ -192,6 +192,7 @@ class TransferManager {
       direct: !!t.direct,
       directMode: t.directMode || '',
       directNote: t.directNote || '',
+      waitConflict: !!t._waitConflict,
       startedAt: t.startedAt,
       finishedAt: t.finishedAt,
     };
@@ -299,6 +300,14 @@ class TransferManager {
     return [...this.tasks.values()].map((t) => this.pub(t));
   }
 
+  // 是否存在运行中/排队中的任务（关窗确认用）
+  hasActive() {
+    for (const t of this.tasks.values()) {
+      if (t.status === 'running' || t.status === 'queued') return true;
+    }
+    return false;
+  }
+
   _add(job) {
     const id = job.id || `tf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     const t = {
@@ -343,11 +352,35 @@ class TransferManager {
     return out;
   }
 
+  // 任务的目标端唯一键：两个任务写同一目标会交错损坏数据（尤其断点续传的追加写）
+  _targetKey(t) {
+    if (t.kind === 'upload') return `U:${t.serverId}:${t.dstRemote}`;
+    if (t.kind === 'download') return `D:${t.dstLocal}`;
+    return `R:${t.peerId}:${t.dstRemote}`;
+  }
+
   _schedule() {
-    while (this.running < this.maxConcurrent && this.queue.length) {
+    const runningKeys = new Set();
+    for (const t of this.tasks.values()) {
+      if (t.status === 'running') runningKeys.add(this._targetKey(t));
+    }
+    let deferred = 0; // 本轮被互斥推迟的任务数；等于队列长度时说明全冲突，避免空转
+    while (this.running < this.maxConcurrent && this.queue.length && deferred < this.queue.length) {
       const id = this.queue.shift();
       const t = this.tasks.get(id);
       if (!t || t.status !== 'queued') continue;
+      const key = this._targetKey(t);
+      if (runningKeys.has(key)) {
+        // 同目标互斥：推回队尾，等占用者结束后由其 finally 的 _schedule 再次调度
+        this.queue.push(id);
+        if (!t._waitConflict) {
+          t._waitConflict = true;
+          this.emit(t);
+        }
+        deferred += 1;
+        continue;
+      }
+      runningKeys.add(key);
       this._launch(t);
     }
   }
@@ -355,6 +388,7 @@ class TransferManager {
   async _launch(t) {
     this.running++;
     t.status = 'running';
+    t._waitConflict = false;
     t.error = '';
     t.speed = 0;
     t.startedAt = t.startedAt || Date.now();
@@ -881,6 +915,7 @@ class TransferManager {
     let lastBytes = 0;
     let lastTime = Date.now();
     const errors = [];
+    let errorsDropped = 0; // 超出封顶后只计数，防止极端目录（如整树无权限）把内存撑爆
     const curDone = () => {
       let s = doneFilesBytes;
       for (const v of inflight.values()) s += v;
@@ -922,7 +957,8 @@ class TransferManager {
           });
         } catch (e) {
           if (e && e.aborted) throw e;
-          errors.push(`${j.key}: ${e && e.message ? e.message : e}`);
+          if (errors.length < 100) errors.push(`${j.key}: ${e && e.message ? e.message : e}`);
+          else errorsDropped += 1;
         } finally {
           inflight.delete(j.key);
           doneFilesBytes += j.size || 0;
@@ -958,7 +994,10 @@ class TransferManager {
       };
       schedule();
     });
-    if (errors.length) throw new Error(`目录内 ${errors.length} 项失败，首个：${errors[0]}`);
+    if (errors.length) {
+      const total = errors.length + errorsDropped;
+      throw new Error(`目录内 ${total} 项失败${errorsDropped ? `（仅列出前 ${errors.length} 项）` : ''}，首个：${errors[0]}`);
+    }
   }
 
   // 目录中继：走通用树引擎；readdir 自带文件属性（不再每文件多一次往返）、单目录列举超时
@@ -1043,6 +1082,7 @@ class TransferManager {
     const t = this.tasks.get(id);
     if (!t) return false;
     if (t.status === 'running') return false;
+    this._cleanup(t); // 下载半成品随任务一起清掉（任务没了就再也没机会续传）
     this.tasks.delete(id);
     this.queue = this.queue.filter((x) => x !== id);
     this.saveSoon();

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUpDown, Terminal } from 'lucide-react';
 import { useStore, type Density, type ThemeMode } from './state';
+import { api } from './api';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
 import { SettingsDrawer } from './components/SettingsDrawer';
@@ -20,6 +21,13 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [quitAsk, setQuitAsk] = useState(false);
+
+  // 主进程在有活跃传输时拦截了关窗，这里弹确认框
+  useEffect(() => {
+    if (!api) return;
+    return api.onConfirmQuit(() => setQuitAsk(true));
+  }, []);
 
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
 
@@ -38,7 +46,7 @@ export default function App() {
           <span className="brand-mark" title="ServerConsole">
             <Terminal size={13} strokeWidth={2.6} />
           </span>
-          Server Console <small>v0.4.0</small>
+          Server Console <small>v0.4.1</small>
         </div>
         <nav className="nav">
           <button
@@ -178,6 +186,40 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {quitAsk && (
+        <div className="mask" onClick={() => setQuitAsk(false)}>
+          <div className="dialog" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+            <h3>还有 {activeTransferCount} 个传输任务进行中</h3>
+            <div className="body">
+              最小化到任务栏后传输继续跑；强制退出会中断所有传输（已传部分保留断点，下次可续传）。
+            </div>
+            <div className="foot">
+              <button className="btn" onClick={() => setQuitAsk(false)}>
+                取消
+              </button>
+              <button
+                className="btn danger"
+                onClick={() => {
+                  setQuitAsk(false);
+                  api?.forceQuit();
+                }}
+              >
+                强制退出
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setQuitAsk(false);
+                  api?.backgroundContinue();
+                }}
+              >
+                最小化并继续
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
