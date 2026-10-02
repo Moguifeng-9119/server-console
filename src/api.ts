@@ -3,6 +3,7 @@ import type {
   ConfigChange,
   DirListing,
   FileEntry,
+  ForwardingRule,
   IpcResult,
   ServerConfig,
   SnapshotPayload,
@@ -34,8 +35,32 @@ interface Api {
   setInterval: (ms: number) => Promise<number>;
   kill: (id: string, pid: number, signal: 'TERM' | 'KILL') => Promise<{ ok: boolean; error?: string }>;
   restartService: (id: string, service: string) => Promise<{ ok: boolean; error?: string }>;
+  exec: (id: string, cmd: string) => Promise<IpcResult<{ stdout: string; stderr: string }>>;
   onKeyboardInteractive: (cb: (data: { reqId: string; title: string; prompts: string[] }) => void) => () => void;
   submitInteractive: (reqId: string, answers: string[]) => Promise<boolean>;
+
+  parallelRun: (ids: string[], cmd: string) => Promise<IpcResult<string>>;
+  parallelStop: (runId: string) => Promise<unknown>;
+  onParallelData: (cb: (d: { runId: string; serverId: string; text?: string; done?: boolean }) => void) => () => void;
+  onParallelDone: (cb: (d: { runId: string }) => void) => () => void;
+
+  forwardingsList: () => Promise<ForwardingRule[]>;
+  forwardingsUpsert: (rule: Partial<ForwardingRule>) => Promise<IpcResult<string>>;
+  forwardingsRemove: (id: string) => Promise<IpcResult<boolean>>;
+  forwardingsStart: (id: string) => Promise<IpcResult<boolean>>;
+  forwardingsStop: (id: string) => Promise<IpcResult<boolean>>;
+  onForwardingsChanged: (cb: (list: ForwardingRule[]) => void) => () => void;
+
+  snippetsList: () => Promise<Array<{ id: string; name: string; cmd: string }>>;
+  snippetsSet: (list: Array<{ id: string; name: string; cmd: string }>) => Promise<boolean>;
+
+  webhookGet: () => Promise<{ url: string }>;
+  webhookSet: (o: { url: string }) => Promise<boolean>;
+  webhookSend: (payload: { title: string; body: string }) => Promise<IpcResult<boolean>>;
+
+  setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
+  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit' }>;
+  showMainWindow: () => void;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
 
@@ -68,6 +93,7 @@ interface Api {
   sftpDelete: (id: string, p: string) => Promise<IpcResult<boolean>>;
   sftpStat: (id: string, p: string) => Promise<IpcResult<{ size: number; type: string }>>;
   sftpReadText: (id: string, p: string, tail?: boolean) => Promise<IpcResult<{ text: string; truncated: boolean; mode: string; size?: number }>>;
+  sftpWriteText: (id: string, p: string, text: string) => Promise<IpcResult<boolean>>;
   sftpSearch: (id: string, base: string, keyword: string) => Promise<IpcResult<{ base: string; paths: string[] }>>;
   sftpArchive: (id: string, cwd: string, names: string[], archiveName: string) => Promise<IpcResult<{ name: string }>>;
   sftpExtract: (id: string, cwd: string, p: string) => Promise<IpcResult<{ ok: boolean }>>;
@@ -86,7 +112,7 @@ interface Api {
   transferRetryFailed: () => Promise<unknown>;
   transferMove: (id: string, dir: 'up' | 'down') => Promise<unknown>;
   transferConcurrency: (n: number) => Promise<number>;
-  transferOptions: (o: { notifyDone?: boolean; notifyFail?: boolean }) => Promise<unknown>;
+  transferOptions: (o: { notifyDone?: boolean; notifyFail?: boolean; limitBytes?: number }) => Promise<unknown>;
   transferUpload: (id: string, localPaths: string[], remoteDir: string, serverName?: string) => Promise<IpcResult<TransferItem[]>>;
   transferDownload: (
     id: string,

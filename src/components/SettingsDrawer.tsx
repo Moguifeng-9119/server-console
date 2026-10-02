@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useStore, type Density, type ThemeMode } from '../state';
-import type { TrustedHost } from '../types';
+import type { ForwardingRule, TrustedHost } from '../types';
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const {
@@ -18,14 +18,27 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     tempAlert,
     setTempAlert,
     audit,
+    configs,
+    pushToast,
   } = useStore();
   const [tofu, setTofu] = useState<boolean | null>(null);
   const [hosts, setHosts] = useState<TrustedHost[]>([]);
+  const [closeAction, setCloseAction] = useState<'ask' | 'minimize' | 'exit'>('ask');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [snippets, setSnippets] = useState<Array<{ id: string; name: string; cmd: string }>>([]);
+  const [rules, setRules] = useState<ForwardingRule[]>([]);
+  const [newRule, setNewRule] = useState({ serverId: '', localPort: '', remoteHost: '127.0.0.1', remotePort: '' });
 
   useEffect(() => {
     if (!api) return;
-    api.securityGet().then((o) => setTofu(o.tofu)).catch(() => {});
-    api.hostKeysList().then(setHosts).catch(() => {});
+    const a = api;
+    a.securityGet().then((o) => setTofu(o.tofu)).catch(() => {});
+    a.hostKeysList().then(setHosts).catch(() => {});
+    a.getAppSettings().then((o) => setCloseAction(o.closeAction)).catch(() => {});
+    a.webhookGet().then((o) => setWebhookUrl(o.url || '')).catch(() => {});
+    a.snippetsList().then(setSnippets).catch(() => {});
+    a.forwardingsList().then(setRules).catch(() => {});
+    return a.onForwardingsChanged(setRules);
   }, []);
 
   const themes: Array<[ThemeMode, string]> = [
@@ -191,6 +204,167 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="field">
+          <label>关窗行为</label>
+          <select
+            className="mini"
+            value={closeAction}
+            onChange={(e) => {
+              const v = e.target.value as 'ask' | 'minimize' | 'exit';
+              setCloseAction(v);
+              api?.setAppSettings({ closeAction: v });
+            }}
+          >
+            <option value="ask">有传输时询问，无传输直接退出</option>
+            <option value="minimize">关闭 = 隐藏到托盘（传输继续）</option>
+            <option value="exit">直接退出</option>
+          </select>
+        </div>
+
+        <div className="field">
+          <label>告警 Webhook（钉钉 / 飞书 / 企微机器人，可选）</label>
+          <div className="row" style={{ gap: 6 }}>
+            <input
+              className="mini mono"
+              style={{ flex: 1 }}
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://oapi.dingtalk.com/robot/send?access_token=…"
+            />
+            <button
+              className="btn"
+              onClick={() => api?.webhookSet({ url: webhookUrl.trim() }).then(() => pushToast({ level: 'info', title: 'Webhook 已保存' }))}
+            >
+              保存
+            </button>
+            <button
+              className="btn"
+              title="发送一条测试消息"
+              onClick={() => api?.webhookSend({ title: 'ServerConsole', body: '这是一条测试告警' })}
+            >
+              测试
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>快速命令片段（服务器页顶部可一键执行）</label>
+          {snippets.map((sn, i) => (
+            <div className="row" style={{ gap: 6, marginBottom: 6 }} key={sn.id}>
+              <input
+                className="mini"
+                style={{ width: 130 }}
+                value={sn.name}
+                placeholder="名称"
+                onChange={(e) =>
+                  setSnippets((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                }
+              />
+              <input
+                className="mini mono"
+                style={{ flex: 1 }}
+                value={sn.cmd}
+                placeholder="命令"
+                onChange={(e) =>
+                  setSnippets((prev) => prev.map((x, j) => (j === i ? { ...x, cmd: e.target.value } : x)))
+                }
+              />
+              <button className="btn mini danger" onClick={() => setSnippets((prev) => prev.filter((_, j) => j !== i))}>
+                删
+              </button>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className="btn mini"
+              onClick={() => setSnippets((prev) => [...prev, { id: `sn_${Date.now().toString(36)}`, name: '', cmd: '' }])}
+            >
+              添加片段
+            </button>
+            <span style={{ flex: 1 }} />
+            <button
+              className="btn mini primary"
+              onClick={() => api?.snippetsSet(snippets.filter((s) => s.name.trim() && s.cmd.trim())).then(() => pushToast({ level: 'info', title: '快速命令已保存' }))}
+            >
+              保存片段
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>本地端口转发（等价 ssh -L）</label>
+          {rules.length > 0 && (
+            <div className="audit">
+              {rules.map((r) => {
+                const srv = configs.find((c) => c.id === r.serverId);
+                return (
+                  <div className="e" key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className="mono" style={{ flex: 1 }}>
+                      :{r.localPort} → {r.remoteHost}:{r.remotePort} <span style={{ color: 'var(--text-faint)' }}>@{srv?.name || '?'}</span>
+                    </span>
+                    <span
+                      style={{ color: r.status === 'listening' ? 'var(--ok)' : r.status === 'error' ? 'var(--crit)' : 'var(--text-faint)' }}
+                      title={r.error}
+                    >
+                      {r.status === 'listening' ? '监听中' : r.status === 'error' ? '错误' : '已停止'}
+                    </span>
+                    {r.status === 'listening' ? (
+                      <button className="btn mini" onClick={() => api?.forwardingsStop(r.id)}>
+                        停止
+                      </button>
+                    ) : (
+                      <button className="btn mini" onClick={() => api?.forwardingsStart(r.id).then((x) => x && !x.ok && pushToast({ level: 'error', title: '启动失败', detail: x.error }))}>
+                        启动
+                      </button>
+                    )}
+                    <button
+                      className="btn mini danger"
+                      onClick={() => api?.forwardingsRemove(r.id)}
+                    >
+                      删
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            <select className="mini" value={newRule.serverId} onChange={(e) => setNewRule((p) => ({ ...p, serverId: e.target.value }))}>
+              <option value="">服务器…</option>
+              {configs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <input className="mini num" style={{ width: 76 }} placeholder="本地端口" value={newRule.localPort} onChange={(e) => setNewRule((p) => ({ ...p, localPort: e.target.value }))} />
+            <input className="mini mono" style={{ width: 110 }} placeholder="远程 host" value={newRule.remoteHost} onChange={(e) => setNewRule((p) => ({ ...p, remoteHost: e.target.value }))} />
+            <input className="mini num" style={{ width: 76 }} placeholder="远程端口" value={newRule.remotePort} onChange={(e) => setNewRule((p) => ({ ...p, remotePort: e.target.value }))} />
+            <button
+              className="btn mini primary"
+              onClick={() => {
+                const a = api;
+                if (!a) return;
+                a.forwardingsUpsert({
+                  serverId: newRule.serverId,
+                  localPort: Number(newRule.localPort),
+                  remoteHost: newRule.remoteHost.trim() || '127.0.0.1',
+                  remotePort: Number(newRule.remotePort),
+                  enabled: true,
+                }).then((r) => {
+                  if (r && !r.ok) pushToast({ level: 'error', title: '添加失败', detail: r.error });
+                  else {
+                    setNewRule({ serverId: '', localPort: '', remoteHost: '127.0.0.1', remotePort: '' });
+                    a.forwardingsList().then(setRules);
+                  }
+                });
+              }}
+            >
+              添加
+            </button>
+          </div>
         </div>
 
         <div className="field">

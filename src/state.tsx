@@ -301,6 +301,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       };
       pushToast({ level: 'warn', title: label[type], detail: nowTime() });
       api?.notify(label[type], `${s.name} · ${nowTime()}`);
+      api?.webhookSend({ title: label[type], body: `${s.name} · ${nowTime()}` });
     }
     knownAlerts.current = keys;
   }, [servers, alertsEnabled, thresholds.crit, tempAlert, pushToast]);

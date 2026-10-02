@@ -197,3 +197,15 @@ export interface TrustedHost {
   fp: string; // SHA256:... 指纹
   firstSeen: number;
 }
+
+// 本地端口转发规则
+export interface ForwardingRule {
+  id: string;
+  serverId: string;
+  localPort: number;
+  remoteHost: string;
+  remotePort: number;
+  enabled: boolean;
+  status?: 'listening' | 'error' | 'stopped';
+  error?: string;
+}

@@ -14,6 +14,7 @@ import type { FileEntry, TransferItem } from './types';
 const HIST_WINDOW = 60_000; // 瞬时速度曲线保留近 60s
 const LS_CONC = 'sc.tf.concurrency';
 const LS_OPTS = 'sc.tf.opts';
+const LS_LIMIT = 'sc.tf.limit';
 
 interface TransferStore {
   items: TransferItem[];
@@ -38,6 +39,8 @@ interface TransferStore {
   move: (id: string, dir: 'up' | 'down') => void;
   setConcurrency: (n: number) => void;
   concurrency: number;
+  limitMB: number;
+  setLimitMB: (n: number) => void;
   notifyOpts: { notifyDone: boolean; notifyFail: boolean; sound: boolean };
   setNotifyOpts: (o: Partial<{ notifyDone: boolean; notifyFail: boolean; sound: boolean }>) => void;
   getSpeedHistory: (id: string) => number[];
@@ -82,6 +85,10 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     return n >= 1 && n <= 15 ? n : 15;
   });
   const [notifyOpts, setNotifyOptsState] = useState(loadOpts);
+  const [limitMB, setLimitMBState] = useState<number>(() => {
+    const n = Number(localStorage.getItem(LS_LIMIT));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  });
   const speedHist = useRef<Record<string, number[]>>([] as unknown as Record<string, number[]>);
   const histTime = useRef<Record<string, number[]>>([] as unknown as Record<string, number[]>);
   const prevStatus = useRef<Record<string, string>>({});
@@ -116,7 +123,7 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     api.transferList().then(setItems);
     // 启动时把本地保存的并发上限与通知选项同步给主进程
     api.transferConcurrency(concurrency);
-    api.transferOptions({ notifyDone: notifyOpts.notifyDone, notifyFail: notifyOpts.notifyFail });
+    api.transferOptions({ notifyDone: notifyOpts.notifyDone, notifyFail: notifyOpts.notifyFail, limitBytes: limitMB * 1024 * 1024 });
     const off = api.onTransferUpdate((t) => {
       pushHist(t.id, t.speed || 0);
       // 任务新进入失败态：轻提示音
@@ -225,6 +232,13 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     api?.transferConcurrency(v);
   }, []);
 
+  const setLimitMB = useCallback((n: number) => {
+    const v = Math.max(0, Math.round(n));
+    setLimitMBState(v);
+    localStorage.setItem(LS_LIMIT, String(v));
+    api?.transferOptions({ limitBytes: v * 1024 * 1024 });
+  }, []);
+
   const setNotifyOpts = useCallback((o: Partial<{ notifyDone: boolean; notifyFail: boolean; sound: boolean }>) => {
     setNotifyOptsState((prev) => {
       const next = { ...prev, ...o };
@@ -263,6 +277,8 @@ export function TransferProvider({ children }: { children: ReactNode }) {
       move,
       setConcurrency,
       concurrency,
+      limitMB,
+      setLimitMB,
       notifyOpts,
       setNotifyOpts,
       getSpeedHistory,
@@ -286,6 +302,8 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     move,
     setConcurrency,
     concurrency,
+    limitMB,
+    setLimitMB,
     notifyOpts,
     setNotifyOpts,
     getSpeedHistory,

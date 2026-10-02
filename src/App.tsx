@@ -10,6 +10,7 @@ import { ServerManager } from './components/ServerManager';
 import { ImportSshConfig } from './components/ImportSshConfig';
 import { ConfigWatchBanner } from './components/ConfigWatchBanner';
 import { TransferDrawer } from './components/TransferDrawer';
+import { ParallelCommand } from './components/ParallelCommand';
 import { useTransfers } from './transfers';
 
 type ServerTab = 'gpu' | 'proc' | 'files';
@@ -17,9 +18,12 @@ type ServerTab = 'gpu' | 'proc' | 'files';
 const LS_VIEW = 'sc.view';
 
 // 恢复上次页面：只在结构合法时采用，服务器已被删除则由下方 effect 兜底回总览
-function loadView(): { kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab } {
+function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab } {
   try {
     const raw = JSON.parse(localStorage.getItem(LS_VIEW) || 'null');
+    if (raw && raw.kind === 'parallel') {
+      return { kind: 'parallel' };
+    }
     if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files'].includes(raw.tab)) {
       return { kind: 'server', id: raw.id, tab: raw.tab };
     }
@@ -33,7 +37,7 @@ export default function App() {
   const { servers, theme, setTheme, density, setDensity, toasts, demo, configs } = useStore();
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
-  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
+  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -185,7 +189,7 @@ export default function App() {
 
       <main className="main">
         <header className="topbar">
-          <span className="title">{view.kind === 'overview' ? '总览' : current?.name}</span>
+          <span className="title">{view.kind === 'overview' ? '总览' : view.kind === 'parallel' ? '并行命令' : current?.name}</span>
           {demo && (
             <button className="btn" style={{ color: 'var(--warn)' }} onClick={() => setManagerOpen(true)}>
               演示数据 · 点此连接真实服务器
@@ -231,7 +235,9 @@ export default function App() {
 
         <ConfigWatchBanner />
         <div className="content">
-          {view.kind === 'overview' ? (
+          {view.kind === 'parallel' ? (
+            <ParallelCommand />
+          ) : view.kind === 'overview' ? (
             configs.length === 0 && !demo ? (
               <div className="empty">
                 还没有连接任何服务器。

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../state';
+import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { FileManager } from './FileManager';
@@ -237,6 +238,24 @@ export function ServerPanel({
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
   const [restartAsk, setRestartAsk] = useState(false);
   const [svcName, setSvcName] = useState('docker');
+  const [snippets, setSnippets] = useState<Array<{ id: string; name: string; cmd: string }>>([]);
+  const [snipOut, setSnipOut] = useState<{ name: string; output: string; running: boolean } | null>(null);
+
+  useEffect(() => {
+    api?.snippetsList().then(setSnippets).catch(() => {});
+  }, []);
+
+  const runSnippet = async (sn: { id: string; name: string; cmd: string }) => {
+    if (!api) return;
+    setSnipOut({ name: sn.name, output: '执行中…', running: true });
+    const r = await api.exec(s.id, sn.cmd);
+    if (r.ok && r.data) {
+      const out = (r.data.stdout + (r.data.stderr ? `\n${r.data.stderr}` : '')).trim() || '（无输出）';
+      setSnipOut({ name: sn.name, output: out, running: false });
+    } else {
+      setSnipOut({ name: sn.name, output: r.error || '执行失败', running: false });
+    }
+  };
 
   const target = confirm ? s.processes.find((p) => p.pid === confirm.pid) : undefined;
 
@@ -257,6 +276,26 @@ export function ServerPanel({
         <span className="mono faint">
           {s.host}
         </span>
+        <span style={{ flex: 1 }} />
+        {snippets.length > 0 && (
+          <select
+            className="mini"
+            value=""
+            title="一键执行快速命令（设置中管理）"
+            onChange={(e) => {
+              const sn = snippets.find((x) => x.id === e.target.value);
+              if (sn) runSnippet(sn);
+              e.target.value = '';
+            }}
+          >
+            <option value="">快速命令…</option>
+            {snippets.map((sn) => (
+              <option key={sn.id} value={sn.id}>
+                {sn.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {s.status !== 'online' ? (
@@ -398,6 +437,27 @@ export function ServerPanel({
               </button>
               <button className="btn primary" disabled={!svcName.trim()} onClick={doRestart}>
                 确认重启
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {snipOut && (
+        <div className="mask" onClick={() => setSnipOut(null)}>
+          <div className="dialog" style={{ width: 680 }} onClick={(e) => e.stopPropagation()}>
+            <h3>快速命令 · {snipOut.name}</h3>
+            <div className="body">
+              <pre className="mono" style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 360, overflow: 'auto', fontSize: 12 }}>
+                {snipOut.output}
+              </pre>
+            </div>
+            <div className="foot">
+              <button className="btn" onClick={() => navigator.clipboard?.writeText(snipOut.output)}>
+                复制输出
+              </button>
+              <button className="btn primary" onClick={() => setSnipOut(null)}>
+                关闭
               </button>
             </div>
           </div>

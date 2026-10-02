@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('api', {
   setInterval: (ms) => ipcRenderer.invoke('ssh:setInterval', ms),
   kill: (id, pid, signal) => ipcRenderer.invoke('ssh:kill', { id, pid, signal }),
   restartService: (id, service) => ipcRenderer.invoke('ssh:restartService', { id, service }),
+  exec: (id, cmd) => ipcRenderer.invoke('ssh:exec', { id, cmd }),
   // 交互式认证（2FA/MFA）：主进程广播提示问题，渲染层弹框作答回传
   onKeyboardInteractive: (cb) => {
     const h = (_e, data) => cb(data);
@@ -42,6 +43,46 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('ssh:keyboard-interactive', h);
   },
   submitInteractive: (reqId, answers) => ipcRenderer.invoke('ssh:interactive-reply', { reqId, answers }),
+
+  // 并行命令
+  parallelRun: (ids, cmd) => ipcRenderer.invoke('parallel:run', { ids, cmd }),
+  parallelStop: (runId) => ipcRenderer.invoke('parallel:stop', runId),
+  onParallelData: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('parallel:data', h);
+    return () => ipcRenderer.removeListener('parallel:data', h);
+  },
+  onParallelDone: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('parallel:done', h);
+    return () => ipcRenderer.removeListener('parallel:done', h);
+  },
+
+  // 端口转发
+  forwardingsList: () => ipcRenderer.invoke('forwardings:list'),
+  forwardingsUpsert: (rule) => ipcRenderer.invoke('forwardings:upsert', rule),
+  forwardingsRemove: (id) => ipcRenderer.invoke('forwardings:remove', id),
+  forwardingsStart: (id) => ipcRenderer.invoke('forwardings:start', id),
+  forwardingsStop: (id) => ipcRenderer.invoke('forwardings:stop', id),
+  onForwardingsChanged: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('forwardings:changed', h);
+    return () => ipcRenderer.removeListener('forwardings:changed', h);
+  },
+
+  // 快速命令片段
+  snippetsList: () => ipcRenderer.invoke('snippets:list'),
+  snippetsSet: (list) => ipcRenderer.invoke('snippets:set', list),
+
+  // 告警 Webhook
+  webhookGet: () => ipcRenderer.invoke('webhook:get'),
+  webhookSet: (o) => ipcRenderer.invoke('webhook:set', o),
+  webhookSend: (payload) => ipcRenderer.invoke('webhook:send', payload),
+
+  // 系统托盘 / 关窗行为
+  setAppSettings: (o) => ipcRenderer.invoke('app:set-settings', o),
+  getAppSettings: () => ipcRenderer.invoke('app:get-settings'),
+  showMainWindow: () => ipcRenderer.send('app:show-main'),
   onSnapshot: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('ssh:snapshot', h);
@@ -86,6 +127,7 @@ contextBridge.exposeInMainWorld('api', {
   sftpDelete: (id, p) => ipcRenderer.invoke('sftp:delete', { id, path: p }),
   sftpStat: (id, p) => ipcRenderer.invoke('sftp:stat', { id, path: p }),
   sftpReadText: (id, p, tail) => ipcRenderer.invoke('sftp:readText', { id, path: p, tail }),
+  sftpWriteText: (id, p, text) => ipcRenderer.invoke('sftp:writeText', { id, path: p, text }),
   sftpSearch: (id, base, keyword) => ipcRenderer.invoke('sftp:search', { id, base, keyword }),
   sftpArchive: (id, cwd, names, archiveName) =>
     ipcRenderer.invoke('sftp:archive', { id, cwd, names, archiveName }),

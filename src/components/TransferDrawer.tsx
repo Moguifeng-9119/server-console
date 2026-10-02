@@ -341,6 +341,19 @@ export function TransferDrawer() {
           <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyDone} onChange={(e) => tf.setNotifyOpts({ notifyDone: e.target.checked })} />完成通知</label>
           <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyFail} onChange={(e) => tf.setNotifyOpts({ notifyFail: e.target.checked })} />失败通知</label>
           <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.sound} onChange={(e) => tf.setNotifyOpts({ sound: e.target.checked })} />失败提示音</label>
+          <label className="td-chk">
+            限速
+            <input
+              className="mini num"
+              style={{ width: 52, marginLeft: 4 }}
+              type="number"
+              min={0}
+              value={tf.limitMB || ''}
+              placeholder="不限"
+              onChange={(e) => tf.setLimitMB(Number(e.target.value) || 0)}
+            />
+            MB/s
+          </label>
           <span className="td-spacer" />
           {tf.runningCount > 0 && <span className="td-pin">传输中已钉住，不会被误关</span>}
         </div>

@@ -72,8 +72,9 @@ function humanErr(e) {
   return m === '__ABORT__' ? '已中止' : m;
 }
 
-// 把可读流泵到可写流，带背压、字节计数、可中止
-function pump(rs, ws, onBytes, gate) {
+// 把可读流泵到可写流，带背压、字节计数、可中止、可选全局限速
+// limitTake: 管理器级共享令牌桶回调，入参字节数，返回需要暂停的毫秒数（0=不限）
+function pump(rs, ws, onBytes, gate, limitTake) {
   return new Promise((resolve, reject) => {
     let bytes = 0;
     let settled = false;
@@ -82,6 +83,7 @@ function pump(rs, ws, onBytes, gate) {
     const cleanup = () => {
       gate.untrack(rs);
       gate.untrack(ws);
+      if (limitTimer) clearTimeout(limitTimer);
       try {
         rs.destroy();
       } catch {
@@ -101,17 +103,25 @@ function pump(rs, ws, onBytes, gate) {
       reject(e || new Error('流异常'));
     };
     const offAbort = gate.onAbort(() => fail(ABORT));
+    let limitTimer = null;
     rs.on('error', fail);
     ws.on('error', fail);
     rs.on('data', (d) => {
       bytes += d.length;
       onBytes(bytes);
       const ok = ws.write(d);
+      const wait = limitTake ? limitTake(d.length) : 0;
       if (ok === false) {
         rs.pause();
         ws.once('drain', () => {
           if (!settled) rs.resume();
         });
+      } else if (wait > 0 && !limitTimer) {
+        rs.pause();
+        limitTimer = setTimeout(() => {
+          limitTimer = null;
+          if (!settled) rs.resume();
+        }, Math.min(wait, 500));
       }
     });
     rs.on('end', () => ws.end());
@@ -152,6 +162,22 @@ class TransferManager {
 
   setOptions(o = {}) {
     this.options = { ...this.options, ...o };
+    if (!this.options.limitBytes) this._bucket = { tokens: 0, last: Date.now() };
+  }
+
+  // 全局令牌桶限速：返回需要暂停的毫秒数（0 = 放行）
+  _limitTake(n) {
+    const limit = this.options.limitBytes || 0;
+    if (!limit) return 0;
+    const now = Date.now();
+    const b = this._bucket || (this._bucket = { tokens: 0, last: now });
+    b.tokens = Math.min(limit * 2, b.tokens + ((now - b.last) / 1000) * limit);
+    b.last = now;
+    if (b.tokens >= n) {
+      b.tokens -= n;
+      return 0;
+    }
+    return ((n - b.tokens) / limit) * 1000;
   }
 
   onUpdate(fn) {
@@ -521,7 +547,7 @@ class TransferManager {
       flags: offset ? 'a' : 'w',
       chunkSize: STREAM_CHUNK,
     });
-    await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate);
+    await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
   }
 
   // 目录上传：本地 readdir 渐进展开 + 有界文件并发，总量/文件数随遍历回填
@@ -598,7 +624,7 @@ class TransferManager {
     }
     const remote = sftp.createReadStream(remoteAbs, { start: offset, chunkSize: STREAM_CHUNK });
     const local = fs.createWriteStream(part, { flags: offset ? 'a' : 'w' });
-    await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate);
+    await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
     await fsp.rename(part, localAbs);
   }
 
@@ -898,6 +924,7 @@ class TransferManager {
       sb.createWriteStream(dstAbs, { start: offset, flags: offset ? 'a' : 'w', chunkSize: STREAM_CHUNK }),
       (d) => onBytes && onBytes(offset + d),
       gate,
+      (n) => this._limitTake(n),
     );
   }
 

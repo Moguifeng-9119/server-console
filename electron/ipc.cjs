@@ -7,6 +7,7 @@ const localfs = require('./localfs.cjs');
 const sshconfig = require('./sshconfig.cjs');
 const audit = require('./audit.cjs');
 const hostkeys = require('./hostkeys.cjs');
+const { ForwardingManager } = require('./forwardings.cjs');
 const { TransferManager } = require('./transfer.cjs');
 
 const pool = new Pool();
@@ -15,6 +16,7 @@ let timer = null;
 let intervalMs = 2000;
 let ticking = false;
 let transfers = null;
+let forwardings = null;
 let configWatchPath = '';
 let lastConfigMtime = 0;
 let knownAliases = null; // 上次 config 的别名集合（null=尚未建立基线，首次不报删除）
@@ -28,6 +30,14 @@ function statusOfError(e) {
   if (/authentic/i.test(m)) return 'auth';
   if (/timed out|timeout/i.test(m)) return 'timeout';
   return 'offline';
+}
+
+function logError(tag, e) {
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'error.log'), `[${new Date().toISOString()}] ${tag}: ${e && e.stack ? e.stack : e}\n`);
+  } catch {
+    /* noop */
+  }
 }
 
 async function tick() {
@@ -251,6 +261,13 @@ function registerIpc() {
     }
   });
 
+  // 通用命令执行（快速命令片段等）：30s 超时，返回 stdout/stderr
+  ipcMain.handle('ssh:exec', wrap(async ({ id, cmd }) => {
+    const conn = await getConn(id);
+    const { stdout, stderr } = await conn.exec(String(cmd), 30000);
+    return { stdout, stderr };
+  }));
+
   // ============ 本机文件对话框 ============
   ipcMain.handle('dialog:openFiles', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
@@ -329,6 +346,19 @@ function registerIpc() {
     }),
   );
 
+  // 远程文本保存：写临时文件后原子改名，避免写一半损坏原文件
+  ipcMain.handle(
+    'sftp:writeText',
+    wrap(async ({ id, path: p, text }) => {
+      const conn = await getConn(id);
+      const sftp = await conn.sftp();
+      const tmp = `${p}.sctmp`;
+      await new Promise((res, rej) => sftp.writeFile(tmp, Buffer.from(String(text), 'utf8'), (e) => (e ? rej(e) : res())));
+      await new Promise((res, rej) => sftp.rename(tmp, p, (e) => (e ? rej(e) : res())));
+      return true;
+    }),
+  );
+
   // 文件搜索：远程 find（限制深度与条数）
   ipcMain.handle(
     'sftp:search',
@@ -376,6 +406,131 @@ function registerIpc() {
     }),
   );
 
+  // ============ 并行命令：多服务器同时执行，输出按行缓冲节流广播 ============
+  const parallelRuns = new Map(); // runId -> { stop, remaining }
+  ipcMain.handle(
+    'parallel:run',
+    wrap(async ({ ids, cmd }) => {
+      const runId = `pc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const command = String(cmd || '').trim();
+      if (!command) throw new Error('命令不能为空');
+      if (!ids.length) throw new Error('请至少选择一台服务器');
+      const buf = new Map(); // serverId -> 待发送文本
+      let remaining = ids.length;
+      const flush = setInterval(() => {
+        for (const [serverId, text] of buf) {
+          if (text) {
+            buf.set(serverId, '');
+            broadcast('parallel:data', { runId, serverId, text });
+          }
+        }
+      }, 250);
+      const finishOne = (serverId) => {
+        broadcast('parallel:data', { runId, serverId, done: true });
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(flush);
+          parallelRuns.delete(runId);
+          broadcast('parallel:done', { runId });
+        }
+      };
+      const run = { stop: () => clearInterval(flush), remaining: ids.length, streams: new Set() };
+      parallelRuns.set(runId, run);
+      for (const id of ids) {
+        (async () => {
+          try {
+            const conn = await getConn(id);
+            const res = await conn.execStream(command, {
+              timeout: 0,
+              onStream: (stream) => run.streams.add(stream),
+              onLine: (line) => {
+                const cur = buf.get(id) || '';
+                buf.set(id, cur + line + '\n');
+              },
+            });
+            if (res.stderr) buf.set(id, (buf.get(id) || '') + res.stderr);
+            finishOne(id);
+          } catch (e) {
+            buf.set(id, (buf.get(id) || '') + `[错误] ${e.message}\n`);
+            finishOne(id);
+          }
+        })();
+      }
+      return { ok: true, data: runId };
+    }),
+  );
+  ipcMain.handle('parallel:stop', (_e, runId) => {
+    const run = parallelRuns.get(String(runId));
+    if (run) {
+      for (const s of run.streams) {
+        try {
+          s.close();
+        } catch {
+          /* noop */
+        }
+      }
+      run.stop();
+      parallelRuns.delete(String(runId));
+      broadcast('parallel:done', { runId: String(runId) });
+    }
+    return true;
+  });
+
+  // ============ 快速命令片段 ============
+  const snippetsFile = () => path.join(app.getPath('userData'), 'snippets.json');
+  ipcMain.handle('snippets:list', () => {
+    try {
+      return JSON.parse(fs.readFileSync(snippetsFile(), 'utf8'));
+    } catch {
+      return [];
+    }
+  });
+  ipcMain.handle('snippets:set', (_e, list) => {
+    fs.mkdirSync(path.dirname(snippetsFile()), { recursive: true });
+    fs.writeFileSync(snippetsFile(), JSON.stringify(Array.isArray(list) ? list : [], null, 2), { mode: 0o600 });
+    return true;
+  });
+
+  // ============ 告警 Webhook（钉钉/飞书/企微自定义机器人，按 URL 自动识别格式） ============
+  const webhookFile = () => path.join(app.getPath('userData'), 'webhook.json');
+  ipcMain.handle('webhook:get', () => {
+    try {
+      return JSON.parse(fs.readFileSync(webhookFile(), 'utf8'));
+    } catch {
+      return { url: '' };
+    }
+  });
+  ipcMain.handle('webhook:set', (_e, o) => {
+    fs.mkdirSync(path.dirname(webhookFile()), { recursive: true });
+    fs.writeFileSync(webhookFile(), JSON.stringify({ url: String(o?.url || '') }, null, 2), { mode: 0o600 });
+    return true;
+  });
+  ipcMain.handle('webhook:send', wrap(async (payload) => {
+    let url = '';
+    try {
+      url = JSON.parse(fs.readFileSync(webhookFile(), 'utf8')).url || '';
+    } catch {
+      return { ok: true };
+    }
+    if (!url) return { ok: true };
+    const text = `【${payload?.title || '告警'}】${payload?.body || ''}`;
+    let body;
+    if (/qyapi\.weixin/.test(url)) body = { msgtype: 'text', text: { content: text } };
+    else if (/oapi\.dingtalk/.test(url)) body = { msgtype: 'text', text: { content: text } };
+    else if (/open\.feishu/.test(url)) body = { msg_type: 'text', content: { text } };
+    else body = { text };
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    try {
+      await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+    } catch (e) {
+      logError('webhook send failed', e);
+    } finally {
+      clearTimeout(timer);
+    }
+    return { ok: true };
+  }));
+
   // ============ 传输队列 ============
   transfers = new TransferManager({
     getConn,
@@ -392,6 +547,25 @@ function registerIpc() {
     },
   });
   transfers.onUpdate((t) => broadcast('transfer:update', t));
+
+  // 端口转发实例（handler 与 init 都用这个闭包）
+  forwardings = new ForwardingManager({
+    dataDir: app.getPath('userData'),
+    getConn,
+    onChange: (list) => broadcast('forwardings:changed', list),
+  });
+  const forwardingList = () => (forwardings ? forwardings.list() : []);
+
+  ipcMain.handle('forwardings:list', () => forwardingList());
+  ipcMain.handle('forwardings:upsert', wrap((rule) => forwardings.upsert(rule)));
+  ipcMain.handle('forwardings:remove', wrap((id) => forwardings.remove(id)));
+  ipcMain.handle('forwardings:start', wrap(async (id) => {
+    const rule = forwardingList().find((r) => r.id === id);
+    if (!rule) throw new Error('转发规则不存在');
+    await forwardings.start(rule);
+    return true;
+  }));
+  ipcMain.handle('forwardings:stop', wrap((id) => forwardings.stop(id)));
 
   ipcMain.handle('transfer:list', () => transfers.list());
   ipcMain.handle('transfer:pause', (_e, id) => transfers.pause(id));
@@ -546,6 +720,8 @@ function init() {
   registerIpc();
   start();
   watchDefaultConfig();
+  // 恢复启用的端口转发规则（异步，不阻塞启动）
+  forwardings.startAll().catch((e) => logError('forwardings startAll', e));
 }
 
 module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false) };

@@ -329,14 +329,21 @@ class Connection {
   // 流式执行：过程中按行回调 stdout（用于实时解析 rsync 逐文件输出），结束时汇总
   /**
    * @param {string} cmd
-   * @param {{ onLine?: (line: string) => void; timeout?: number }=} opts
+   * @param {{ onLine?: (line: string) => void; onStream?: (stream: unknown) => void; timeout?: number }=} opts
    */
-  execStream(cmd, { onLine, timeout = 0 } = {}) {
+  execStream(cmd, { onLine, onStream, timeout = 0 } = {}) {
     return this.connect().then(
       () =>
         new Promise((resolve, reject) => {
           this.client.exec(cmd, (err, stream) => {
             if (err) return reject(err);
+            if (onStream) {
+              try {
+                onStream(stream);
+              } catch {
+                /* noop */
+              }
+            }
             // 百万文件的 rsync 逐文件输出可能极大；stdout/stderr 只保留尾部用于诊断
             const OUT_CAP = 256 * 1024;
             let out = '';
