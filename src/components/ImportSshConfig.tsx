@@ -103,6 +103,7 @@ export function ImportSshConfig({
         authType: 'key',
         keyPath,
         passphrase: '',
+        ...(e.proxyJump ? { proxyJump: e.proxyJump } : {}),
       });
       if (res.ok) ok++;
       else fail++;

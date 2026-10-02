@@ -9,10 +9,13 @@ type Draft = {
   host: string;
   port: number;
   username: string;
-  authType: 'password' | 'key';
+  authType: 'password' | 'key' | 'agent';
   password: string;
   keyPath: string;
   passphrase: string;
+  agentPath: string;
+  group: string;
+  proxyJump: string;
 };
 
 const emptyDraft: Draft = {
@@ -24,6 +27,9 @@ const emptyDraft: Draft = {
   password: '',
   keyPath: '',
   passphrase: '',
+  agentPath: '',
+  group: '',
+  proxyJump: '',
 };
 
 export function ServerManager({ onClose }: { onClose: () => void }) {
@@ -34,6 +40,7 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<ServerConfig | null>(null);
   const [confirmDel, setConfirmDel] = useState<ServerConfig | null>(null);
+  const [confirmDup, setConfirmDup] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -46,7 +53,13 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
       port: Number(draft.port) || 22,
       username: draft.username.trim(),
       authType: draft.authType,
+      group: draft.group.trim(),
+      proxyJump: draft.proxyJump.trim(),
     };
+    if (draft.authType === 'agent') {
+      const agentPart = draft.agentPath.trim() ? { agentPath: draft.agentPath.trim() } : {};
+      return { ...base, keyPath: '', ...agentPart };
+    }
     if (draft.authType === 'password') {
       return draft.password ? { ...base, password: draft.password, keyPath: '' } : { ...base, keyPath: '' };
     }
@@ -65,6 +78,9 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
       password: '',
       keyPath: c.keyPath || '',
       passphrase: '',
+      agentPath: c.agentPath || '',
+      group: c.group || '',
+      proxyJump: c.proxyJump || '',
     });
     setTestResult(`正在编辑：${c.name}（凭据留空则保持不变）`);
   };
@@ -83,11 +99,8 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
     setTestResult(res.ok ? `连接成功：${res.gpus} 张 GPU，${res.processes} 个进程` : `连接失败：${res.error}`);
   };
 
-  const save = async () => {
-    if (!draft.host.trim() || !draft.username.trim()) {
-      setTestResult('请至少填写主机和用户名');
-      return;
-    }
+  const doSave = async () => {
+    setConfirmDup(false);
     setSaving(true);
     setTestResult(editing ? '保存中…' : '添加中…');
     try {
@@ -110,6 +123,19 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const save = async () => {
+    if (!draft.host.trim() || !draft.username.trim()) {
+      setTestResult('请至少填写主机和用户名');
+      return;
+    }
+    // 添加时同名同主机已存在 → 二次确认（分组/跳板机场景下允许故意重名）
+    if (!editing && configs.some((c) => c.name === payload().name && c.host === payload().host)) {
+      setConfirmDup(true);
+      return;
+    }
+    await doSave();
   };
 
   const removeTarget = async (c: ServerConfig) => {
@@ -164,10 +190,23 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
             <button className={draft.authType === 'key' ? 'on' : ''} onClick={() => set('authType', 'key')}>
               私钥
             </button>
+            <button className={draft.authType === 'agent' ? 'on' : ''} onClick={() => set('authType', 'agent')} title="使用系统 ssh-agent（Windows 支持 OpenSSH agent 服务与 Pageant）">
+              agent
+            </button>
           </div>
         </div>
 
-        {draft.authType === 'password' ? (
+        {draft.authType === 'agent' ? (
+          <>
+            <div className="body" style={{ color: 'var(--text-dim)', marginBottom: 10 }}>
+              将使用系统 ssh-agent 认证（Windows 默认走 OpenSSH Authentication Agent 服务管道，也可在下方私钥口令框留空并手动指定路径——不常用）。
+            </div>
+            <div className="field">
+              <label>agent 路径（可选，留空自动探测）</label>
+              <input className="mini mono" style={{ width: '100%' }} value={draft.agentPath} onChange={(e) => set('agentPath', e.target.value)} placeholder="\\.\pipe\openssh-ssh-agent 或 SSH_AUTH_SOCK" />
+            </div>
+          </>
+        ) : draft.authType === 'password' ? (
           <div className="field">
             <label>密码{editing ? '（留空保持不变）' : ''}</label>
             <input className="mini" style={{ width: '100%' }} type="password" value={draft.password} onChange={(e) => set('password', e.target.value)} />
@@ -184,6 +223,29 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
             </div>
           </>
         )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label>分组（可选）</label>
+            <input
+              className="mini"
+              style={{ width: '100%' }}
+              list="group-options"
+              value={draft.group}
+              onChange={(e) => set('group', e.target.value)}
+              placeholder="如：训练集群 / 推理 / 个人"
+            />
+            <datalist id="group-options">
+              {Array.from(new Set(configs.map((c) => (c.group || '').trim()).filter(Boolean))).map((g) => (
+                <option key={g} value={g} />
+              ))}
+            </datalist>
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>跳板机 ProxyJump（可选）</label>
+            <input className="mini mono" style={{ width: '100%' }} value={draft.proxyJump} onChange={(e) => set('proxyJump', e.target.value)} placeholder="user@bastion:22" />
+          </div>
+        </div>
 
         {testResult && (
           <div className="body" style={{ color: testResult.startsWith('连接成功') || testResult.startsWith('已添加') || testResult.startsWith('已更新') || testResult.startsWith('正在编辑') ? 'var(--ok)' : 'var(--crit)', marginBottom: 10 }}>
@@ -256,6 +318,27 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
               </button>
               <button className="btn danger" onClick={() => removeTarget(confirmDel)}>
                 确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDup && (
+        <div className="mask" onClick={() => setConfirmDup(false)}>
+          <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: 'var(--warn)' }}>已存在同名同主机的连接</h3>
+            <div className="body">
+              <code>{payload().name}（{payload().host}:{payload().port}）</code>
+              <br />
+              如果这是有意添加（例如同机不同账号/跳板链不同），可以继续；否则建议直接编辑已有连接。
+            </div>
+            <div className="foot">
+              <button className="btn" onClick={() => setConfirmDup(false)}>
+                取消
+              </button>
+              <button className="btn primary" onClick={doSave}>
+                仍然添加
               </button>
             </div>
           </div>

@@ -210,6 +210,8 @@ export function TransferDrawer() {
   const [kind, setKind] = useState<KindFilter>('all');
   const [st, setSt] = useState<StatusFilter>('all');
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [finishedOpen, setFinishedOpen] = useState(false); // 「全部」视图下完成区默认折叠
+  const [renderCap, setRenderCap] = useState(200); // 任务过多时渐进渲染
 
   useEffect(() => {
     const show = () => setOpen(true);
@@ -244,6 +246,16 @@ export function TransferDrawer() {
       return true;
     });
   }, [tf.items, kind, st]);
+
+  const activeList = useMemo(
+    () => filtered.filter((t) => !['done', 'canceled'].includes(t.status)),
+    [filtered],
+  );
+  const finishedList = useMemo(
+    () => filtered.filter((t) => ['done', 'canceled'].includes(t.status)),
+    [filtered],
+  );
+  const showFinished = st === 'done' || finishedOpen;
 
   const speedOf = (k: TransferKind) =>
     tf.items.filter((t) => t.status === 'running' && t.kind === k).reduce((a, t) => a + (t.speed || 0), 0);
@@ -335,9 +347,21 @@ export function TransferDrawer() {
 
         <div className="td-list">
           {filtered.length === 0 && <div className="td-empty">暂无传输任务</div>}
-          {filtered.map((t) => (
+          {activeList.slice(0, renderCap).map((t) => (
             <TaskRow key={t.id} t={t} tf={tf} picked={picked} togglePick={togglePick} />
           ))}
+          {st === 'all' && finishedList.length > 0 && (
+            <button className="td-fold" onClick={() => setFinishedOpen((v) => !v)}>
+              {finishedList.length} 条已完成/已取消 {finishedOpen ? '▾' : '▸'}
+            </button>
+          )}
+          {(st === 'done' || finishedOpen) &&
+            finishedList.slice(0, renderCap).map((t) => <TaskRow key={t.id} t={t} tf={tf} picked={picked} togglePick={togglePick} />)}
+          {(activeList.length > renderCap || (showFinished && finishedList.length > renderCap)) && (
+            <button className="td-fold" onClick={() => setRenderCap((v) => v + 300)}>
+              继续加载（还有 {Math.max(0, activeList.length - renderCap) + (showFinished ? Math.max(0, finishedList.length - renderCap) : 0)} 条）
+            </button>
+          )}
         </div>
       </aside>
     </div>

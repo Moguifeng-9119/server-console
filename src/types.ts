@@ -37,6 +37,7 @@ export interface Server {
   name: string;
   host: string;
   status: ServerStatus;
+  group?: string;
   gpus: Gpu[];
   processes: ProcessItem[];
   history: number[];
@@ -55,8 +56,11 @@ export interface ServerConfig {
   host: string;
   port: number;
   username: string;
-  authType: 'password' | 'key';
+  authType: 'password' | 'key' | 'agent';
   keyPath?: string;
+  group?: string; // 分组（侧栏分区显示）
+  proxyJump?: string; // 跳板机 [user@]host[:port]
+  agentPath?: string; // 自定义 ssh-agent 路径（authType=agent 时可选）
 }
 
 export interface SnapshotPayload {
@@ -159,6 +163,7 @@ export interface SshHostEntry {
   keyExists: boolean;
   keyCandidates: string[];
   ownKeyCandidates: string[];
+  proxyJump?: string;
 }
 
 export interface SshConfigInfo {

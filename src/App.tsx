@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Terminal } from 'lucide-react';
 import { useStore, type Density, type ThemeMode } from './state';
 import { api } from './api';
+import type { Server } from './types';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
 import { SettingsDrawer } from './components/SettingsDrawer';
@@ -57,6 +58,20 @@ export default function App() {
     return api.onConfirmQuit(() => setQuitAsk(true));
   }, []);
 
+  // 2FA/MFA 键盘交互认证弹框（主进程广播提示问题，这里收集作答）
+  const [kiAsk, setKiAsk] = useState<{ reqId: string; title: string; prompts: string[]; values: string[] } | null>(null);
+  useEffect(() => {
+    if (!api) return;
+    return api.onKeyboardInteractive(({ reqId, title, prompts }) => {
+      setKiAsk({ reqId, title, prompts, values: prompts.map(() => '') });
+    });
+  }, []);
+  const submitKi = () => {
+    if (!kiAsk || !api) return;
+    void api.submitInteractive(kiAsk.reqId, kiAsk.values);
+    setKiAsk(null);
+  };
+
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
 
   // 打开服务器：同一台保留当前 tab，换台回到 GPU；tab 状态提升到这里，避免切 tab 重挂载丢文件面板状态
@@ -66,6 +81,62 @@ export default function App() {
       id,
       tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
     }));
+
+  // 侧栏分组：只要有服务器带分组信息就启用分区；折叠状态持久化
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem('sc.groups.collapsed') || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      localStorage.setItem('sc.groups.collapsed', JSON.stringify([...n]));
+      return n;
+    });
+  const hasGroups = servers.some((s) => (s.group || '').trim() !== '');
+  const groupSections = useMemo(() => {
+    const map = new Map<string, Server[]>();
+    for (const s of servers) {
+      const g = (s.group || '').trim();
+      const key = g || '__ungrouped__';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
+    }
+    return [...map.entries()].map(([key, items]) => ({ key, name: key === '__ungrouped__' ? '未分组' : key, items }));
+  }, [servers]);
+
+  const renderServerItem = (s: Server) => {
+    const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
+    return (
+      <div
+        key={s.id}
+        className={`nav-item ${view.kind === 'server' && view.id === s.id ? 'active' : ''}`}
+        style={{ cursor: 'pointer' }}
+        title="单击查看监控 · 双击或点右侧“文件”直达文件管理"
+        onClick={() => openServer(s.id)}
+        onDoubleClick={() => openServer(s.id, 'files')}
+      >
+        <i className={`dot ${s.status}`} />
+        <span>{s.name}</span>
+        <span className="sub mono">{s.status === 'online' ? `${Math.round(avg)}%` : '—'}</span>
+        <button
+          className="nav-files"
+          title="打开文件管理"
+          onClick={(e) => {
+            e.stopPropagation();
+            openServer(s.id, 'files');
+          }}
+        >
+          文件
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="app">
@@ -84,34 +155,20 @@ export default function App() {
             <span>总览</span>
             <span className="sub">{servers.filter((s) => s.status === 'online').length}/{servers.length}</span>
           </button>
-          <div className="note" style={{ padding: '10px 10px 4px' }}>服务器</div>
-          {servers.map((s) => {
-            const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
-            return (
-              <div
-                key={s.id}
-                className={`nav-item ${view.kind === 'server' && view.id === s.id ? 'active' : ''}`}
-                style={{ cursor: 'pointer' }}
-                title="单击查看监控 · 双击或点右侧“文件”直达文件管理"
-                onClick={() => openServer(s.id)}
-                onDoubleClick={() => openServer(s.id, 'files')}
-              >
-                <i className={`dot ${s.status}`} />
-                <span>{s.name}</span>
-                <span className="sub mono">{s.status === 'online' ? `${Math.round(avg)}%` : '—'}</span>
-                <button
-                  className="nav-files"
-                  title="打开文件管理"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openServer(s.id, 'files');
-                  }}
-                >
-                  文件
-                </button>
-              </div>
-            );
-          })}
+          {!hasGroups && <div className="note" style={{ padding: '10px 10px 4px' }}>服务器</div>}
+          {hasGroups
+            ? groupSections.map((sec) => (
+                <div key={sec.key}>
+                  <div className="group-head" onClick={() => toggleGroup(sec.key)} title="点击折叠/展开">
+                    <span>{sec.name}</span>
+                    <span>
+                      {sec.items.length} {collapsedGroups.has(sec.key) ? '▸' : '▾'}
+                    </span>
+                  </div>
+                  {!collapsedGroups.has(sec.key) && sec.items.map(renderServerItem)}
+                </div>
+              ))
+            : servers.map(renderServerItem)}
         </nav>
         <div className="sidebar-foot">
           <button className="btn" style={{ flex: 1, paddingInline: 4 }} onClick={() => setImportOpen(true)}>
@@ -243,6 +300,52 @@ export default function App() {
                 }}
               >
                 最小化并继续
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {kiAsk && (
+        <div className="mask">
+          <div className="dialog" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
+            <h3>{kiAsk.title}</h3>
+            <div className="body" style={{ color: 'var(--text-dim)' }}>
+              服务器要求交互式认证（如二次验证码）。
+            </div>
+            {kiAsk.prompts.map((p, i) => (
+              <div className="field" key={i}>
+                <label>{p}</label>
+                <input
+                  className="mini"
+                  style={{ width: '100%' }}
+                  autoFocus={i === 0}
+                  type={/password|密码|口令|pin/i.test(p) ? 'password' : 'text'}
+                  value={kiAsk.values[i]}
+                  onChange={(e) =>
+                    setKiAsk((prev) => {
+                      if (!prev) return prev;
+                      const values = [...prev.values];
+                      values[i] = e.target.value;
+                      return { ...prev, values };
+                    })
+                  }
+                  onKeyDown={(e) => e.key === 'Enter' && submitKi()}
+                />
+              </div>
+            ))}
+            <div className="foot">
+              <button
+                className="btn"
+                onClick={() => {
+                  void api?.submitInteractive(kiAsk.reqId, kiAsk.prompts.map(() => ''));
+                  setKiAsk(null);
+                }}
+              >
+                取消（回退密码）
+              </button>
+              <button className="btn primary" onClick={submitKi}>
+                提交
               </button>
             </div>
           </div>

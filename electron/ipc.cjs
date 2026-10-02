@@ -1,7 +1,7 @@
 const { ipcMain, BrowserWindow, Notification, dialog, app } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { Pool, Connection, setHostKeyChecker } = require('./ssh.cjs');
+const { Pool, Connection, setHostKeyChecker, setInteractiveHandler, setJumpResolver } = require('./ssh.cjs');
 const store = require('./store.cjs');
 const localfs = require('./localfs.cjs');
 const sshconfig = require('./sshconfig.cjs');
@@ -164,6 +164,16 @@ function registerIpc() {
   ipcMain.handle('security:get', () => hostkeys.getOpts());
   ipcMain.handle('security:set', (_e, o) => hostkeys.setOpts(o || {}));
 
+  // 交互式认证作答回传
+  ipcMain.handle('ssh:interactive-reply', (_e, { reqId, answers }) => {
+    const p = pendingInteractive.get(String(reqId));
+    if (p) {
+      pendingInteractive.delete(String(reqId));
+      p.resolve(Array.isArray(answers) ? answers.map(String) : []);
+    }
+    return true;
+  });
+
   ipcMain.handle('servers:list', () => servers.map(store.publicView));
 
   ipcMain.handle('servers:add', (_e, cfg) => {
@@ -191,6 +201,7 @@ function registerIpc() {
       const v = validateServerCfg({ ...servers[i], ...patch });
       servers[i] = { ...servers[i], ...patch, ...v };
       persist();
+      pool.remove(servers[i].id); // 凭据/端口可能已变，丢弃旧连接让下个采集周期用新配置重建
       return { ok: true, server: store.publicView(servers[i]) };
     } catch (e) {
       return { ok: false, error: e.message };
@@ -476,8 +487,61 @@ function registerIpc() {
   );
 }
 
+// 跳板机凭据解析：优先复用已保存的、主机匹配的连接凭据；否则回退用目标自身凭据
+function resolveJump(cfg) {
+  const raw = String(cfg.proxyJump || '').trim();
+  if (!raw) return null;
+  let user = '';
+  let hostPort = raw;
+  const at = raw.lastIndexOf('@');
+  if (at >= 0) {
+    user = raw.slice(0, at);
+    hostPort = raw.slice(at + 1);
+  }
+  let host = hostPort;
+  let port = 22;
+  const colon = hostPort.lastIndexOf(':');
+  if (colon >= 0) {
+    const p = Number(hostPort.slice(colon + 1));
+    if (Number.isInteger(p) && p > 0 && p <= 65535) {
+      host = hostPort.slice(0, colon);
+      port = p;
+    }
+  }
+  const hit = servers.find((s) => s.host === host && s.port === port && (!user || s.username === user));
+  const base = hit || cfg;
+  return {
+    host,
+    port,
+    username: user || base.username,
+    authType: base.authType || 'password',
+    password: base.password,
+    keyPath: base.keyPath,
+    passphrase: base.passphrase,
+    agentPath: base.agentPath,
+  };
+}
+
+// 交互式认证（2FA/MFA）：广播给渲染层弹框作答，等待回复（2 分钟超时回退密码）
+const pendingInteractive = new Map();
+function handleInteractive({ name, prompts }) {
+  const reqId = `ki_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  broadcast('ssh:keyboard-interactive', { reqId, title: name || '服务器身份验证', prompts });
+  return new Promise((resolve, reject) => {
+    pendingInteractive.set(reqId, { resolve });
+    setTimeout(() => {
+      if (pendingInteractive.has(reqId)) {
+        pendingInteractive.delete(reqId);
+        reject(new Error('交互式认证等待超时'));
+      }
+    }, 120000);
+  });
+}
+
 function init() {
   setHostKeyChecker(hostkeys.makeVerifier()); // 所有出站 SSH 连接启用 TOFU 指纹校验
+  setJumpResolver(resolveJump);
+  setInteractiveHandler(handleInteractive);
   servers = store.load();
   registerIpc();
   start();

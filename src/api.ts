@@ -34,6 +34,8 @@ interface Api {
   setInterval: (ms: number) => Promise<number>;
   kill: (id: string, pid: number, signal: 'TERM' | 'KILL') => Promise<{ ok: boolean; error?: string }>;
   restartService: (id: string, service: string) => Promise<{ ok: boolean; error?: string }>;
+  onKeyboardInteractive: (cb: (data: { reqId: string; title: string; prompts: string[] }) => void) => () => void;
+  submitInteractive: (reqId: string, answers: string[]) => Promise<boolean>;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
 

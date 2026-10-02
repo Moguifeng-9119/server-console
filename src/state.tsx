@@ -263,6 +263,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         id: c.id,
         name: c.name,
         host: `${c.username}@${c.host}`,
+        group: c.group,
         status: s?.status ?? 'offline',
         gpus: s?.gpus ?? [],
         processes: s?.processes ?? [],

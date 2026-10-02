@@ -2039,3 +2039,34 @@ a.link {
 a.link:hover {
   text-decoration: underline;
 }
+
+/* 侧栏分组标题 */
+.group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 10px 4px;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+.group-head:hover {
+  color: var(--text-dim);
+}
+
+/* 传输中心折叠/加载更多按钮 */
+.td-fold {
+  width: 100%;
+  text-align: center;
+  padding: 7px;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  font-size: 11.5px;
+}
+.td-fold:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}

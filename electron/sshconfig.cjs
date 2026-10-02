@@ -118,6 +118,7 @@ function buildEntries(blocks, baseDir) {
       keyExists,
       keyCandidates: idList,
       ownKeyCandidates: localIds,
+      proxyJump: kv.proxyjump || '', // 仅支持 ProxyJump 指令；ProxyCommand 暂不解析
       raw: { hostname: hostName, user: (kv.user || '').trim(), port: kv.port || '' },
     });
   }

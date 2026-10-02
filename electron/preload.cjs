@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('api', {
   setInterval: (ms) => ipcRenderer.invoke('ssh:setInterval', ms),
   kill: (id, pid, signal) => ipcRenderer.invoke('ssh:kill', { id, pid, signal }),
   restartService: (id, service) => ipcRenderer.invoke('ssh:restartService', { id, service }),
+  // 交互式认证（2FA/MFA）：主进程广播提示问题，渲染层弹框作答回传
+  onKeyboardInteractive: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('ssh:keyboard-interactive', h);
+    return () => ipcRenderer.removeListener('ssh:keyboard-interactive', h);
+  },
+  submitInteractive: (reqId, answers) => ipcRenderer.invoke('ssh:interactive-reply', { reqId, answers }),
   onSnapshot: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('ssh:snapshot', h);

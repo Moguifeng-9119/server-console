@@ -165,51 +165,13 @@ class Connection {
   }
 
   authConfig() {
-    const { username, password, keyPath, passphrase } = this.cfg;
-    const base = { username, readyTimeout: 10000, keepaliveInterval: 15000, keepaliveCountMax: 3 };
-    if (keyPath) {
-      try {
-        return { ...base, privateKey: fs.readFileSync(keyPath), passphrase: passphrase || undefined };
-      } catch (e) {
-        throw new Error(`读取私钥失败：${e.message}`);
-      }
-    }
-    return { ...base, password };
+    return authOpts(this.cfg);
   }
 
   connect() {
     if (this.client) return Promise.resolve();
     if (this.pending) return this.pending;
-    this.pending = new Promise((resolve, reject) => {
-      const client = new Client();
-      client
-        .on('ready', () => {
-          this.status = 'online';
-          this.error = '';
-          this._fails = 0;
-          this._nextRetryAt = 0;
-          this.pending = null;
-          resolve();
-        })
-        .on('error', (err) => {
-          // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
-          if (this._hostKeyError) {
-            err.message = this._hostKeyError;
-            this._hostKeyError = '';
-          }
-          this.status = /authentic/i.test(err.message) ? 'auth' : 'offline';
-          this.error = err.message;
-          this.pending = null;
-          this._fails += 1;
-          this._nextRetryAt = Date.now() + Math.min(30000, 1000 * 2 ** Math.min(this._fails, 5));
-          this.dispose();
-          reject(err);
-        })
-        .on('close', () => {
-          this.status = 'offline';
-          this.pending = null;
-          this.dispose();
-        });
+    this.pending = (async () => {
       try {
         /** @type {Record<string, any>} */
         const connectOpts = { host: this.cfg.host, port: this.cfg.port || 22, ...this.authConfig() };
@@ -228,13 +190,79 @@ class Connection {
               });
           };
         }
-        client.connect(connectOpts);
-        this.client = client;
+        // ProxyJump：先建立跳板机连接，再把目标连接隧道进其通道（forwardOut）
+        if (this.cfg.proxyJump && jumpResolver) {
+          const jump = await Promise.resolve()
+            .then(() => jumpResolver(this.cfg))
+            .catch((e) => {
+              throw new Error(`跳板机解析失败：${e.message}`);
+            });
+          if (jump) {
+            const jc = new Client();
+            this._jumpClient = jc;
+            jc.on('close', () => {
+              // 跳板断开时一并断开目标，避免半挂连接
+              try {
+                if (this.client) this.client.end();
+              } catch {
+                /* noop */
+              }
+            });
+            await new Promise((res, rej) => {
+              jc.once('ready', res);
+              jc.once('error', (e) => rej(new Error(`跳板机连接失败：${e.message}`)));
+              jc.connect({ host: jump.host, port: jump.port || 22, ...authOpts(jump) });
+            });
+            connectOpts.sock = await new Promise((res, rej) =>
+              jc.forwardOut('127.0.0.1', 0, this.cfg.host, this.cfg.port || 22, (e, s) => (e ? rej(e) : res(s))),
+            );
+          }
+        }
+        await new Promise((resolve, reject) => {
+          const client = new Client();
+          client
+            .on('ready', () => {
+              this.status = 'online';
+              this.error = '';
+              this._fails = 0;
+              this._nextRetryAt = 0;
+              this.pending = null;
+              resolve();
+            })
+            .on('error', (err) => {
+              // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
+              if (this._hostKeyError) {
+                err.message = this._hostKeyError;
+                this._hostKeyError = '';
+              }
+              this.status = /authentic/i.test(err.message) ? 'auth' : 'offline';
+              this.error = err.message;
+              this._fails += 1;
+              this._nextRetryAt = Date.now() + Math.min(30000, 1000 * 2 ** Math.min(this._fails, 5));
+              reject(err);
+            })
+            .on('close', () => {
+              this.status = 'offline';
+              this.pending = null;
+              this.dispose();
+            });
+          // keyboard-interactive（2FA/MFA）：有注入的交互通道就走渲染层弹框；否则回退用配置密码作答
+          client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
+            const qs = prompts.map((p) => p.prompt || '');
+            Promise.resolve()
+              .then(() => (interactiveHandler ? interactiveHandler({ name: _name, prompts: qs }) : null))
+              .then((answers) => finish(Array.isArray(answers) && answers.length === qs.length ? answers : qs.map(() => this.cfg.password || '')))
+              .catch(() => finish(qs.map(() => this.cfg.password || '')));
+          });
+          client.connect(connectOpts);
+          this.client = client;
+        });
       } catch (e) {
         this.pending = null;
-        reject(e);
+        this.dispose();
+        throw e;
       }
-    });
+    })();
     return this.pending;
   }
 
@@ -246,6 +274,14 @@ class Connection {
         /* noop */
       }
       this._sftp = null;
+    }
+    if (this._jumpClient) {
+      try {
+        this._jumpClient.end();
+      } catch {
+        /* noop */
+      }
+      this._jumpClient = null;
     }
     if (this.client) {
       try {
@@ -411,20 +447,26 @@ class Connection {
         linkToDir: false,
       };
     });
-    // 符号链接：解析其指向，指向目录则允许进入
+    // 符号链接：解析其指向，指向目录则允许进入（有界并发，避免上千链接逐个串行往返）
+    const links = entries.filter((e) => e.type === 'link');
+    let linkIdx = 0;
+    const resolveLink = async (e) => {
+      try {
+        const st = await new Promise((res, rej) =>
+          sftp.stat(posixJoin(target, e.name), (er, r) => (er ? rej(er) : res(r))),
+        );
+        e.linkToDir = sftpType(st.mode) === 'dir';
+      } catch {
+        /* 悬空链接保持 link */
+      }
+    };
     await Promise.all(
-      entries
-        .filter((e) => e.type === 'link')
-        .map(async (e) => {
-          try {
-            const st = await new Promise((res, rej) =>
-              sftp.stat(posixJoin(target, e.name), (er, r) => (er ? rej(er) : res(r))),
-            );
-            e.linkToDir = sftpType(st.mode) === 'dir';
-          } catch {
-            /* 悬空链接保持 link */
-          }
-        }),
+      Array.from({ length: Math.min(8, links.length) }, async () => {
+        while (linkIdx < links.length) {
+          const e = links[linkIdx++];
+          await resolveLink(e);
+        }
+      }),
     );
     entries.sort((a, b) => {
       const ad = a.type === 'dir' || a.linkToDir;
@@ -504,6 +546,35 @@ function setHostKeyChecker(fn) {
   hostKeyCheck = typeof fn === 'function' ? fn : null;
 }
 
+// 交互式认证（2FA/MFA 键盘提示）与跳板机凭据解析均由主进程注入
+let interactiveHandler = null; // ({name, prompts}) => Promise<string[]>
+function setInteractiveHandler(fn) {
+  interactiveHandler = typeof fn === 'function' ? fn : null;
+}
+let jumpResolver = null; // (cfg) => {host,port,username,authType,password,keyPath,passphrase,agentPath} | null
+function setJumpResolver(fn) {
+  jumpResolver = typeof fn === 'function' ? fn : null;
+}
+
+// 由配置构造 ssh2 认证参数（目标连接与跳板机共用）
+function authOpts(cfg) {
+  const base = { username: cfg.username, readyTimeout: 10000, keepaliveInterval: 15000, tryKeyboard: true };
+  if (cfg.authType === 'agent') {
+    const agent =
+      cfg.agentPath || process.env.SSH_AUTH_SOCK || (process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : undefined);
+    if (!agent) throw new Error('未找到系统 ssh-agent（未设置 SSH_AUTH_SOCK）');
+    return { ...base, agent };
+  }
+  if (cfg.keyPath) {
+    try {
+      return { ...base, privateKey: fs.readFileSync(cfg.keyPath), passphrase: cfg.passphrase || undefined };
+    } catch (e) {
+      throw new Error(`读取私钥失败：${e.message}`);
+    }
+  }
+  return { ...base, password: cfg.password };
+}
+
 class Pool {
   constructor() {
     this.conns = new Map();
@@ -538,4 +609,4 @@ class Pool {
   }
 }
 
-module.exports = { Pool, Connection, parseSnapshot, COLLECT_CMD, setHostKeyChecker };
+module.exports = { Pool, Connection, parseSnapshot, COLLECT_CMD, setHostKeyChecker, setInteractiveHandler, setJumpResolver };
