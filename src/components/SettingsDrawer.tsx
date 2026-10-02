@@ -205,6 +205,29 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        <div className="field">
+          <label>帮助 · 快捷键与操作</label>
+          <div className="help-list">
+            <div className="e"><b>双击侧栏服务器</b><span>直达该机的文件管理</span></div>
+            <div className="e"><b>Ctrl/点击 · Shift/点击</b><span>文件列表多选 / 范围选择</span></div>
+            <div className="e"><b>Ctrl+A / Esc</b><span>全选当前面板 / 清空选择</span></div>
+            <div className="e"><b>右键文件或进程</b><span>更多操作（下载、互传、压缩、结束进程…）</span></div>
+            <div className="e"><b>拖拽文件到右侧面板</b><span>上传到远程当前目录</span></div>
+            <div className="e"><b>Esc（传输中心）</b><span>无活跃传输时可关闭抽屉</span></div>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>关于</label>
+          <div className="body" style={{ color: 'var(--text-dim)' }}>
+            ServerConsole <b className="num">v{__APP_VERSION__}</b> · 本地优先的多服务器 GPU 监控 / SFTP / 互传工具，数据只经你的本机与你的服务器。
+            <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
+              <a className="link" href="https://github.com/Moguifeng-9119/server-console" target="_blank" rel="noreferrer">GitHub 仓库</a>
+              <a className="link" href="https://github.com/Moguifeng-9119/server-console/issues" target="_blank" rel="noreferrer">反馈问题</a>
+            </div>
+          </div>
+        </div>
+
         <button className="btn" style={{ width: '100%' }} onClick={onClose}>
           关闭
         </button>

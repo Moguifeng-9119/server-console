@@ -10,6 +10,7 @@
 ![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
+![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 
 [English](./README.md) | 简体中文
 
@@ -18,6 +19,13 @@
 **服务器间高速直传**——基于 Electron、React 和 [`ssh2`](https://github.com/mscdex/ssh2) 构建。
 无云端、无数据中转：所有连接都从你的本机直接发起。
 
+  <p align="center">
+    <img src="assets/screenshots/overview.png" alt="机群总览" width="880" />
+  </p>
+  <p align="center">
+    <img src="assets/screenshots/gpu-panel.png" alt="GPU 面板" width="430" />&nbsp;
+    <img src="assets/screenshots/processes.png" alt="进程表" width="430" />
+  </p>
 </div>
 
 ---

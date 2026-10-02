@@ -26,7 +26,7 @@ function createWindow() {
     height: Math.min(900, Math.round(height * 0.9)),
     minWidth: 900,
     minHeight: 600,
-    title: 'Server Console',
+    title: 'ServerConsole',
     backgroundColor: '#0e1116',
     autoHideMenuBar: true,
     ...(fs.existsSync(windowIcon) ? { icon: windowIcon } : {}),

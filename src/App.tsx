@@ -13,15 +13,43 @@ import { useTransfers } from './transfers';
 
 type ServerTab = 'gpu' | 'proc' | 'files';
 
+const LS_VIEW = 'sc.view';
+
+// 恢复上次页面：只在结构合法时采用，服务器已被删除则由下方 effect 兜底回总览
+function loadView(): { kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_VIEW) || 'null');
+    if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files'].includes(raw.tab)) {
+      return { kind: 'server', id: raw.id, tab: raw.tab };
+    }
+  } catch {
+    /* 忽略坏数据 */
+  }
+  return { kind: 'overview' };
+}
+
 export default function App() {
   const { servers, theme, setTheme, density, setDensity, toasts, demo, configs } = useStore();
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
-  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab }>({ kind: 'overview' });
+  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [quitAsk, setQuitAsk] = useState(false);
+
+  // 页面/标签持久化
+  useEffect(() => {
+    localStorage.setItem(LS_VIEW, JSON.stringify(view));
+  }, [view]);
+
+  // 上次页面对应的服务器已被删除 → 回总览
+  const serversReady = servers.length > 0;
+  useEffect(() => {
+    if (serversReady && view.kind === 'server' && !servers.find((s) => s.id === view.id)) {
+      setView({ kind: 'overview' });
+    }
+  }, [serversReady, servers, view]);
 
   // 主进程在有活跃传输时拦截了关窗，这里弹确认框
   useEffect(() => {

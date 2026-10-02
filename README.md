@@ -12,12 +12,20 @@
 ![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 ![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
+![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 
 **ServerConsole** is a local-first desktop app that centralizes multiple Linux/GPU servers:
 live GPU & process monitoring, a dual-pane SFTP file manager, uploads/downloads, and
 **high-speed server-to-server direct transfer** — built with Electron, React and [`ssh2`](https://github.com/mscdex/ssh2).
 No cloud, no relay of your data: every connection runs straight from your machine.
 
+  <p align="center">
+    <img src="assets/screenshots/overview.png" alt="Fleet overview" width="880" />
+  </p>
+  <p align="center">
+    <img src="assets/screenshots/gpu-panel.png" alt="GPU panel" width="430" />&nbsp;
+    <img src="assets/screenshots/processes.png" alt="Process table" width="430" />
+  </p>
 </div>
 
 ---
