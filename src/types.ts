@@ -61,6 +61,7 @@ export interface ServerConfig {
   group?: string; // 分组（侧栏分区显示）
   proxyJump?: string; // 跳板机 [user@]host[:port]
   agentPath?: string; // 自定义 ssh-agent 路径（authType=agent 时可选）
+  compress?: boolean; // SSH 通道压缩（慢链路）
 }
 
 export interface SnapshotPayload {

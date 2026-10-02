@@ -83,6 +83,26 @@ contextBridge.exposeInMainWorld('api', {
   setAppSettings: (o) => ipcRenderer.invoke('app:set-settings', o),
   getAppSettings: () => ipcRenderer.invoke('app:get-settings'),
   showMainWindow: () => ipcRenderer.send('app:show-main'),
+
+  // 内嵌 SSH 终端
+  terminalOpen: (id, cols, rows) => ipcRenderer.invoke('terminal:open', { id, cols, rows }),
+  terminalWrite: (termId, data) => ipcRenderer.invoke('terminal:write', { termId, data }),
+  terminalResize: (termId, cols, rows) => ipcRenderer.invoke('terminal:resize', { termId, cols, rows }),
+  terminalClose: (termId) => ipcRenderer.invoke('terminal:close', { termId }),
+  onTerminalData: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('terminal:data', h);
+    return () => ipcRenderer.removeListener('terminal:data', h);
+  },
+  onTerminalClosed: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('terminal:closed', h);
+    return () => ipcRenderer.removeListener('terminal:closed', h);
+  },
+
+  // GPU 历史持久化
+  historyLoad: () => ipcRenderer.invoke('history:load'),
+  historySave: (map) => ipcRenderer.invoke('history:save', map),
   onSnapshot: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('ssh:snapshot', h);

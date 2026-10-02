@@ -16,6 +16,7 @@ type Draft = {
   agentPath: string;
   group: string;
   proxyJump: string;
+  compress: boolean;
 };
 
 const emptyDraft: Draft = {
@@ -30,6 +31,7 @@ const emptyDraft: Draft = {
   agentPath: '',
   group: '',
   proxyJump: '',
+  compress: false,
 };
 
 export function ServerManager({ onClose }: { onClose: () => void }) {
@@ -81,6 +83,7 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
       agentPath: c.agentPath || '',
       group: c.group || '',
       proxyJump: c.proxyJump || '',
+      compress: !!c.compress,
     });
     setTestResult(`正在编辑：${c.name}（凭据留空则保持不变）`);
   };
@@ -245,6 +248,13 @@ export function ServerManager({ onClose }: { onClose: () => void }) {
             <label>跳板机 ProxyJump（可选）</label>
             <input className="mini mono" style={{ width: '100%' }} value={draft.proxyJump} onChange={(e) => set('proxyJump', e.target.value)} placeholder="user@bastion:22" />
           </div>
+        </div>
+
+        <div className="field">
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={draft.compress} onChange={(e) => set('compress', e.target.checked)} />
+            SSH 通道压缩（慢链路 / 高延迟网络下可提升吞吐）
+          </label>
         </div>
 
         {testResult && (

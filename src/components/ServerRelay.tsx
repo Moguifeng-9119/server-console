@@ -200,6 +200,7 @@ export function RelayDialog({
   );
   const [dstCwd, setDstCwd] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ignoreExisting, setIgnoreExisting] = useState(false);
 
   const dst = configs.find((c) => c.id === dstId);
   const dstOffline = !!dstId && statusOf(dstId) !== 'online';
@@ -233,7 +234,7 @@ export function RelayDialog({
     }
     setBusy(true);
     try {
-      await tf.relay(selfId, dstId, items, dstCwd, selfName, dst?.name);
+      await tf.relay(selfId, dstId, items, dstCwd, selfName, dst?.name, ignoreExisting);
       pushToast({ level: 'info', title: `已加入互传队列：→ ${dst?.name}`, detail: `${items.length} 项 → ${dstCwd}` });
       onDone();
     } catch (e) {
@@ -296,6 +297,10 @@ export function RelayDialog({
           </div>
         </div>
         <div className="foot">
+          <label className="td-chk" style={{ marginRight: 'auto' }} title="仅 rsync 直传支持；经本机中继或 tar/scp 时忽略此项">
+            <input type="checkbox" checked={ignoreExisting} onChange={(e) => setIgnoreExisting(e.target.checked)} />
+            跳过目标已有文件（同步模式）
+          </label>
           <button
             className="btn primary"
             disabled={busy || !dstId || dstOffline || items.length === 0 || !dstCwd}

@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const DEFAULT_CONCURRENCY = 15; // 同时传输的顶层任务数（默认，可在设置中 1-15 调整）
 const MAX_CONCURRENT_TASKS = DEFAULT_CONCURRENCY;
@@ -144,7 +145,7 @@ class TransferManager {
     this.notify = typeof notify === 'function' ? notify : null; // 任务完成/失败系统通知回调
     this.knownHostsLine = typeof knownHostsLine === 'function' ? knownHostsLine : null;
     this.maxConcurrent = DEFAULT_CONCURRENCY;
-    this.options = { notifyDone: true, notifyFail: true };
+    this.options = { notifyDone: true, notifyFail: true, verify: false, limitBytes: 0 };
     this.tasks = new Map();
     this.queue = [];
     this.running = 0;
@@ -334,6 +335,38 @@ class TransferManager {
     return false;
   }
 
+  _md5Local(p) {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('md5');
+      const rs = fs.createReadStream(p);
+      rs.on('data', (d) => hash.update(d))
+        .on('end', () => resolve(hash.digest('hex')))
+        .on('error', reject);
+    });
+  }
+
+  // 传输完成后的完整性校验：返回 true/false；无法校验（远端无 md5sum 等）返回 null 视为通过
+  async _verifyChecksum(t) {
+    const remoteMd5 = async (conn, p) => {
+      const r = await conn.exec(`md5sum ${shq(p)}`, 60000);
+      const h = (r.stdout || '').trim().split(/\s+/)[0] || '';
+      return /^[0-9a-f]{32}$/.test(h) ? h : null;
+    };
+    if (t.kind === 'upload') {
+      const conn = await this._conn(t.serverId);
+      const [local, remote] = await Promise.all([this._md5Local(t.srcLocal), remoteMd5(conn, t.dstRemote)]);
+      if (!local || !remote) return null;
+      return local === remote;
+    }
+    if (t.kind === 'download') {
+      const conn = await this._conn(t.serverId);
+      const [local, remote] = await Promise.all([this._md5Local(t.dstLocal), remoteMd5(conn, t.srcRemote)]);
+      if (!local || !remote) return null;
+      return local === remote;
+    }
+    return null;
+  }
+
   _add(job) {
     const id = job.id || `tf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     const t = {
@@ -355,6 +388,7 @@ class TransferManager {
       srcRemote: job.srcRemote,
       dstRemote: job.dstRemote,
       direction: job.direction,
+      ignoreExisting: !!job.ignoreExisting,
       direct: false,
       directMode: '',
       directNote: '',
@@ -446,6 +480,15 @@ class TransferManager {
       t.speed = 0;
       t.transferred = t.size;
       t.finishedAt = Date.now();
+      // 可选完整性校验：仅单文件（目录树代价过高）；远端无 md5sum 时静默跳过
+      if (this.options.verify && !t._isTree && (t.kind === 'upload' || t.kind === 'download')) {
+        this.emit(t);
+        const ok = await this._verifyChecksum(t).catch(() => null);
+        if (ok === false) {
+          t.status = 'error';
+          t.error = '传输完成但 MD5 校验失败，建议删除目标文件后重试';
+        }
+      }
     } catch (e) {
       t.speed = 0;
       if (e && e.aborted) {
@@ -552,6 +595,7 @@ class TransferManager {
 
   // 目录上传：本地 readdir 渐进展开 + 有界文件并发，总量/文件数随遍历回填
   async _uploadTree(t, gate) {
+    t._isTree = true;
     const conn = await this._conn(t.serverId);
     const sftp = await conn.sftp();
     const srcRoot = t.srcLocal;
@@ -630,6 +674,7 @@ class TransferManager {
 
   // 目录下载：listDir 渐进展开（含 linkToDir 解析，不再把指向目录的符号链接当小文件）+ 有界文件并发
   async _downloadTree(t, gate) {
+    t._isTree = true;
     const conn = await this._conn(t.serverId);
     const sftp = await conn.sftp();
     const srcRoot = t.srcRemote;
@@ -772,8 +817,10 @@ class TransferManager {
       let modeLines = '';
       if (useRsync) {
         // rsync：两端都有时最优，支持增量续传；--out-format 逐文件回传已完成文件名（@@前缀，stdout 实时流出），错误仍进日志
+        // 同步模式（ignoreExisting）仅 rsync 支持
+        const flags = '-aW --partial --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '');
         modeLines +=
-          `if rsync -aW --partial --numeric-ids --out-format='@@%n' -e ${q(sshVar)} ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
+          `if rsync ${flags} --out-format='@@%n' -e ${q(sshVar)} ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
           `else echo "rsync:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       }
       if (useTar) {
@@ -1129,6 +1176,8 @@ function posixDir(p) {
   const i = p.lastIndexOf('/');
   return i >= 0 ? p.slice(0, i) : '.';
 }
+
+const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 
 // 远程目标已有内容时返回可续传的字节偏移（目标不存在/更大/为 0 一律从头）
 async function remoteFileOffset(sftp, remotePath, size) {

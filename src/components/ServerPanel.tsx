@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { FileManager } from './FileManager';
+import { TerminalPane } from './TerminalPane';
 
 type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
@@ -230,8 +231,8 @@ export function ServerPanel({
 }: {
   s: Server;
   onBack: () => void;
-  tab: 'gpu' | 'proc' | 'files';
-  onTab: (t: 'gpu' | 'proc' | 'files') => void;
+  tab: 'gpu' | 'proc' | 'files' | 'term';
+  onTab: (t: 'gpu' | 'proc' | 'files' | 'term') => void;
 }) {
   const { kill, restartService } = useStore();
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
@@ -315,6 +316,9 @@ export function ServerPanel({
             <button className={tab === 'files' ? 'on' : ''} onClick={() => onTab('files')}>
               文件
             </button>
+            <button className={tab === 'term' ? 'on' : ''} onClick={() => onTab('term')}>
+              终端
+            </button>
             <span className="note" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
               {tab === 'files' ? '双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传' : '右键任意进程行可执行操作'}
             </span>
@@ -323,6 +327,8 @@ export function ServerPanel({
             <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />
           ) : tab === 'proc' ? (
             <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />
+          ) : tab === 'term' ? (
+            <TerminalPane serverId={s.id} />
           ) : (
             <FileManager serverId={s.id} />
           )}

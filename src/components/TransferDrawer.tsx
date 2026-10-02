@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { api } from '../api';
 import { useTransfers } from '../transfers';
 import { formatBytes, formatDuration, formatSpeed, etaSeconds, pctOf } from '../format';
 import type { TransferItem, TransferKind, TransferStatus } from '../types';
@@ -212,6 +213,16 @@ export function TransferDrawer() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [finishedOpen, setFinishedOpen] = useState(false); // 「全部」视图下完成区默认折叠
   const [renderCap, setRenderCap] = useState(200); // 任务过多时渐进渲染
+  const [verifyOn, setVerifyOn] = useState(() => localStorage.getItem('sc.tf.verify') === '1');
+
+  useEffect(() => {
+    api?.transferOptions({ verify: verifyOn });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const setVerify = (v: boolean) => {
+    setVerifyOn(v);
+    localStorage.setItem('sc.tf.verify', v ? '1' : '0');
+    api?.transferOptions({ verify: v });
+  };
 
   useEffect(() => {
     const show = () => setOpen(true);
@@ -353,6 +364,9 @@ export function TransferDrawer() {
               onChange={(e) => tf.setLimitMB(Number(e.target.value) || 0)}
             />
             MB/s
+          </label>
+          <label className="td-chk" title="单文件传输完成后对比 MD5（远端需有 md5sum；目录树不校验）">
+            <input type="checkbox" checked={verifyOn} onChange={(e) => setVerify(e.target.checked)} />MD5 校验
           </label>
           <span className="td-spacer" />
           {tf.runningCount > 0 && <span className="td-pin">传输中已钉住，不会被误关</span>}

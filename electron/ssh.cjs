@@ -566,6 +566,7 @@ function setJumpResolver(fn) {
 // 由配置构造 ssh2 认证参数（目标连接与跳板机共用）
 function authOpts(cfg) {
   const base = { username: cfg.username, readyTimeout: 10000, keepaliveInterval: 15000, tryKeyboard: true };
+  if (cfg.compress) base.compress = true; // 慢链路可选：SSH 通道压缩
   if (cfg.authType === 'agent') {
     const agent =
       cfg.agentPath || process.env.SSH_AUTH_SOCK || (process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : undefined);

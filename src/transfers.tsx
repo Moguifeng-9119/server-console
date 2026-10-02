@@ -25,7 +25,7 @@ interface TransferStore {
   queuedCount: number;
   upload: (serverId: string, localPaths: string[], remoteDir: string, serverName?: string) => Promise<number>;
   download: (serverId: string, items: FileEntry[], localDir: string, serverName?: string) => Promise<number>;
-  relay: (srcId: string, dstId: string, items: FileEntry[], dstDir: string, srcName?: string, dstName?: string) => Promise<number>;
+  relay: (srcId: string, dstId: string, items: FileEntry[], dstDir: string, srcName?: string, dstName?: string, ignoreExisting?: boolean) => Promise<number>;
   pause: (id: string) => void;
   cancel: (id: string) => void;
   resume: (id: string) => void;
@@ -164,9 +164,9 @@ export function TransferProvider({ children }: { children: ReactNode }) {
   );
 
   const relay = useCallback(
-    async (srcId: string, dstId: string, sel: FileEntry[], dstDir: string, srcName?: string, dstName?: string) => {
+    async (srcId: string, dstId: string, sel: FileEntry[], dstDir: string, srcName?: string, dstName?: string, ignoreExisting?: boolean) => {
       if (!api) return 0;
-      const r = await api.transferRelay(srcId, dstId, sel, dstDir, srcName, dstName);
+      const r = await api.transferRelay(srcId, dstId, sel, dstDir, srcName, dstName, ignoreExisting);
       if (!r.ok) throw new Error(r.error || '加入服务器互传队列失败');
       return r.data?.length ?? 0;
     },

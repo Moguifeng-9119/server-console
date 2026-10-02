@@ -61,6 +61,16 @@ interface Api {
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
   getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit' }>;
   showMainWindow: () => void;
+
+  terminalOpen: (id: string, cols: number, rows: number) => Promise<IpcResult<string>>;
+  terminalWrite: (termId: string, data: string) => Promise<unknown>;
+  terminalResize: (termId: string, cols: number, rows: number) => Promise<unknown>;
+  terminalClose: (termId: string) => Promise<unknown>;
+  onTerminalData: (cb: (d: { termId: string; data: string }) => void) => () => void;
+  onTerminalClosed: (cb: (d: { termId: string }) => void) => () => void;
+
+  historyLoad: () => Promise<Record<string, number[]>>;
+  historySave: (map: Record<string, number[]>) => Promise<boolean>;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
 
@@ -112,7 +122,7 @@ interface Api {
   transferRetryFailed: () => Promise<unknown>;
   transferMove: (id: string, dir: 'up' | 'down') => Promise<unknown>;
   transferConcurrency: (n: number) => Promise<number>;
-  transferOptions: (o: { notifyDone?: boolean; notifyFail?: boolean; limitBytes?: number }) => Promise<unknown>;
+  transferOptions: (o: { notifyDone?: boolean; notifyFail?: boolean; limitBytes?: number; verify?: boolean }) => Promise<unknown>;
   transferUpload: (id: string, localPaths: string[], remoteDir: string, serverName?: string) => Promise<IpcResult<TransferItem[]>>;
   transferDownload: (
     id: string,
@@ -127,6 +137,7 @@ interface Api {
     dstDir: string,
     srcName?: string,
     dstName?: string,
+    ignoreExisting?: boolean,
   ) => Promise<IpcResult<TransferItem[]>>;
   onTransferUpdate: (cb: (t: TransferItem) => void) => () => void;
 }

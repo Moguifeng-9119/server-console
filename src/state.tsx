@@ -237,11 +237,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
       if (lastAvg.current[id] === avg) continue;
       lastAvg.current[id] = avg;
-      next[id] = [...(histories[id] ?? []), avg].slice(-60);
+      next[id] = [...(histories[id] ?? []), avg].slice(-720); // 持久化后放宽到 720 点
       changed = true;
     }
     if (changed) setHistories((prev) => ({ ...prev, ...next }));
   }, [snaps, demo, histories]);
+
+  // 历史曲线持久化：启动恢复 + 每 30 秒落盘（无变化不写）
+  const historiesRef = useRef(histories);
+  historiesRef.current = histories;
+  useEffect(() => {
+    if (!api) return;
+    const a = api;
+    a.historyLoad().then((saved) => {
+      if (saved && Object.keys(saved).length) setHistories((prev) => ({ ...saved, ...prev }));
+    });
+    const timer = setInterval(() => {
+      const cur = historiesRef.current;
+      if (Object.keys(cur).length) void a.historySave(cur);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!api || demo) return;

@@ -531,6 +531,72 @@ function registerIpc() {
     return { ok: true };
   }));
 
+  // ============ 内嵌 SSH 终端 ============
+  const terminals = new Map(); // termId -> { stream, serverId }
+  ipcMain.handle('terminal:open', wrap(async ({ id, cols, rows }) => {
+    const conn = await getConn(id);
+    const client = await new Promise((resolve, reject) => conn.connect().then(() => resolve(conn.client)).catch(reject));
+    const termId = `tm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    await new Promise((resolve, reject) => {
+      client.shell({ term: 'xterm-256color', cols: cols || 80, rows: rows || 24 }, (err, stream) => {
+        if (err) return reject(err);
+        terminals.set(termId, { stream, serverId: id });
+        stream.on('data', (d) => broadcast('terminal:data', { termId, data: d.toString('utf8') }));
+        stream.stderr?.on?.('data', (d) => broadcast('terminal:data', { termId, data: d.toString('utf8') }));
+        stream.on('close', () => {
+          terminals.delete(termId);
+          broadcast('terminal:closed', { termId });
+          resolve();
+        });
+        resolve();
+      });
+    });
+    return { ok: true, data: termId };
+  }));
+  ipcMain.handle('terminal:write', (_e, { termId, data }) => {
+    const t = terminals.get(String(termId));
+    if (t) t.stream.write(String(data));
+    return true;
+  });
+  ipcMain.handle('terminal:resize', (_e, { termId, cols, rows }) => {
+    const t = terminals.get(String(termId));
+    if (t) {
+      try {
+        t.stream.setWindow(Math.floor(Number(rows)) || 24, Math.floor(Number(cols)) || 80, 0, 0);
+      } catch {
+        /* noop */
+      }
+    }
+    return true;
+  });
+  ipcMain.handle('terminal:close', (_e, { termId }) => {
+    const t = terminals.get(String(termId));
+    if (t) {
+      try {
+        t.stream.end();
+      } catch {
+        /* noop */
+      }
+      terminals.delete(String(termId));
+    }
+    return true;
+  });
+
+  // ============ GPU 历史持久化 ============
+  const historyFile = () => path.join(app.getPath('userData'), 'history.json');
+  ipcMain.handle('history:load', () => {
+    try {
+      return JSON.parse(fs.readFileSync(historyFile(), 'utf8'));
+    } catch {
+      return {};
+    }
+  });
+  ipcMain.handle('history:save', (_e, map) => {
+    fs.mkdirSync(path.dirname(historyFile()), { recursive: true });
+    fs.writeFileSync(historyFile(), JSON.stringify(map || {}), 'utf8');
+    return true;
+  });
+
   // ============ 传输队列 ============
   transfers = new TransferManager({
     getConn,
@@ -637,7 +703,7 @@ function registerIpc() {
   // 每个顶层项建一个任务，目录在执行期边遍历边传
   ipcMain.handle(
     'transfer:relay',
-    wrap(async ({ srcId, dstId, items, dstDir, srcName, dstName }) => {
+    wrap(async ({ srcId, dstId, items, dstDir, srcName, dstName, ignoreExisting }) => {
       await getConn(srcId);
       await getConn(dstId);
       const jobs = [];
@@ -654,6 +720,7 @@ function registerIpc() {
           name: item.name,
           size: item.size || 0,
           groupId: gid,
+          ignoreExisting: !!ignoreExisting,
         });
       }
       return transfers.addMany(jobs);

@@ -13,7 +13,7 @@ import { TransferDrawer } from './components/TransferDrawer';
 import { ParallelCommand } from './components/ParallelCommand';
 import { useTransfers } from './transfers';
 
-type ServerTab = 'gpu' | 'proc' | 'files';
+type ServerTab = 'gpu' | 'proc' | 'files' | 'term';
 
 const LS_VIEW = 'sc.view';
 
@@ -24,7 +24,7 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'serv
     if (raw && raw.kind === 'parallel') {
       return { kind: 'parallel' };
     }
-    if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files'].includes(raw.tab)) {
+    if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files', 'term'].includes(raw.tab)) {
       return { kind: 'server', id: raw.id, tab: raw.tab };
     }
   } catch {
