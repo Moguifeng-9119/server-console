@@ -2343,3 +2343,9 @@ a.link:hover {
   font-family: var(--font-mono);
   background: var(--bg-elev);
 }
+
+/* Windows 自绘标题栏：顶栏内容避开右上角系统按钮区域
+   （titlebar-area-* 由 titleBarOverlay 注入；无 overlay 环境回退为 8px） */
+.topbar {
+  padding-right: calc(100vw - env(titlebar-area-width, 100vw) + 8px);
+}
