@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Terminal } from 'lucide-react';
-import { useStore, type Density, type ThemeMode } from './state';
+import { ArrowUpDown, Search, Terminal } from 'lucide-react';
+import { useStore } from './state';
 import { api } from './api';
 import type { Server } from './types';
 import { Overview } from './components/Overview';
@@ -11,6 +11,7 @@ import { ImportSshConfig } from './components/ImportSshConfig';
 import { ConfigWatchBanner } from './components/ConfigWatchBanner';
 import { TransferDrawer } from './components/TransferDrawer';
 import { ParallelCommand } from './components/ParallelCommand';
+import { HistoryDialog } from './components/HistoryDialog';
 import { CommandPalette, type PaletteAction } from './components/CommandPalette';
 import { useTransfers } from './transfers';
 
@@ -35,7 +36,7 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'serv
 }
 
 export default function App() {
-  const { servers, theme, setTheme, density, setDensity, toasts, demo, configs } = useStore();
+  const { servers, theme, setTheme, toasts, demo, configs } = useStore();
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
   const [view, setView] = useState<{ kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
@@ -44,6 +45,7 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [quitAsk, setQuitAsk] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [historyView, setHistoryView] = useState<Server | null>(null);
 
   // 页面/标签持久化
   useEffect(() => {
@@ -223,6 +225,11 @@ export default function App() {
               演示数据 · 点此连接真实服务器
             </button>
           )}
+          <button className="topbar-search" onClick={() => setPaletteOpen(true)} title="搜索服务器 / 执行动作">
+            <Search size={13} />
+            <span>搜索服务器 / 命令</span>
+            <kbd>Ctrl K</kbd>
+          </button>
           <span className="spacer" />
           <button
             className={`transfer-entry ${activeTransferCount ? 'active' : ''}`}
@@ -233,32 +240,6 @@ export default function App() {
             传输
             {activeTransferCount > 0 && <span className="transfer-entry-badge num">{activeTransferCount}</span>}
           </button>
-          <div className="seg">
-            {(
-              [
-                ['system', '跟随'],
-                ['light', '浅'],
-                ['dark', '深'],
-              ] as Array<[ThemeMode, string]>
-            ).map(([v, l]) => (
-              <button key={v} className={theme === v ? 'on' : ''} onClick={() => setTheme(v)}>
-                {l}
-              </button>
-            ))}
-          </div>
-          <div className="seg">
-            {(
-              [
-                ['compact', '紧凑'],
-                ['default', '默认'],
-                ['comfy', '宽松'],
-              ] as Array<[Density, string]>
-            ).map(([v, l]) => (
-              <button key={v} className={density === v ? 'on' : ''} onClick={() => setDensity(v)}>
-                {l}
-              </button>
-            ))}
-          </div>
         </header>
 
         <ConfigWatchBanner />
@@ -276,7 +257,7 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <Overview onOpen={(id) => openServer(id)} />
+              <Overview onOpen={(id) => openServer(id)} onHistory={(s) => setHistoryView(s)} />
             )
           ) : current ? (
             <ServerPanel
@@ -340,6 +321,7 @@ export default function App() {
         </div>
       )}
 
+      <HistoryDialog s={historyView} onClose={() => setHistoryView(null)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} servers={servers} actions={paletteActions} />
 
       {kiAsk && (

@@ -2,7 +2,7 @@ import { useStore } from '../state';
 import type { Server } from '../types';
 import { Sparkline } from './Sparkline';
 
-function ServerCard({ s, onOpen }: { s: Server; onOpen: () => void }) {
+function ServerCard({ s, onOpen, onHistory }: { s: Server; onOpen: () => void; onHistory: (s: Server) => void }) {
   const { colorOf } = useStore();
   const online = s.status === 'online';
   const avgUtil = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
@@ -13,7 +13,15 @@ function ServerCard({ s, onOpen }: { s: Server; onOpen: () => void }) {
   const zombies = s.processes.filter((p) => p.state === 'Z').length;
 
   return (
-    <div className="card" onClick={onOpen}>
+    <div
+      className="card"
+      onClick={onOpen}
+      title="单击进入 · 右键查看 GPU 历史曲线"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onHistory(s);
+      }}
+    >
       <div className="card-head">
         <i className={`dot ${s.status}`} />
         <span className="name">{s.name}</span>
@@ -65,7 +73,7 @@ function ServerCard({ s, onOpen }: { s: Server; onOpen: () => void }) {
   );
 }
 
-export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
+export function Overview({ onOpen, onHistory }: { onOpen: (id: string) => void; onHistory: (s: Server) => void }) {
   const { servers } = useStore();
   const online = servers.filter((s) => s.status === 'online').length;
   return (
@@ -75,7 +83,7 @@ export function Overview({ onOpen }: { onOpen: (id: string) => void }) {
       </div>
       <div className="grid">
         {servers.map((s) => (
-          <ServerCard key={s.id} s={s} onOpen={() => onOpen(s.id)} />
+          <ServerCard key={s.id} s={s} onOpen={() => onOpen(s.id)} onHistory={() => onHistory(s)} />
         ))}
       </div>
     </>

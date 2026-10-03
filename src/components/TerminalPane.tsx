@@ -88,6 +88,9 @@ export function TerminalPane({ serverId }: { serverId: string }) {
       const ro = new ResizeObserver(onResize);
       ro.observe(host);
       onResize();
+      // 关键：xterm 只有聚焦才会产生 onData；连接成功后立即聚焦，点击面板时重新聚焦
+      term.focus();
+      host.addEventListener('mousedown', () => setTimeout(() => term?.focus(), 0));
     })();
 
     return () => {

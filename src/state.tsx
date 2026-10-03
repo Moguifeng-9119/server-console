@@ -73,6 +73,7 @@ interface Store {
   toasts: Toast[];
   pushToast: (t: Omit<Toast, 'id'>) => void;
   audit: AuditEntry[];
+  histories: Record<string, number[]>;
   kill: (serverId: string, pid: number, signal: 'TERM' | 'KILL') => void;
   restartService: (serverId: string, service: string) => void;
   colorOf: (pct: number) => string;
@@ -97,7 +98,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
   const [density, setDensity] = useState<Density>(() => {
     const v = localStorage.getItem('sc.density.user');
-    return v === 'compact' || v === 'comfy' || v === 'default' ? v : 'compact';
+    return v === 'compact' || v === 'comfy' || v === 'default' ? v : 'default';
   });
   const [thresholds, setThresholdsState] = useState<Thresholds>(() =>
     loadPref('sc.thresholds', { warn: 50, high: 75, crit: 90 }, isThresholds),
@@ -449,6 +450,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toasts,
       pushToast,
       audit,
+      histories,
       kill,
       restartService,
       colorOf,
@@ -476,6 +478,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toasts,
       pushToast,
       audit,
+      histories,
       kill,
       restartService,
       colorOf,

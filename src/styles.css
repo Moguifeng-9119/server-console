@@ -15,45 +15,48 @@
   --accent: #0891b2; /* 青蓝主色 */
   --accent-2: #06b6d4;
   --accent-ink: #ffffff;
+  --accent-soft: rgba(8, 145, 178, 0.1);
 }
 
 [data-theme='dark'] {
-  --bg: #0a101d;
-  --bg-elev: #101a2b;
-  --bg-elev2: #18243a;
-  --bg-hover: #1e2c44;
-  --border: #233047;
-  --border-strong: #33425d;
-  --text: #e7eef8;
-  --text-dim: #94a4bd;
-  --text-faint: #5e6e88;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --bg: #05080f;
+  --bg-elev: #0c1420;
+  --bg-elev2: #131f30;
+  --bg-hover: #182639;
+  --border: #1e2a3f;
+  --border-strong: #2f405c;
+  --text: #e9f1fb;
+  --text-dim: #97a8c2;
+  --text-faint: #5b6d89;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   --ok: #34d399;
   --warn: #fbbf24;
   --high: #fb923c;
   --crit: #f87171;
-  --accent: #22d3ee;
+  --accent: #2fd6f5;
   --accent-2: #2dd4bf;
+  --accent-soft: rgba(47, 214, 245, 0.12);
   --accent-ink: #04222b;
 }
 
 [data-theme='light'] {
-  --bg: #f4f7fb;
+  --bg: #f6f7f9;
   --bg-elev: #ffffff;
-  --bg-elev2: #eef3f9;
-  --bg-hover: #e8eff7;
-  --border: #e2e9f2;
-  --border-strong: #cad6e4;
-  --text: #0f1b2d;
-  --text-dim: #58687f;
-  --text-faint: #93a1b5;
-  --shadow: 0 1px 2px rgba(16, 42, 72, 0.05), 0 12px 32px rgba(16, 42, 72, 0.1);
-  --ok: #15a34a;
+  --bg-elev2: #eff2f6;
+  --bg-hover: #eaeef4;
+  --border: #e5e9ef;
+  --border-strong: #cdd7e2;
+  --text: #141d2b;
+  --text-dim: #5a6a80;
+  --text-faint: #96a2b3;
+  --shadow: 0 1px 2px rgba(20, 29, 43, 0.04), 0 10px 28px rgba(20, 29, 43, 0.08);
+  --ok: #16a34a;
   --warn: #c27d0a;
   --high: #dd6008;
   --crit: #dc2626;
-  --accent: #0891b2;
+  --accent: #0e7fa5;
   --accent-2: #06b6d4;
+  --accent-soft: rgba(14, 127, 165, 0.1);
   --accent-ink: #ffffff;
 }
 
@@ -67,11 +70,11 @@
 }
 [data-density='default'] {
   --fs: 13.5px;
-  --fs-kpi: 30px;
-  --row-h: 32px;
-  --gap: 12px;
-  --pad-card: 14px;
-  --pad-page: 18px;
+  --fs-kpi: 32px;
+  --row-h: 34px;
+  --gap: 14px;
+  --pad-card: 18px;
+  --pad-page: 20px;
 }
 [data-density='comfy'] {
   --fs: 15px;
@@ -318,6 +321,7 @@ input.mini {
   gap: var(--gap);
 }
 .card {
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, border-color 0.18s ease;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -2229,4 +2233,113 @@ a.link:hover {
 }
 .pal-item.on {
   background: var(--bg-hover);
+}
+
+/* 历史曲线对话框 */
+.hist-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hist-stats {
+  display: flex;
+  gap: 18px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.hist-stats .num {
+  color: var(--text);
+  font-weight: 600;
+}
+.hist-chart {
+  width: 100%;
+  height: auto;
+}
+
+/* ============ 适度微交互（v0.9 UI 重构） ============ */
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+/* 进度条平滑增长 */
+.bar i,
+.td-bar i,
+.td-overall i {
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* 按钮按下反馈 */
+.btn:active,
+.seg button:active,
+.nav-item:active {
+  transform: scale(0.98);
+}
+.btn,
+.seg button,
+.nav-item {
+  transition: transform 0.08s ease, background 0.13s ease, border-color 0.13s ease, box-shadow 0.13s ease;
+}
+/* 抽屉与对话框缓动 */
+.td-drawer {
+  animation: td-slide 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.drawer {
+  animation: td-slide 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dialog {
+  animation: pal-pop 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 侧栏导航项激活指示 */
+.nav-item.active {
+  position: relative;
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+/* 命令栏搜索按钮（顶栏） */
+.topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 340px;
+  margin-inline: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elev2);
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.topbar-search:hover {
+  border-color: var(--accent);
+  color: var(--text-dim);
+}
+.topbar-search kbd {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: var(--bg-elev);
 }

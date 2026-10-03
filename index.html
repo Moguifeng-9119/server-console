@@ -12,7 +12,7 @@
         var dark = t === 'dark' || ((t === null || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
         var d = localStorage.getItem('sc.density.user');
-        document.documentElement.dataset.density = d === 'comfy' || d === 'default' ? d : 'compact';
+        document.documentElement.dataset.density = d === 'comfy' || d === 'default' ? d : 'default';
       } catch (e) {}
     </script>
   </head>
