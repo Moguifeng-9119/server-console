@@ -177,7 +177,7 @@ export default function App() {
           <span className="brand-mark" title="ServerConsole">
             <Terminal size={13} strokeWidth={2.6} />
           </span>
-          Server Console <small>v0.4.1</small>
+          ServerConsole <small>v{__APP_VERSION__}</small>
         </div>
         <nav className="nav">
           <button
