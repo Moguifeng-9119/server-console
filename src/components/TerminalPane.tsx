@@ -18,6 +18,7 @@ export function TerminalPane({ serverId }: { serverId: string }) {
     const a = api;
     let disposed = false;
     let termId = '';
+    let activeTermId = '';
     let term: import('@xterm/xterm').Terminal | null = null;
     let fit: import('@xterm/addon-fit').FitAddon | null = null;
     const offList: Array<() => void> = [];
@@ -50,6 +51,20 @@ export function TerminalPane({ serverId }: { serverId: string }) {
         /* 容器尚未布局时忽略 */
       }
 
+      // 先注册数据监听，再发起连接：服务器提示符/欢迎信息会在 shell 建立瞬间到达，晚注册会丢
+      offList.push(
+        a.onTerminalData(({ termId: tid, data }) => {
+          if (tid === activeTermId && term) term.write(data);
+        }),
+      );
+      offList.push(
+        a.onTerminalClosed(({ termId: tid }) => {
+          if (tid !== activeTermId || disposed) return;
+          setStatus('closed');
+          term?.write('\r\n\x1b[33m连接已断开，点击上方「重连」。\x1b[0m\r\n');
+        }),
+      );
+
       const r = await a.terminalOpen(serverId, term.cols || 80, term.rows || 24);
       if (disposed) {
         if (r.ok && r.data) void a.terminalClose(r.data);
@@ -60,22 +75,11 @@ export function TerminalPane({ serverId }: { serverId: string }) {
         term.write(`\r\n\x1b[31m连接失败：${r.error || '未知错误'}\x1b[0m\r\n`);
         return;
       }
-      termId = r.data;
-      termIdRef.current = termId;
+      // 监听器已在 open 之前注册（见下），这里只激活通道
+      activeTermId = r.data;
+      termIdRef.current = activeTermId;
       setStatus('live');
-      term.onData((data) => void a.terminalWrite(termId, data));
-      offList.push(
-        a.onTerminalData(({ termId: tid, data }) => {
-          if (tid === termId) term?.write(data);
-        }),
-      );
-      offList.push(
-        a.onTerminalClosed(({ termId: tid }) => {
-          if (tid !== termId || disposed) return;
-          setStatus('closed');
-          term?.write('\r\n\x1b[33m连接已断开，点击上方「重连」。\x1b[0m\r\n');
-        }),
-      );
+      term.onData((data) => void a.terminalWrite(activeTermId, data));
       const onResize = () => {
         if (!term || !fit) return;
         try {
@@ -96,7 +100,7 @@ export function TerminalPane({ serverId }: { serverId: string }) {
     return () => {
       disposed = true;
       offList.forEach((off) => off());
-      if (termId) void a.terminalClose(termId);
+      if (activeTermId || termId) void a.terminalClose(activeTermId || termId);
       termIdRef.current = '';
       term?.dispose();
     };

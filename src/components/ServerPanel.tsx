@@ -21,8 +21,8 @@ function KpiStrip({ s }: { s: Server }) {
     { k: '显存占用', v: `${Math.round(vram)}%`, color: colorOf(vram) },
     { k: '负载 1m', v: s.loadAvg[0].toFixed(1) },
     { k: `CPU（${s.cpuCores} 核）`, v: `${s.cpuUsage}%`, color: colorOf(s.cpuUsage) },
-    { k: '内存', v: `${s.memUsed}/${s.memTotal} GB`, color: colorOf((s.memUsed / s.memTotal) * 100) },
-    { k: 'Swap', v: `${s.swapUsed}/${s.swapTotal} GB` },
+    { k: '内存', v: `${Math.round(s.memUsed)}/${Math.round(s.memTotal)}G`, color: colorOf((s.memUsed / s.memTotal) * 100) },
+    { k: 'Swap', v: `${s.swapUsed}/${s.swapTotal}G` },
   ];
   return (
     <div className="kpi-strip">
