@@ -83,6 +83,9 @@ contextBridge.exposeInMainWorld('api', {
   setAppSettings: (o) => ipcRenderer.invoke('app:set-settings', o),
   getAppSettings: () => ipcRenderer.invoke('app:get-settings'),
   showMainWindow: () => ipcRenderer.send('app:show-main'),
+  checkUpdate: () => ipcRenderer.invoke('app:check-update'),
+  configExport: (passphrase) => ipcRenderer.invoke('config:export', { passphrase }),
+  configImport: (passphrase) => ipcRenderer.invoke('config:import', { passphrase }),
 
   // 内嵌 SSH 终端
   terminalOpen: (id, cols, rows) => ipcRenderer.invoke('terminal:open', { id, cols, rows }),

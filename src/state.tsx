@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { createServers, killProcess, tick } from './mock';
 import type { AuditEntry, Server, ServerConfig, SnapshotPayload, Toast } from './types';
 import { api, isElectron } from './api';
 
@@ -87,7 +86,8 @@ function nowTime() {
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [demo, setDemo] = useState(!isElectron);
-  const [demoServers, setDemoServers] = useState<Server[]>(() => createServers());
+  const [demoServers, setDemoServers] = useState<Server[]>([]);
+  const mockRef = useRef<typeof import('./mock') | null>(null);
   const [configs, setConfigs] = useState<ServerConfig[]>([]);
   const [snaps, setSnaps] = useState<Record<string, SnapshotPayload>>({});
   const [histories, setHistories] = useState<Record<string, number[]>>({});
@@ -264,10 +264,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     api.setInterval(refreshMs);
   }, [refreshMs, demo]);
 
-  // 演示数据的模拟轮询
+  // 演示数据：懒加载 mock 模块（不进生产包）+ 模拟轮询
   useEffect(() => {
     if (!demo) return;
-    const timer = setInterval(() => setDemoServers((prev) => prev.map(tick)), refreshMs);
+    import('./mock').then((m) => {
+      mockRef.current = m;
+      setDemoServers(m.createServers());
+    });
+  }, [demo]);
+
+  useEffect(() => {
+    if (!demo) return;
+    const timer = setInterval(() => {
+      const m = mockRef.current;
+      if (m) setDemoServers((prev) => prev.map(m.tick));
+    }, refreshMs);
     return () => clearInterval(timer);
   }, [demo, refreshMs]);
 
@@ -373,7 +384,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         pushToast({ level: 'error', title: `进程 ${pid} 不存在`, detail: '可能已自行退出' });
         return;
       }
-      setDemoServers((prev) => prev.map((x) => (x.id === serverId ? killProcess(x, pid) : x)));
+      const m = mockRef.current;
+      if (m) setDemoServers((prev) => prev.map((x) => (x.id === serverId ? m.killProcess(x, pid) : x)));
       setAudit((prev) => [
         { id: seq.current++, time: nowTime(), server: s.name, action, target: `${pid} ${target.command.slice(0, 40)}`, result: 'ok' as const },
         ...prev,

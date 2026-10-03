@@ -20,6 +20,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     audit,
     configs,
     pushToast,
+    refresh,
   } = useStore();
   const [tofu, setTofu] = useState<boolean | null>(null);
   const [hosts, setHosts] = useState<TrustedHost[]>([]);
@@ -27,6 +28,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [snippets, setSnippets] = useState<Array<{ id: string; name: string; cmd: string }>>([]);
   const [rules, setRules] = useState<ForwardingRule[]>([]);
+  const [exportPass, setExportPass] = useState('');
   const [newRule, setNewRule] = useState({ serverId: '', localPort: '', remoteHost: '127.0.0.1', remotePort: '' });
 
   useEffect(() => {
@@ -398,6 +400,56 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
             <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console" target="_blank" rel="noreferrer">GitHub 仓库</a>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console/issues" target="_blank" rel="noreferrer">反馈问题</a>
+              <button
+                className="link"
+                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}
+                onClick={() =>
+                  api?.checkUpdate().then((r) => {
+                    if (r?.ok && r.data?.isNew) pushToast({ level: 'info', title: '发现新版本 ' + (r.data.latest || ''), detail: '即将打开发布页' });
+                    else if (r?.ok) pushToast({ level: 'info', title: '已是最新版本（' + (r.data?.current || '') + '）' });
+                    else pushToast({ level: 'error', title: '检查更新失败', detail: r?.error });
+                    if (r?.ok && r.data?.isNew && r.data.url) window.open(r.data.url, '_blank');
+                  })
+                }
+              >
+                检查更新
+              </button>
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                className="mini"
+                style={{ flex: 1 }}
+                type="password"
+                placeholder="导出/导入口令（用于加密凭据）"
+                value={exportPass}
+                onChange={(e) => setExportPass(e.target.value)}
+              />
+              <button
+                className="btn mini"
+                disabled={!exportPass}
+                onClick={() =>
+                  api?.configExport(exportPass).then((r) => {
+                    if (r?.ok && r.data) pushToast({ level: 'info', title: '已导出到', detail: r.data });
+                    else if (r && !r.ok) pushToast({ level: 'error', title: '导出失败', detail: r.error });
+                  })
+                }
+              >
+                导出
+              </button>
+              <button
+                className="btn mini"
+                disabled={!exportPass}
+                onClick={() =>
+                  api?.configImport(exportPass).then((r) => {
+                    if (r?.ok && Number(r.data) >= 0) {
+                      pushToast({ level: 'info', title: '导入完成', detail: '新增 ' + r.data + ' 台服务器' });
+                      refresh();
+                    } else if (r && !r.ok) pushToast({ level: 'error', title: '导入失败', detail: r.error });
+                  })
+                }
+              >
+                导入
+              </button>
             </div>
           </div>
         </div>

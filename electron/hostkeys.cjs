@@ -2,7 +2,11 @@
 // 首次连接记录主机公钥指纹并放行；之后每次连接比对，不一致视为可疑（可能中间人）并拒绝。
 // 指纹库：userData/hostkeys.json；TOFU 开关：userData/security.json。
 // ssh.cjs / transfer.cjs 保持零 electron 依赖：通过 setHostKeyChecker / knownHostsLine 注入本模块能力。
-const { app } = require('electron');
+let dataDir = '';
+function init(dir) {
+  dataDir = dir;
+  trust = null;
+}
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -13,11 +17,11 @@ let trust = null; // Map<'host|port', { type, blob, fp, firstSeen }>
 let opts = { tofu: true };
 
 function trustPath() {
-  if (!trustFile) trustFile = path.join(app.getPath('userData'), 'hostkeys.json');
+  if (!trustFile) trustFile = path.join(dataDir || require('electron').app.getPath('userData'), 'hostkeys.json');
   return trustFile;
 }
 function secPath() {
-  if (!secFile) secFile = path.join(app.getPath('userData'), 'security.json');
+  if (!secFile) secFile = path.join(dataDir || require('electron').app.getPath('userData'), 'security.json');
   return secPath();
 }
 
@@ -149,4 +153,4 @@ function setOpts(o = {}) {
   return { ...opts };
 }
 
-module.exports = { makeVerifier, knownHostsLine, list, remove, getOpts, setOpts, fingerprintOf };
+module.exports = { init, makeVerifier, knownHostsLine, list, remove, getOpts, setOpts, fingerprintOf };

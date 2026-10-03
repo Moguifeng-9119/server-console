@@ -2205,3 +2205,28 @@ a.link:hover {
   padding: 6px;
   overflow: hidden;
 }
+
+/* 标题栏拖拽区（Windows overlay）；交互控件排除 */
+.topbar {
+  -webkit-app-region: drag;
+}
+.topbar button,
+.topbar input,
+.topbar select,
+.topbar .seg {
+  -webkit-app-region: no-drag;
+}
+
+/* 命令面板条目 */
+.pal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.pal-item.on {
+  background: var(--bg-hover);
+}

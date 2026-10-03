@@ -11,6 +11,7 @@ import { ImportSshConfig } from './components/ImportSshConfig';
 import { ConfigWatchBanner } from './components/ConfigWatchBanner';
 import { TransferDrawer } from './components/TransferDrawer';
 import { ParallelCommand } from './components/ParallelCommand';
+import { CommandPalette, type PaletteAction } from './components/CommandPalette';
 import { useTransfers } from './transfers';
 
 type ServerTab = 'gpu' | 'proc' | 'files' | 'term';
@@ -42,6 +43,7 @@ export default function App() {
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [quitAsk, setQuitAsk] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // 页面/标签持久化
   useEffect(() => {
@@ -76,8 +78,17 @@ export default function App() {
     setKiAsk(null);
   };
 
-  const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
-
+  // Ctrl+K 命令面板
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // 打开服务器：同一台保留当前 tab，换台回到 GPU；tab 状态提升到这里，避免切 tab 重挂载丢文件面板状态
   const openServer = (id: string, tab?: ServerTab) =>
     setView((v) => ({
@@ -85,6 +96,23 @@ export default function App() {
       id,
       tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
     }));
+
+  const paletteActions = useMemo<PaletteAction[]>(
+    () => [
+      ...servers.map((s) => ({ id: 'open-server:' + s.id, label: '连接 ' + s.name, hint: s.host, run: () => openServer(s.id) })),
+      { id: 'overview', label: '打开总览', run: () => setView({ kind: 'overview' }) },
+      { id: 'parallel', label: '打开并行命令', run: () => setView({ kind: 'parallel' }) },
+      { id: 'transfers', label: '打开传输中心', run: () => window.dispatchEvent(new Event('sc:show-transfers')) },
+      { id: 'settings', label: '打开设置', run: () => setSettingsOpen(true) },
+      { id: 'manager', label: '管理服务器', run: () => setManagerOpen(true) },
+      { id: 'theme', label: '切换深/浅主题', run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+    ],
+    [servers, openServer, setTheme, theme]
+  );
+
+  const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
+
+
 
   // 侧栏分组：只要有服务器带分组信息就启用分区；折叠状态持久化
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -311,6 +339,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} servers={servers} actions={paletteActions} />
 
       {kiAsk && (
         <div className="mask">

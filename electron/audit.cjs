@@ -1,6 +1,10 @@
 // 操作审计日志：主进程持有，追加写 userData/audit.log（JSONL）。
 // 渲染层的内存列表只是最近条目的视图；重启后仍可回溯（这正是它区别于 state 的意义）。
-const { app } = require('electron');
+let dataDir = '';
+function init(dir) {
+  dataDir = dir;
+  file = null;
+}
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -9,7 +13,7 @@ const FILE_MAX_LINES = 2000; // 文件最大行数，超出截断头部
 let file = null;
 
 function auditFile() {
-  if (!file) file = path.join(app.getPath('userData'), 'audit.log');
+  if (!file) file = path.join(dataDir || require('electron').app.getPath('userData'), 'audit.log');
   return file;
 }
 
@@ -54,4 +58,4 @@ function trim() {
   }
 }
 
-module.exports = { loadRecent, append };
+module.exports = { init, loadRecent, append };

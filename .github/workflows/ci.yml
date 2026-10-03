@@ -7,7 +7,10 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     env:
       # 只做类型检查/测试/冒烟，不运行 Electron，跳过二进制下载提速
       ELECTRON_SKIP_BINARY_DOWNLOAD: 1

@@ -1,5 +1,5 @@
 // 主进程：SSH 采集、凭据存储、系统通知都跑在这里（renderer 只负责展示）
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const ipc = require('./ipc.cjs');
@@ -42,6 +42,8 @@ function createWindow() {
     backgroundColor: '#0e1116',
     autoHideMenuBar: true,
     ...(fs.existsSync(windowIcon) ? { icon: windowIcon } : {}),
+    // Windows 自绘标题栏：系统按钮覆盖在应用上，侧栏品牌区自然衔接
+    ...(process.platform === 'win32' ? { titleBarStyle: 'hidden', titleBarOverlay: { color: '#f4f7fb', symbolColor: '#0f1b2d', height: 34 } } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -84,6 +86,12 @@ function createWindow() {
     }
   });
 
+  // 外链走系统浏览器
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   mainWindow = win;
 
   // 开发态连 vite dev server；打包态加载 dist
@@ -119,6 +127,23 @@ ipcMain.on('app:show-main', () => {
   mainWindow.focus();
 });
 ipcMain.handle('app:get-settings', () => ({ closeAction }));
+ipcMain.handle('app:check-update', async () => {
+  try {
+    const res = await fetch('https://api.github.com/repos/Moguifeng-9119/server-console/releases/latest', {
+      headers: { 'user-agent': 'server-console' },
+      signal: AbortSignal.timeout(8000),
+    });
+    const j = /** @type {Record<string, unknown>} */ (await res.json());
+    const latest = String(j.tag_name || '');
+    const current = 'v' + app.getVersion();
+    const pa = latest.replace(/^v/, '').split('.').map(Number);
+    const pb = current.replace(/^v/, '').split('.').map(Number);
+    const isNew = pa[0] > pb[0] || (pa[0] === pb[0] && (pa[1] > pb[1] || (pa[1] === pb[1] && (pa[2] || 0) > (pb[2] || 0))));
+    return { ok: true, data: { latest, current, isNew, url: typeof j.html_url === 'string' ? j.html_url : '' } };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
 ipcMain.handle('app:set-settings', (_e, o) => {
   if (['ask', 'minimize', 'exit'].includes(o?.closeAction)) closeAction = o.closeAction;
   fs.mkdirSync(path.dirname(appSettingsFile()), { recursive: true });

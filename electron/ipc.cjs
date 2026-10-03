@@ -1,4 +1,5 @@
-const { ipcMain, BrowserWindow, Notification, dialog, app } = require('electron');
+const { ipcMain, BrowserWindow, Notification, dialog, app, safeStorage } = require('electron');
+const nodeCrypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Pool, Connection, setHostKeyChecker, setInteractiveHandler, setJumpResolver } = require('./ssh.cjs');
@@ -40,6 +41,8 @@ function logError(tag, e) {
   }
 }
 
+const lastSnapJson = new Map(); // serverId -> 上次快照 JSON（增量广播：内容无变化不重发）
+
 async function tick() {
   if (ticking) return;
   ticking = true;
@@ -52,6 +55,9 @@ async function tick() {
       if (conn.isBackedOff()) return; // 退避窗口内不重试也不重复广播
       try {
         const snap = await conn.collect();
+        const json = JSON.stringify(snap);
+        if (lastSnapJson.get(cfg.id) === json) return; // 无变化不重发
+        lastSnapJson.set(cfg.id, json);
         broadcast('ssh:snapshot', { id: cfg.id, status: 'online', error: '', ...snap });
       } catch (e) {
         broadcast('ssh:status', { id: cfg.id, status: statusOfError(e), error: e.message });
@@ -597,6 +603,39 @@ function registerIpc() {
     return true;
   });
 
+  // ============ 配置导出/导入（AES-256-GCM 口令加密） ============
+  ipcMain.handle('config:export', wrap(async ({ passphrase }) => {
+    const r = await dialog.showSaveDialog({ title: '导出配置', defaultPath: 'serverconsole-config.json' });
+    if (r.canceled || !r.filePath) return { ok: true, data: '' };
+    const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
+    const iv = nodeCrypto.randomBytes(12);
+    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', key, iv);
+    const enc = Buffer.concat([cipher.update(JSON.stringify(servers), 'utf8'), cipher.final(), cipher.getAuthTag()]);
+    fs.writeFileSync(r.filePath, JSON.stringify({ sc_export: 1, iv: iv.toString('base64'), data: enc.toString('base64') }, null, 2), { mode: 0o600 });
+    return { ok: true, data: r.filePath };
+  }));
+  ipcMain.handle('config:import', wrap(async ({ passphrase }) => {
+    const r = await dialog.showOpenDialog({ title: '导入配置', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
+    if (r.canceled || !r.filePaths[0]) return { ok: true, data: -1 };
+    const j = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+    if (j.sc_export !== 1) throw new Error('不是 ServerConsole 导出文件');
+    const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
+    const iv = Buffer.from(j.iv, 'base64');
+    const buf = Buffer.from(j.data, 'base64');
+    const decipher = nodeCrypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(buf.subarray(buf.length - 16));
+    const plain = Buffer.concat([decipher.update(buf.subarray(0, buf.length - 16)), decipher.final()]).toString('utf8');
+    const imported = JSON.parse(plain);
+    let count = 0;
+    for (const s of imported) {
+      if (servers.some((x) => x.name === s.name && x.host === s.host)) continue; // 重名同主机跳过
+      servers.push({ ...s, id: 'srv_' + Date.now().toString(36) + '_' + count });
+      count += 1;
+    }
+    persist();
+    return { ok: true, data: count };
+  }));
+
   // ============ 传输队列 ============
   transfers = new TransferManager({
     getConn,
@@ -780,6 +819,10 @@ function handleInteractive({ name, prompts }) {
 }
 
 function init() {
+  const userData = app.getPath('userData');
+  store.init({ dataDir: userData, safeStorage });
+  audit.init(userData);
+  hostkeys.init(userData);
   setHostKeyChecker(hostkeys.makeVerifier()); // 所有出站 SSH 连接启用 TOFU 指纹校验
   setJumpResolver(resolveJump);
   setInteractiveHandler(handleInteractive);

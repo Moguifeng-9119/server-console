@@ -51,12 +51,22 @@ No cloud, no relay of your data: every connection runs straight from your machin
 ### 🧩 Multi-server management
 - **Password & private-key** auth (passphrase supported), with per-server connection tests.
 - Credentials are encrypted at rest with the OS keychain (Windows DPAPI / libsecret) and **never leave your machine**.
-- Sidebar with live reachability and configurable auto-refresh (1 / 2 / 5 / 10 s).
+- Sidebar with live reachability, **groups**, configurable auto-refresh (1 / 2 / 5 / 10 s) and Ctrl+K command palette.
 
 ### 🔑 One-click `~/.ssh/config` import
 - A **real React dialog** (no script injection) parses OpenSSH config: hosts, users, ports and `IdentityFile`s.
 - Browse any config file, assign one shared key or a key per host; existing hosts are auto-skipped.
 - **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
+
+### 🧰 Ops toolkit
+- **Embedded SSH terminal** per server (xterm.js), with reconnect on drop.
+- **Parallel commands**: run one command on N selected servers at once, per-server live output.
+- **Local port forwarding** (ssh -L equivalent) with rule management and auto-restore.
+- **Quick command snippets**, one-click from the server header.
+- Alert **webhooks** (DingTalk / Feishu / WeCom), transfer **rate limit**, optional **MD5 verification**.
+- **Remote text editing** with atomic save-back; relay "sync mode" (skip existing, rsync).
+- ProxyJump bastions, keyboard-interactive (2FA/MFA) and ssh-agent auth; SSH compression; system tray.
+- Encrypted config export/import; update check via GitHub Releases.
 
 ### 📊 Real GPU & process monitoring
 - Dashboard KPIs: average GPU utilization, VRAM, CPU, memory, load average and zombie-process count.

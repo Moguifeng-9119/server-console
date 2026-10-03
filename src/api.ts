@@ -61,6 +61,9 @@ interface Api {
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
   getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit' }>;
   showMainWindow: () => void;
+  checkUpdate: () => Promise<IpcResult<{ latest: string; current: string; isNew: boolean; url: string }>>;
+  configExport: (passphrase: string) => Promise<IpcResult<string>>;
+  configImport: (passphrase: string) => Promise<IpcResult<number>>;
 
   terminalOpen: (id: string, cols: number, rows: number) => Promise<IpcResult<string>>;
   terminalWrite: (termId: string, data: string) => Promise<unknown>;

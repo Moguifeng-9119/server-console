@@ -310,7 +310,10 @@ class TransferManager {
     if (!this.storeFile) return;
     try {
       const arr = JSON.parse(fs.readFileSync(this.storeFile, 'utf8'));
+      const kinds = ['upload', 'download', 'relay'];
       for (const t of arr) {
+        // 版本兼容/坏数据防护：缺关键字段的条目直接丢弃
+        if (!t || !kinds.includes(t.kind) || typeof t.id !== 'string') continue;
         if (t.status === 'running' || t.status === 'queued') t.status = 'paused';
         t.speed = 0;
         this.tasks.set(t.id, t);

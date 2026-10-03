@@ -1,20 +1,29 @@
-const { app, safeStorage } = require('electron');
+// 凭据存储：safeStorage 加密 + 不可用时 base64 降级（plain: 前缀）。
+// 通过 init({ dataDir, safeStorage }) 注入，避免测试环境依赖 electron。
 const fs = require('node:fs');
 const path = require('node:path');
 
 let file = null;
+let dataDir = '';
+let enc = null; // electron safeStorage 适配器
+
+function init(opts = {}) {
+  dataDir = opts.dataDir || '';
+  enc = opts.safeStorage || null;
+  file = null;
+}
 
 function storeFile() {
-  if (!file) file = path.join(app.getPath('userData'), 'servers.json');
+  if (!file) file = path.join(dataDir || require('electron').app.getPath('userData'), 'servers.json');
   return file;
 }
 
 function encrypt(v) {
   if (!v) return '';
-  if (safeStorage.isEncryptionAvailable()) {
-    return `enc:${safeStorage.encryptString(v).toString('base64')}`;
+  if (enc && enc.isEncryptionAvailable()) {
+    return `enc:${enc.encryptString(v).toString('base64')}`;
   }
-  // 兜底：Linux 无 libsecret 时 safeStorage 不可用，明文落盘并标记
+  // 兜底：无 safeStorage（Linux 无 libsecret / 测试环境）时明文落盘并标记
   return `plain:${Buffer.from(v, 'utf8').toString('base64')}`;
 }
 
@@ -22,7 +31,7 @@ function decrypt(v) {
   if (!v) return '';
   if (v.startsWith('enc:')) {
     try {
-      return safeStorage.decryptString(Buffer.from(v.slice(4), 'base64'));
+      return enc ? enc.decryptString(Buffer.from(v.slice(4), 'base64')) : '';
     } catch {
       return '';
     }
@@ -62,4 +71,10 @@ function publicView(s) {
   return { ...rest, hasPassword: Boolean(password), hasPassphrase: Boolean(passphrase) };
 }
 
-module.exports = { load, save, publicView, encryptionAvailable: () => safeStorage.isEncryptionAvailable() };
+module.exports = {
+  init,
+  load,
+  save,
+  publicView,
+  encryptionAvailable: () => !!(enc && enc.isEncryptionAvailable()),
+};
