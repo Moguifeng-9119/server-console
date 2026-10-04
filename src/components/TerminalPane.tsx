@@ -22,6 +22,7 @@ export function TerminalPane({ serverId }: { serverId: string }) {
     let term: import('@xterm/xterm').Terminal | null = null;
     let fit: import('@xterm/addon-fit').FitAddon | null = null;
     const offList: Array<() => void> = [];
+    const dbg = { dataEvents: 0, wrote: 0, attach: 0, openOk: false };
 
     setStatus('connecting');
     (async () => {
@@ -54,7 +55,8 @@ export function TerminalPane({ serverId }: { serverId: string }) {
       // 先注册数据监听，再发起连接：服务器提示符/欢迎信息会在 shell 建立瞬间到达，晚注册会丢
       offList.push(
         a.onTerminalData(({ termId: tid, data }) => {
-          if (tid === activeTermId && term) term.write(data);
+          dbg.dataEvents += 1;
+          if (tid === activeTermId && term) { term.write(data); dbg.wrote += data.length; }
         }),
       );
       offList.push(
@@ -77,9 +79,12 @@ export function TerminalPane({ serverId }: { serverId: string }) {
       }
       // 监听器已在 open 之前注册（见下），这里只激活通道
       activeTermId = r.data;
+      dbg.openOk = true;
       termIdRef.current = activeTermId;
       setStatus('live');
       term.onData((data) => void a.terminalWrite(activeTermId, data));
+      // 挂接：主进程把挂接前缓冲的输出一次性补发（提示符/欢迎信息不丢）
+      void a.terminalAttach(activeTermId).then(() => { dbg.attach += 1; });
       const onResize = () => {
         if (!term || !fit) return;
         try {
@@ -94,6 +99,20 @@ export function TerminalPane({ serverId }: { serverId: string }) {
       onResize();
       // 关键：xterm 只有聚焦才会产生 onData；连接成功后立即聚焦，点击面板时重新聚焦
       term.focus();
+      // e2e 测试钩子：canvas 渲染下 DOM 读不到文本，暴露缓冲区读取器
+      (window as any).__scTerm = {
+        dbg,
+        dump: () => {
+          if (!term) return '';
+          const buf = term.buffer.active;
+          const lines: string[] = [];
+          for (let i = 0; i <= buf.cursorY + 1 && i < buf.length; i++) {
+            const l = buf.getLine(i);
+            if (l) lines.push(l.translateToString(true));
+          }
+          return lines.filter(Boolean).join('\n');
+        },
+      };
       host.addEventListener('mousedown', () => setTimeout(() => term?.focus(), 0));
     })();
 

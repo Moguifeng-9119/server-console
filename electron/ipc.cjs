@@ -60,6 +60,7 @@ async function tick() {
         lastSnapJson.set(cfg.id, json);
         broadcast('ssh:snapshot', { id: cfg.id, status: 'online', error: '', ...snap });
       } catch (e) {
+        console.error('[tick-error]', cfg.host + ':' + cfg.port, statusOfError(e), e.message);
         broadcast('ssh:status', { id: cfg.id, status: statusOfError(e), error: e.message });
       }
     }),
@@ -462,7 +463,7 @@ function registerIpc() {
           }
         })();
       }
-      return { ok: true, data: runId };
+      return runId;
     }),
   );
   ipcMain.handle('parallel:stop', (_e, runId) => {
@@ -538,7 +539,7 @@ function registerIpc() {
   }));
 
   // ============ 内嵌 SSH 终端 ============
-  const terminals = new Map(); // termId -> { stream, serverId }
+  const terminals = new Map(); // termId -> { stream, serverId, buf, attached }
   ipcMain.handle('terminal:open', wrap(async ({ id, cols, rows }) => {
     const conn = await getConn(id);
     const client = await new Promise((resolve, reject) => conn.connect().then(() => resolve(conn.client)).catch(reject));
@@ -546,8 +547,14 @@ function registerIpc() {
     await new Promise((resolve, reject) => {
       client.shell({ term: 'xterm-256color', cols: cols || 80, rows: rows || 24 }, (err, stream) => {
         if (err) return reject(err);
-        terminals.set(termId, { stream, serverId: id });
-        stream.on('data', (d) => broadcast('terminal:data', { termId, data: d.toString('utf8') }));
+        // attached=false 期间输出进缓冲，渲染层挂接(attach)后一次性冲刷——避免提示符落在广播前被丢
+        terminals.set(termId, { stream, serverId: id, buf: '', attached: false });
+        stream.on('data', (d) => {
+          const t = terminals.get(termId);
+          const s = d.toString('utf8');
+          if (t && t.attached) broadcast('terminal:data', { termId, data: s });
+          else if (t) t.buf += s;
+        });
         stream.stderr?.on?.('data', (d) => broadcast('terminal:data', { termId, data: d.toString('utf8') }));
         stream.on('close', () => {
           terminals.delete(termId);
@@ -557,8 +564,21 @@ function registerIpc() {
         resolve();
       });
     });
-    return { ok: true, data: termId };
+    return termId;
   }));
+  // 渲染层挂接：补发挂接前缓冲的输出（提示符/欢迎信息），之后实时广播
+  ipcMain.handle('terminal:attach', (_e, arg) => {
+    const termId = typeof arg === 'string' ? arg : arg && arg.termId;
+    const t = terminals.get(String(termId));
+    if (t && !t.attached) {
+      t.attached = true;
+      if (t.buf) {
+        broadcast('terminal:data', { termId, data: t.buf });
+        t.buf = '';
+      }
+    }
+    return true;
+  });
   ipcMain.handle('terminal:write', (_e, { termId, data }) => {
     const t = terminals.get(String(termId));
     if (t) t.stream.write(String(data));
@@ -606,17 +626,17 @@ function registerIpc() {
   // ============ 配置导出/导入（AES-256-GCM 口令加密） ============
   ipcMain.handle('config:export', wrap(async ({ passphrase }) => {
     const r = await dialog.showSaveDialog({ title: '导出配置', defaultPath: 'serverconsole-config.json' });
-    if (r.canceled || !r.filePath) return { ok: true, data: '' };
+    if (r.canceled || !r.filePath) return '';
     const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
     const iv = nodeCrypto.randomBytes(12);
     const cipher = nodeCrypto.createCipheriv('aes-256-gcm', key, iv);
     const enc = Buffer.concat([cipher.update(JSON.stringify(servers), 'utf8'), cipher.final(), cipher.getAuthTag()]);
     fs.writeFileSync(r.filePath, JSON.stringify({ sc_export: 1, iv: iv.toString('base64'), data: enc.toString('base64') }, null, 2), { mode: 0o600 });
-    return { ok: true, data: r.filePath };
+    return r.filePath;
   }));
   ipcMain.handle('config:import', wrap(async ({ passphrase }) => {
     const r = await dialog.showOpenDialog({ title: '导入配置', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
-    if (r.canceled || !r.filePaths[0]) return { ok: true, data: -1 };
+    if (r.canceled || !r.filePaths[0]) return -1;
     const j = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
     if (j.sc_export !== 1) throw new Error('不是 ServerConsole 导出文件');
     const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
@@ -633,7 +653,7 @@ function registerIpc() {
       count += 1;
     }
     persist();
-    return { ok: true, data: count };
+    return count;
   }));
 
   // ============ 传输队列 ============

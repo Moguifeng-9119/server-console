@@ -190,6 +190,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    if (process.env.SC_USER_DATA) app.setPath('userData', process.env.SC_USER_DATA); // e2e 测试隔离
     loadAppSettings();
     ipc.init();
     createWindow();

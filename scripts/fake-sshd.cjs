@@ -259,6 +259,29 @@ function attachSftp(sftpStream, rootDir) {
 function attachSession(client, rootDir) {
   client.on('session', (accept) => {
     const session = accept();
+    // 客户端请求 PTY（xterm 终端必须），直接接受
+    session.on('pty', (accept, reject, info) => {
+      console.log('[fake-sshd] pty ok, cols=' + info.cols);
+      accept();
+    });
+    // 真实 shell（终端 e2e 测试用）：把 ssh 流接到本机 shell 子进程
+    session.on('shell', (acceptShell) => {
+      const stream = acceptShell();
+      const { spawn } = require('node:child_process');
+      const exe = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
+      const child = spawn(exe, ['-NoLogo', '-NonInteractive', '-Command', '-'], { stdio: ['pipe', 'pipe', 'pipe'] });
+      stream.write('\r\nfake-shell ready\r\n');
+      stream.on('data', (d) => {
+        try { child.stdin.write(d); } catch { /* noop */ }
+      });
+      child.stdout.on('data', (d) => stream.write(d));
+      child.stderr.on('data', (d) => stream.write(d));
+      child.on('close', () => stream.end());
+      stream.on('close', () => {
+        try { child.kill(); } catch { /* noop */ }
+      });
+      stream.on('error', () => { /* noop */ });
+    });
     session.on('exec', (acceptExec, _reject, info) => {
       const stream = acceptExec();
       const cmd = info.command;

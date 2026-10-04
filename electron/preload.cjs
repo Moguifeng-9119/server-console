@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 内嵌 SSH 终端
   terminalOpen: (id, cols, rows) => ipcRenderer.invoke('terminal:open', { id, cols, rows }),
+  terminalAttach: (termId) => ipcRenderer.invoke('terminal:attach', { termId }),
   terminalWrite: (termId, data) => ipcRenderer.invoke('terminal:write', { termId, data }),
   terminalResize: (termId, cols, rows) => ipcRenderer.invoke('terminal:resize', { termId, cols, rows }),
   terminalClose: (termId) => ipcRenderer.invoke('terminal:close', { termId }),

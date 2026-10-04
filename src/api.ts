@@ -66,6 +66,7 @@ interface Api {
   configImport: (passphrase: string) => Promise<IpcResult<number>>;
 
   terminalOpen: (id: string, cols: number, rows: number) => Promise<IpcResult<string>>;
+  terminalAttach: (termId: string) => Promise<boolean>;
   terminalWrite: (termId: string, data: string) => Promise<unknown>;
   terminalResize: (termId: string, cols: number, rows: number) => Promise<unknown>;
   terminalClose: (termId: string) => Promise<unknown>;
