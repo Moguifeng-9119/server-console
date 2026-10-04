@@ -59,7 +59,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
 
 ### 🧰 Ops toolkit
-- **Embedded SSH terminal** per server (xterm.js), with reconnect on drop.
+- **Embedded SSH terminal** per server (xterm.js): multiple sessions per server, Windows-style copy/paste (right-click, Ctrl+C/V, multi-line paste), scrollback preserved across tab switches.
 - **Parallel commands**: run one command on N selected servers at once, per-server live output.
 - **Local port forwarding** (ssh -L equivalent) with rule management and auto-restore.
 - **Quick command snippets**, one-click from the server header.

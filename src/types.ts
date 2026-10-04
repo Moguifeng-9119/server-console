@@ -210,3 +210,10 @@ export interface ForwardingRule {
   status?: 'listening' | 'error' | 'stopped';
   error?: string;
 }
+
+// 终端会话信息（多开会话列表条目）
+export interface TerminalSessionInfo {
+  termId: string;
+  serverId: string;
+  createdAt: number;
+}

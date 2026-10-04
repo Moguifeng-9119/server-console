@@ -83,19 +83,37 @@ async function main() {
     tabs: document.querySelector('.tabs') ? document.querySelector('.tabs').innerText : '(no tabs)',
   }));
   console.log('DIAG: ' + JSON.stringify(diag));
-  const text = diag.hook === 'object' ? await page.evaluate(() => window.__scTerm.dump()) : '(no hook)';
+  const dump = () => page.evaluate(() => (window.__scTerm ? window.__scTerm.dump() : '(no hook)'));
+  const text = await dump();
   fs.writeFileSync(path.join(tmp, 'terminal.txt'), text);
-  const hasMarker = text.includes('sc-e2e-marker') || text.includes('fake-shell ready');
-  console.log(hasMarker ? 'E2E TERMINAL OK（输入→回显链路通）' : 'E2E TERMINAL FAIL（回显未出现）');
-  console.log('--- 终端文本（尾部 600 字） ---');
-  console.log(text.slice(-600));
+  const hasMarker = text.includes('sc-e2e-marker');
+  console.log(hasMarker ? 'E2E-1 输入→回显 OK' : 'E2E-1 FAIL（回显未出现）');
+  console.log('--- 终端文本 ---\n' + text.slice(-400));
   await page.screenshot({ path: path.join(tmp, 'terminal.png') });
-  console.log('screenshot: ' + path.join(tmp, 'terminal.png'));
+
+  // ===== 记忆测试：切走 tab 再切回，会话与内容必须保留 =====
+  await page.getByRole('button', { name: /进程（/ }).click();
+  await sleep(600);
+  await page.getByRole('button', { name: '终端', exact: true }).click();
+  await sleep(1800); // 重挂载 + 缓冲回放
+  const text2 = await dump();
+  const memoryOk = text2.includes('sc-e2e-marker') || text2.includes('fake-shell ready');
+  console.log(memoryOk ? 'E2E-2 记忆 OK（切 tab 回来内容还在）' : 'E2E-2 FAIL（切换后内容丢失）');
+
+  // ===== 多开测试：+ 新建第二个会话 =====
+  await page.locator('.term-chip.add').click();
+  await sleep(2500);
+  const chipCount = await page.locator('.term-chip:not(.add)').count();
+  const multiOk = chipCount >= 2;
+  console.log(multiOk ? 'E2E-3 多开 OK（会话数 ' + chipCount + '）' : 'E2E-3 FAIL（会话数 ' + chipCount + '）');
+  await page.screenshot({ path: path.join(tmp, 'multi.png') });
 
   await browser.close();
   try { electron.kill(); } catch { /* noop */ }
   sshd.close();
-  process.exit(hasMarker ? 0 : 1);
+  const allOk = hasMarker && memoryOk && multiOk;
+  console.log(allOk ? '\n终端 e2e 全部通过 ✓' : '\n终端 e2e 存在失败 ✗');
+  process.exit(allOk ? 0 : 1);
 }
 
 main()

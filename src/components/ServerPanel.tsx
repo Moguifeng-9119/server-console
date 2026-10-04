@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { FileManager } from './FileManager';
-import { TerminalPane } from './TerminalPane';
+import { TerminalSessions } from './TerminalPane';
 
 type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
@@ -328,7 +328,7 @@ export function ServerPanel({
           ) : tab === 'proc' ? (
             <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />
           ) : tab === 'term' ? (
-            <TerminalPane serverId={s.id} />
+            <TerminalSessions serverId={s.id} />
           ) : (
             <FileManager serverId={s.id} />
           )}

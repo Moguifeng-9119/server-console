@@ -87,9 +87,11 @@ contextBridge.exposeInMainWorld('api', {
   configExport: (passphrase) => ipcRenderer.invoke('config:export', { passphrase }),
   configImport: (passphrase) => ipcRenderer.invoke('config:import', { passphrase }),
 
-  // 内嵌 SSH 终端
+  // 内嵌 SSH 终端（多会话）
   terminalOpen: (id, cols, rows) => ipcRenderer.invoke('terminal:open', { id, cols, rows }),
+  terminalList: () => ipcRenderer.invoke('terminal:list'),
   terminalAttach: (termId) => ipcRenderer.invoke('terminal:attach', { termId }),
+  terminalDetach: (termId) => ipcRenderer.invoke('terminal:detach', { termId }),
   terminalWrite: (termId, data) => ipcRenderer.invoke('terminal:write', { termId, data }),
   terminalResize: (termId, cols, rows) => ipcRenderer.invoke('terminal:resize', { termId, cols, rows }),
   terminalClose: (termId) => ipcRenderer.invoke('terminal:close', { termId }),
@@ -103,8 +105,13 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('terminal:closed', h);
     return () => ipcRenderer.removeListener('terminal:closed', h);
   },
+  onTerminalSessions: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('terminal:sessions', h);
+    return () => ipcRenderer.removeListener('terminal:sessions', h);
+  },
 
-  // GPU 历史持久化
+    // GPU 历史持久化
   historyLoad: () => ipcRenderer.invoke('history:load'),
   historySave: (map) => ipcRenderer.invoke('history:save', map),
   onSnapshot: (cb) => {

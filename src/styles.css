@@ -2363,3 +2363,73 @@ a.link:hover {
   white-space: nowrap;
   font-size: calc(var(--fs-kpi) - 5px);
 }
+
+/* 终端会话条（多开） */
+.term-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.term-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11.5px;
+  cursor: pointer;
+  color: var(--text-dim);
+  user-select: none;
+  transition: border-color 0.13s ease, background 0.13s ease;
+}
+.term-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.term-chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.term-chip.add {
+  padding: 3px 8px;
+}
+.term-chip-x {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.term-chip-x:hover {
+  color: var(--crit);
+}
+.term-empty {
+  color: var(--text-faint);
+  padding: 32px;
+  text-align: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+}
+.term-host-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+.term-status {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 2;
+  color: var(--text-faint);
+  font-size: 11px;
+  background: var(--bg-elev);
+  padding: 2px 8px;
+  border-radius: 6px;
+}

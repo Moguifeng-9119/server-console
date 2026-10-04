@@ -9,6 +9,7 @@ import type {
   SnapshotPayload,
   SshConfigInfo,
   SshHostEntry,
+  TerminalSessionInfo,
   TransferItem,
   TrustedHost,
 } from './types';
@@ -66,14 +67,17 @@ interface Api {
   configImport: (passphrase: string) => Promise<IpcResult<number>>;
 
   terminalOpen: (id: string, cols: number, rows: number) => Promise<IpcResult<string>>;
-  terminalAttach: (termId: string) => Promise<boolean>;
+  terminalList: () => Promise<TerminalSessionInfo[]>;
+  terminalAttach: (termId: string) => Promise<string>;
+  terminalDetach: (termId: string) => Promise<boolean>;
   terminalWrite: (termId: string, data: string) => Promise<unknown>;
   terminalResize: (termId: string, cols: number, rows: number) => Promise<unknown>;
   terminalClose: (termId: string) => Promise<unknown>;
   onTerminalData: (cb: (d: { termId: string; data: string }) => void) => () => void;
   onTerminalClosed: (cb: (d: { termId: string }) => void) => () => void;
+  onTerminalSessions: (cb: (list: TerminalSessionInfo[]) => void) => () => void;
 
-  historyLoad: () => Promise<Record<string, number[]>>;
+    historyLoad: () => Promise<Record<string, number[]>>;
   historySave: (map: Record<string, number[]>) => Promise<boolean>;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;

@@ -539,44 +539,54 @@ function registerIpc() {
   }));
 
   // ============ 内嵌 SSH 终端 ============
-  const terminals = new Map(); // termId -> { stream, serverId, buf, attached }
+  // ============ 内嵌 SSH 终端（多会话：主进程持有，切 tab/重开不丢，缓冲有界） ============
+  const TERMINAL_BUF_CAP = 256 * 1024; // 每会话回放缓冲上限（环形裁剪）
+  const terminals = new Map(); // termId -> { stream, serverId, buf, attached, createdAt }
+  const termData = (termId, s) => {
+    const t = terminals.get(termId);
+    if (t && t.attached) broadcast('terminal:data', { termId, data: s });
+    else if (t) t.buf = (t.buf + s).slice(-TERMINAL_BUF_CAP);
+  };
+  const termSessionsOf = (serverId) =>
+    [...terminals.entries()]
+      .filter(([, t]) => t.serverId === serverId)
+      .map(([termId, t]) => ({ termId, serverId, createdAt: t.createdAt }))
+      .sort((a, b) => a.createdAt - b.createdAt);
+  const broadcastSessions = () => broadcast('terminal:sessions', [...terminals.entries()].map(([termId, t]) => ({ termId, serverId: t.serverId, createdAt: t.createdAt })));
+
   ipcMain.handle('terminal:open', wrap(async ({ id, cols, rows }) => {
     const conn = await getConn(id);
     const client = await new Promise((resolve, reject) => conn.connect().then(() => resolve(conn.client)).catch(reject));
-    const termId = `tm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const termId = 'tm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     await new Promise((resolve, reject) => {
       client.shell({ term: 'xterm-256color', cols: cols || 80, rows: rows || 24 }, (err, stream) => {
         if (err) return reject(err);
-        // attached=false 期间输出进缓冲，渲染层挂接(attach)后一次性冲刷——避免提示符落在广播前被丢
-        terminals.set(termId, { stream, serverId: id, buf: '', attached: false });
-        stream.on('data', (d) => {
-          const t = terminals.get(termId);
-          const s = d.toString('utf8');
-          if (t && t.attached) broadcast('terminal:data', { termId, data: s });
-          else if (t) t.buf += s;
-        });
-        stream.stderr?.on?.('data', (d) => broadcast('terminal:data', { termId, data: d.toString('utf8') }));
+        // attached=false 期间输出进会话缓冲；挂接后实时广播。缓冲即会话记忆（切换/重开不丢）
+        terminals.set(termId, { stream, serverId: id, buf: '', attached: false, createdAt: Date.now() });
+        stream.on('data', (d) => termData(termId, d.toString('utf8')));
+        stream.stderr?.on?.('data', (d) => termData(termId, d.toString('utf8')));
         stream.on('close', () => {
           terminals.delete(termId);
           broadcast('terminal:closed', { termId });
-          resolve();
+          broadcastSessions();
         });
         resolve();
       });
     });
+    broadcastSessions();
     return termId;
   }));
-  // 渲染层挂接：补发挂接前缓冲的输出（提示符/欢迎信息），之后实时广播
-  ipcMain.handle('terminal:attach', (_e, arg) => {
-    const termId = typeof arg === 'string' ? arg : arg && arg.termId;
+  // 挂接：返回累积缓冲（会话记忆回放），之后实时广播
+  ipcMain.handle('terminal:attach', (_e, { termId }) => {
     const t = terminals.get(String(termId));
-    if (t && !t.attached) {
-      t.attached = true;
-      if (t.buf) {
-        broadcast('terminal:data', { termId, data: t.buf });
-        t.buf = '';
-      }
-    }
+    const replay = t ? t.buf : '';
+    if (t) t.attached = true;
+    return replay;
+  });
+  // 脱离：切走 tab 时调用，会话与缓冲保留、后续输出继续进缓冲
+  ipcMain.handle('terminal:detach', (_e, { termId }) => {
+    const t = terminals.get(String(termId));
+    if (t) t.attached = false;
     return true;
   });
   ipcMain.handle('terminal:write', (_e, { termId, data }) => {
@@ -604,11 +614,13 @@ function registerIpc() {
         /* noop */
       }
       terminals.delete(String(termId));
+      broadcastSessions();
     }
     return true;
   });
+  ipcMain.handle('terminal:list', () => [...terminals.entries()].map(([termId, t]) => ({ termId, serverId: t.serverId, createdAt: t.createdAt })));
 
-  // ============ GPU 历史持久化 ============
+    // ============ GPU 历史持久化 ============
   const historyFile = () => path.join(app.getPath('userData'), 'history.json');
   ipcMain.handle('history:load', () => {
     try {
