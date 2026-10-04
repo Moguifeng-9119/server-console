@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Search, Terminal } from 'lucide-react';
 import { useStore } from './state';
+import { useTranslation } from 'react-i18next';
 import { api } from './api';
 import type { Server } from './types';
 import { Overview } from './components/Overview';
@@ -37,6 +38,7 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'serv
 
 export default function App() {
   const { servers, theme, setTheme, toasts, demo, configs } = useStore();
+  const { t } = useTranslation();
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
   const [view, setView] = useState<{ kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
@@ -101,15 +103,15 @@ export default function App() {
 
   const paletteActions = useMemo<PaletteAction[]>(
     () => [
-      ...servers.map((s) => ({ id: 'open-server:' + s.id, label: '连接 ' + s.name, hint: s.host, run: () => openServer(s.id) })),
-      { id: 'overview', label: '打开总览', run: () => setView({ kind: 'overview' }) },
-      { id: 'parallel', label: '打开并行命令', run: () => setView({ kind: 'parallel' }) },
-      { id: 'transfers', label: '打开传输中心', run: () => window.dispatchEvent(new Event('sc:show-transfers')) },
-      { id: 'settings', label: '打开设置', run: () => setSettingsOpen(true) },
-      { id: 'manager', label: '管理服务器', run: () => setManagerOpen(true) },
-      { id: 'theme', label: '切换深/浅主题', run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+      ...servers.map((s) => ({ id: 'open-server:' + s.id, label: t('palette.connect', { name: s.name }), hint: s.host, run: () => openServer(s.id) })),
+      { id: 'overview', label: t('palette.openOverview'), run: () => setView({ kind: 'overview' }) },
+      { id: 'parallel', label: t('palette.openParallel'), run: () => setView({ kind: 'parallel' }) },
+      { id: 'transfers', label: t('palette.openTransfers'), run: () => window.dispatchEvent(new Event('sc:show-transfers')) },
+      { id: 'settings', label: t('palette.openSettings'), run: () => setSettingsOpen(true) },
+      { id: 'manager', label: t('palette.manageServers'), run: () => setManagerOpen(true) },
+      { id: 'theme', label: t('palette.toggleTheme'), run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
     ],
-    [servers, openServer, setTheme, theme]
+    [servers, openServer, setTheme, theme, t]
   );
 
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
@@ -186,10 +188,10 @@ export default function App() {
             className={`nav-item ${view.kind === 'overview' ? 'active' : ''}`}
             onClick={() => setView({ kind: 'overview' })}
           >
-            <span>总览</span>
+            <span>{t('nav.overview')}</span>
             <span className="sub">{servers.filter((s) => s.status === 'online').length}/{servers.length}</span>
           </button>
-          {!hasGroups && <div className="note" style={{ padding: '10px 10px 4px' }}>服务器</div>}
+          {!hasGroups && <div className="note" style={{ padding: '10px 10px 4px' }}>{t('nav.servers')}</div>}
           {hasGroups
             ? groupSections.map((sec) => (
                 <div key={sec.key}>
@@ -206,28 +208,28 @@ export default function App() {
         </nav>
         <div className="sidebar-foot">
           <button className="btn" style={{ flex: 1, paddingInline: 4 }} onClick={() => setImportOpen(true)}>
-            导入
+            {t('nav.import')}
           </button>
           <button className="btn" style={{ flex: 1 }} onClick={() => setManagerOpen(true)}>
-            服务器
+            {t('nav.servers')}
           </button>
           <button className="btn" style={{ flex: 1 }} onClick={() => setSettingsOpen(true)}>
-            设置
+            {t('nav.settings')}
           </button>
         </div>
       </aside>
 
       <main className="main">
         <header className="topbar">
-          <span className="title">{view.kind === 'overview' ? '总览' : view.kind === 'parallel' ? '并行命令' : current?.name}</span>
+          <span className="title">{view.kind === 'overview' ? t('nav.overview') : view.kind === 'parallel' ? t('nav.parallel') : current?.name}</span>
           {demo && (
             <button className="btn" style={{ color: 'var(--warn)' }} onClick={() => setManagerOpen(true)}>
-              演示数据 · 点此连接真实服务器
+              {t('topbar.demoBanner')}
             </button>
           )}
           <button className="topbar-search" onClick={() => setPaletteOpen(true)} title="搜索服务器 / 执行动作">
             <Search size={13} />
-            <span>搜索服务器 / 命令</span>
+            <span>{t('topbar.search')}</span>
             <kbd>Ctrl K</kbd>
           </button>
           <span className="spacer" />
@@ -237,7 +239,7 @@ export default function App() {
             title="打开传输中心"
           >
             <span className="transfer-entry-ico"><ArrowUpDown size={13} strokeWidth={2.2} /></span>
-            传输
+            {t('topbar.transfers')}
             {activeTransferCount > 0 && <span className="transfer-entry-badge num">{activeTransferCount}</span>}
           </button>
         </header>
@@ -292,11 +294,11 @@ export default function App() {
           <div className="dialog" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
             <h3>还有 {activeTransferCount} 个传输任务进行中</h3>
             <div className="body">
-              最小化到任务栏后传输继续跑；强制退出会中断所有传输（已传部分保留断点，下次可续传）。
+              {t('quit.body')}
             </div>
             <div className="foot">
               <button className="btn" onClick={() => setQuitAsk(false)}>
-                取消
+                {t('quit.cancel')}
               </button>
               <button
                 className="btn danger"
@@ -305,7 +307,7 @@ export default function App() {
                   api?.forceQuit();
                 }}
               >
-                强制退出
+                {t('quit.forceQuit')}
               </button>
               <button
                 className="btn primary"
@@ -314,7 +316,7 @@ export default function App() {
                   api?.backgroundContinue();
                 }}
               >
-                最小化并继续
+                {t('quit.minimize')}
               </button>
             </div>
           </div>

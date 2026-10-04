@@ -61,6 +61,7 @@ interface Api {
 
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
   getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit' }>;
+  setAppLanguage: (lang: string) => Promise<boolean>;
   showMainWindow: () => void;
   checkUpdate: () => Promise<IpcResult<{ latest: string; current: string; isNew: boolean; url: string }>>;
   configExport: (passphrase: string) => Promise<IpcResult<string>>;

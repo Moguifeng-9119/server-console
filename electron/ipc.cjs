@@ -1,5 +1,6 @@
 const { ipcMain, BrowserWindow, Notification, dialog, app, safeStorage } = require('electron');
 const nodeCrypto = require('node:crypto');
+const lang = require('./lang.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Pool, Connection, setHostKeyChecker, setInteractiveHandler, setJumpResolver } = require('./ssh.cjs');
@@ -675,11 +676,11 @@ function registerIpc() {
     knownHostsLine: hostkeys.knownHostsLine,
     notify: (t, isFail) => {
       if (!Notification.isSupported()) return;
-      const kindText = t.kind === 'upload' ? '上传' : t.kind === 'download' ? '下载' : '服务器互传';
-      const title = isFail ? `${kindText}失败：${t.name}` : `${kindText}完成：${t.name}`;
+      const kindText = t.kind === 'upload' ? lang.t('up') : t.kind === 'download' ? lang.t('down') : lang.t('relay');
+      const title = isFail ? `${kindText}: ${t.name}` : lang.t('done', { name: t.name });
       const body = isFail
-        ? (t.error || '未知错误').slice(0, 160)
-        : t.size ? `已传输 ${formatBytesHuman(t.size)}` : '传输已完成';
+        ? (t.error || 'Unknown error').slice(0, 160)
+        : t.size ? lang.t('size', { size: formatBytesHuman(t.size) }) : lang.t('doneShort');
       new Notification({ title, body, silent: !isFail }).show(); // 失败带系统提示音，完成静默
     },
   });

@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('api', {
   // 系统托盘 / 关窗行为
   setAppSettings: (o) => ipcRenderer.invoke('app:set-settings', o),
   getAppSettings: () => ipcRenderer.invoke('app:get-settings'),
+  setAppLanguage: (lang) => ipcRenderer.invoke('app:set-language', { lang }),
   showMainWindow: () => ipcRenderer.send('app:show-main'),
   checkUpdate: () => ipcRenderer.invoke('app:check-update'),
   configExport: (passphrase) => ipcRenderer.invoke('config:export', { passphrase }),

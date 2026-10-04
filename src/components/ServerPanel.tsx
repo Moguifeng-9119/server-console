@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../state';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
@@ -10,19 +11,20 @@ type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
 function KpiStrip({ s }: { s: Server }) {
   const { colorOf } = useStore();
+  const { t } = useTranslation();
   const avg = s.gpus.reduce((a, g) => a + g.util, 0) / (s.gpus.length || 1);
   const vram =
     (s.gpus.reduce((a, g) => a + g.memUsed, 0) / (s.gpus.reduce((a, g) => a + g.memTotal, 0) || 1)) * 100;
   const zombies = s.processes.filter((p) => p.state === 'Z').length;
   const cells: Array<{ k: string; v: string; color?: string }> = [
-    { k: '进程总数', v: String(s.processes.length) },
-    { k: '僵尸进程', v: String(zombies), color: zombies ? 'var(--crit)' : undefined },
-    { k: '平均 GPU 利用率', v: `${Math.round(avg)}%`, color: colorOf(avg) },
-    { k: '显存占用', v: `${Math.round(vram)}%`, color: colorOf(vram) },
-    { k: '负载 1m', v: s.loadAvg[0].toFixed(1) },
-    { k: `CPU（${s.cpuCores} 核）`, v: `${s.cpuUsage}%`, color: colorOf(s.cpuUsage) },
-    { k: '内存', v: `${Math.round(s.memUsed)}/${Math.round(s.memTotal)}G`, color: colorOf((s.memUsed / s.memTotal) * 100) },
-    { k: 'Swap', v: `${s.swapUsed}/${s.swapTotal}G` },
+    { k: t('kpi.processes'), v: String(s.processes.length) },
+    { k: t('kpi.zombies'), v: String(zombies), color: zombies ? 'var(--crit)' : undefined },
+    { k: t('kpi.avgGpu'), v: `${Math.round(avg)}%`, color: colorOf(avg) },
+    { k: t('kpi.vram'), v: `${Math.round(vram)}%`, color: colorOf(vram) },
+    { k: t('kpi.load'), v: s.loadAvg[0].toFixed(1) },
+    { k: t('kpi.cpu', { cores: s.cpuCores }), v: `${s.cpuUsage}%`, color: colorOf(s.cpuUsage) },
+    { k: t('kpi.mem'), v: `${Math.round(s.memUsed)}/${Math.round(s.memTotal)}G`, color: colorOf((s.memUsed / s.memTotal) * 100) },
+    { k: t('kpi.swap'), v: `${s.swapUsed}/${s.swapTotal}G` },
   ];
   return (
     <div className="kpi-strip">
@@ -40,6 +42,7 @@ function KpiStrip({ s }: { s: Server }) {
 
 function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y: number) => void }) {
   const { colorOf } = useStore();
+  const { t } = useTranslation();
   return (
     <div className="gpu-list">
       {s.gpus.map((g) => {
@@ -65,7 +68,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
               <span className="num" style={{ fontSize: 15, color: colorOf(memPct) }}>
                 {(g.memUsed / 1024).toFixed(1)} / {(g.memTotal / 1024).toFixed(0)} GiB
               </span>
-              <span className="note">显存 {memPct.toFixed(0)}%</span>
+              <span className="note">{t('gpu.vramPct', { v: memPct.toFixed(0) })}</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
               <i style={{ width: `${memPct}%`, background: colorOf(memPct) }} />
@@ -73,13 +76,13 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
 
             <div className="metrics">
               <div>
-                温度<b style={g.temp == null ? undefined : { color: colorOf(g.temp) }}>{g.temp == null ? 'N/A' : `${g.temp}°C`}</b>
+                {t('gpu.temp')}<b style={g.temp == null ? undefined : { color: colorOf(g.temp) }}>{g.temp == null ? t('gpu.na') : `${g.temp}°C`}</b>
               </div>
               <div>
-                功耗<b>{g.power == null ? 'N/A' : `${g.power} W`}</b>
+                {t('gpu.power')}<b>{g.power == null ? t('gpu.na') : `${g.power} W`}</b>
               </div>
               <div title={g.fan == null ? '该显卡未向驱动报告风扇转速（机房/被动散热卡常见），不是 0 转' : undefined}>
-                风扇<b>{g.fan == null ? 'N/A' : `${g.fan}%`}</b>
+                {t('gpu.fan')}<b>{g.fan == null ? t('gpu.na') : `${g.fan}%`}</b>
               </div>
             </div>
 
@@ -112,6 +115,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
 }
 
 function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y: number) => void }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [user, setUser] = useState('all');
   const [onlyGpu, setOnlyGpu] = useState(false);
@@ -172,10 +176,10 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
         </select>
         <label className="dim" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           <input type="checkbox" checked={onlyGpu} onChange={(e) => setOnlyGpu(e.target.checked)} />
-          只看 GPU 进程
+          {t('proc.onlyGpu')}
         </label>
         <span className="faint">
-          {rows.length} / {s.processes.length} 条
+          {t('proc.count', { a: rows.length, b: s.processes.length })}
         </span>
       </div>
 
@@ -235,6 +239,7 @@ export function ServerPanel({
   onTab: (t: 'gpu' | 'proc' | 'files' | 'term') => void;
 }) {
   const { kill, restartService } = useStore();
+  const { t } = useTranslation();
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
   const [restartAsk, setRestartAsk] = useState(false);
@@ -308,16 +313,16 @@ export function ServerPanel({
           <KpiStrip s={s} />
           <div className="tabs">
             <button className={tab === 'gpu' ? 'on' : ''} onClick={() => onTab('gpu')}>
-              GPU（{s.gpus.length}）
+              {t('server.gpuTab', { n: s.gpus.length })}
             </button>
             <button className={tab === 'proc' ? 'on' : ''} onClick={() => onTab('proc')}>
-              进程（{s.processes.length}）
+              {t('server.procTab', { n: s.processes.length })}
             </button>
             <button className={tab === 'files' ? 'on' : ''} onClick={() => onTab('files')}>
-              文件
+              {t('server.filesTab')}
             </button>
             <button className={tab === 'term' ? 'on' : ''} onClick={() => onTab('term')}>
-              终端
+              {t('server.termTab')}
             </button>
             <span className="note" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
               {tab === 'files' ? '双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传' : '右键任意进程行可执行操作'}
@@ -337,14 +342,14 @@ export function ServerPanel({
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
-          <div className="hdr">进程 {menu.pid}</div>
+          <div className="hdr">{t('ctx.proc', { pid: menu.pid })}</div>
           <button
             onClick={() => {
               setConfirm({ pid: menu.pid, signal: 'TERM' });
               setMenu(null);
             }}
           >
-            结束进程（SIGTERM）
+            {t('ctx.termSig')}
           </button>
           <button
             className="danger"
@@ -353,7 +358,7 @@ export function ServerPanel({
               setMenu(null);
             }}
           >
-            强制结束（SIGKILL）
+            {t('ctx.forceKill')}
           </button>
           <div className="sep" />
           <button
@@ -362,7 +367,7 @@ export function ServerPanel({
               setMenu(null);
             }}
           >
-            复制 PID
+            {t('ctx.copyPid')}
           </button>
           <button
             onClick={() => {
@@ -371,7 +376,7 @@ export function ServerPanel({
               setMenu(null);
             }}
           >
-            复制命令行
+            {t('ctx.copyCmd')}
           </button>
           <div className="sep" />
           <button
@@ -381,7 +386,7 @@ export function ServerPanel({
               setMenu(null);
             }}
           >
-            重启服务…
+            {t('ctx.restartSvc')}
           </button>
         </ContextMenu>
       )}
@@ -390,20 +395,20 @@ export function ServerPanel({
         <div className="mask" onClick={() => setConfirm(null)}>
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
             <h3 style={{ color: 'var(--crit)' }}>
-              确认{confirm.signal === 'KILL' ? '强制' : ''}结束进程 {confirm.pid}？
+              {t('ctx.confirmKillTitle', { force: confirm.signal === 'KILL' ? t('ctx.forceWord') : '', pid: confirm.pid })}
             </h3>
             <div className="body">
-              目标机器：<code>{s.name}</code>（{s.host}）
+              {t('ctx.targetMachine')} <code>{s.name}</code>（{s.host}）
               <br />
-              命令行：<code>{target?.command ?? '（进程已退出）'}</code>
+              {t('ctx.cmdline')} <code>{target?.command ?? ''}</code>
               <br />
-              将执行：<code>kill -{confirm.signal === 'KILL' ? '9' : '15'} {confirm.pid}</code>
+              {t('ctx.willExec')} <code>kill -{confirm.signal === 'KILL' ? '9' : '15'} {confirm.pid}</code>
               <br />
-              <span style={{ color: 'var(--warn)' }}>此操作不可撤销，已记录到本地审计日志。</span>
+              <span style={{ color: 'var(--warn)' }}>{t('ctx.irreversible')}</span>
             </div>
             <div className="foot">
               <button className="btn" onClick={() => setConfirm(null)}>
-                取消
+                {t('ctx.cancel')}
               </button>
               <button
                 className="btn danger"
@@ -412,7 +417,7 @@ export function ServerPanel({
                   setConfirm(null);
                 }}
               >
-                确认执行
+                {t('ctx.confirmExec')}
               </button>
             </div>
           </div>
@@ -422,9 +427,9 @@ export function ServerPanel({
       {restartAsk && (
         <div className="mask" onClick={() => setRestartAsk(false)}>
           <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
-            <h3>重启 systemd 服务</h3>
+            <h3>{t('restart.title')}</h3>
             <div className="field">
-              <label>服务名</label>
+              <label>{t('restart.svcName')}</label>
               <input
                 className="mini"
                 style={{ width: '100%' }}
@@ -435,14 +440,14 @@ export function ServerPanel({
               />
             </div>
             <div className="body dim">
-              将在 <code>{s.name}</code> 上执行：<code>systemctl restart {svcName.trim() || '…'}</code>
+              {t('restart.willExecOn', { name: s.name })} <code>systemctl restart {svcName.trim() || '…'}</code>
             </div>
             <div className="foot">
               <button className="btn" onClick={() => setRestartAsk(false)}>
-                取消
+                {t('ctx.cancel')}
               </button>
               <button className="btn primary" disabled={!svcName.trim()} onClick={doRestart}>
-                确认重启
+                {t('restart.confirmRestart')}
               </button>
             </div>
           </div>

@@ -26,9 +26,11 @@
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "i18next": "^26.4.2",
     "lucide-react": "^1.49.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.15",
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
@@ -83,7 +85,20 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "installerLanguages": [
+        "en_US",
+        "zh_CN",
+        "zh_TW",
+        "ja_JP",
+        "ko_KR",
+        "es_ES",
+        "fr_FR",
+        "de_DE",
+        "ru_RU",
+        "pt_BR"
+      ],
+      "multiLanguageInstaller": true
     }
   }
 }

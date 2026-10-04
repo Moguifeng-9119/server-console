@@ -14,17 +14,9 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { api } from '../api';
 import { useTransfers } from '../transfers';
+import { useTranslation } from 'react-i18next';
 import { formatBytes, formatDuration, formatSpeed, etaSeconds, pctOf } from '../format';
-import type { TransferItem, TransferKind, TransferStatus } from '../types';
-
-const STATUS_TEXT: Record<TransferStatus, string> = {
-  queued: '排队中',
-  running: '传输中',
-  paused: '已暂停',
-  done: '已完成',
-  error: '失败',
-  canceled: '已取消',
-};
+import type { TransferItem, TransferKind } from '../types';
 
 const KIND_META: Record<TransferKind, { icon: LucideIcon; label: string; cls: string }> = {
   upload: { icon: ArrowUp, label: '上传', cls: 'up' },
@@ -76,6 +68,7 @@ function TaskRow({ t, tf, picked, togglePick }: {
 }) {
   const [open, setOpen] = useState(false);
   const [fileQ, setFileQ] = useState('');
+  const tt = useTranslation().t;
   const pct = pctOf(t);
   const eta = etaSeconds(t);
   const hist = tf.getSpeedHistory(t.id);
@@ -101,10 +94,10 @@ function TaskRow({ t, tf, picked, togglePick }: {
           type="checkbox"
           checked={picked.has(t.id)}
           onChange={() => togglePick(t.id)}
-          title="选择以批量取消"
+          title={tt('transfer.pickTip') || ''}
         />
         <span className={`td-kind ${km.cls}`}><km.icon size={13} strokeWidth={2.2} /></span>
-        <button className="td-expand" onClick={() => setOpen((v) => !v)} title={open ? '收起' : '展开详情'}>
+        <button className="td-expand" onClick={() => setOpen((v) => !v)} title={open ? tt('transfer.collapse') : tt('transfer.expand')}>
           {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
         <span className="td-name mono" title={t.name}>
@@ -113,33 +106,33 @@ function TaskRow({ t, tf, picked, togglePick }: {
         {t.kind === 'relay' && (
           <span
             className={`td-badge ${t.direct ? 'direct' : 'relayx'}`}
-            title={t.direct ? `服务器直传${t.directMode ? ' · ' + t.directMode : ''}${t.directNote ? '\n' + t.directNote : ''}` : '经本机中继转发'}
+            title={t.direct ? tt('transfer.directTip', { mode: t.directMode ? ' · ' + t.directMode : '', note: t.directNote ? '\n' + t.directNote : '' }) : tt('transfer.relayTip')}
           >
-            {t.direct ? `直传${t.directMode ? '·' + t.directMode : ''}` : '中继'}
+            {t.direct ? tt('transfer.direct', { mode: t.directMode ? '·' + t.directMode : '' }) : tt('transfer.relay')}
           </span>
         )}
         {t.status === 'queued' && t.waitConflict && (
-          <span className="td-badge wait" title="同一目标有任务正在传输，为避免交错写入损坏文件，本任务暂缓启动">
-            <Hourglass size={11} /> 等待同目标
+          <span className="td-badge wait" title={tt('transfer.waitConflictTip')}>
+            <Hourglass size={11} /> {tt('transfer.waitConflict')}
           </span>
         )}
         <span className="td-peer">{peer}</span>
         <span className="td-spacer" />
         {t.status === 'running' && <span className="td-now num">{formatSpeed(t.speed)}</span>}
-        {t.status === 'running' && (eta != null ? <span className="td-eta num">剩 {formatDuration(eta)}</span> : t.size === 0 ? <span className="td-eta">总量统计中</span> : null)}
-        <span className={`td-status ${t.status}`}>{STATUS_TEXT[t.status]}</span>
+        {t.status === 'running' && (eta != null ? <span className="td-eta num">{formatDuration(eta)}</span> : t.size === 0 ? <span className="td-eta">{tt('transfer.totalUnknown')}</span> : null)}
+        <span className={`td-status ${t.status}`}>{tt('transfer.' + t.status)}</span>
         <span className="td-row-actions">
           {t.status === 'queued' && (
             <>
-              <button className="btn mini" onClick={() => tf.move(t.id, 'up')} title="提前"><ArrowUp size={12} /></button>
-              <button className="btn mini" onClick={() => tf.move(t.id, 'down')} title="置后"><ArrowDown size={12} /></button>
+              <button className="btn mini" onClick={() => tf.move(t.id, 'up')} title={tt('transfer.moveUp')}><ArrowUp size={12} /></button>
+              <button className="btn mini" onClick={() => tf.move(t.id, 'down')} title={tt('transfer.moveDown')}><ArrowDown size={12} /></button>
             </>
           )}
-          {t.status === 'running' && <button className="btn mini" onClick={() => tf.pause(t.id)}>暂停</button>}
-          {t.status === 'paused' && <button className="btn mini primary" onClick={() => tf.resume(t.id)}>续传</button>}
-          {t.status === 'error' && <button className="btn mini primary" onClick={() => tf.retry(t.id)}>重试</button>}
-          {['queued', 'running'].includes(t.status) && <button className="btn mini danger" onClick={() => tf.cancel(t.id)}>取消</button>}
-          {['done', 'canceled', 'error', 'paused'].includes(t.status) && <button className="btn mini" onClick={() => tf.remove(t.id)}>移除</button>}
+          {t.status === 'running' && <button className="btn mini" onClick={() => tf.pause(t.id)}>{tt('transfer.pauseBtn')}</button>}
+          {t.status === 'paused' && <button className="btn mini primary" onClick={() => tf.resume(t.id)}>{tt('transfer.resumeBtn')}</button>}
+          {t.status === 'error' && <button className="btn mini primary" onClick={() => tf.retry(t.id)}>{tt('transfer.retryBtn')}</button>}
+          {['queued', 'running'].includes(t.status) && <button className="btn mini danger" onClick={() => tf.cancel(t.id)}>{tt('transfer.cancel')}</button>}
+          {['done', 'canceled', 'error', 'paused'].includes(t.status) && <button className="btn mini" onClick={() => tf.remove(t.id)}>{tt('transfer.removeBtn')}</button>}
         </span>
       </div>
 
@@ -206,6 +199,8 @@ type StatusFilter = 'all' | 'active' | 'done' | 'error';
 
 export function TransferDrawer() {
   const tf = useTransfers();
+  const { t } = useTranslation();
+  const tt = t;
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
   const [kind, setKind] = useState<KindFilter>('all');
@@ -279,16 +274,16 @@ export function TransferDrawer() {
   if (!open) return null;
 
   const kindTabs: Array<[KindFilter, string]> = [
-    ['all', '全部'],
-    ['upload', '上传'],
-    ['download', '下载'],
-    ['relay', '互传'],
+    ['all', tt('transfer.all')],
+    ['upload', tt('transfer.upload')],
+    ['download', tt('transfer.download')],
+    ['relay', tt('transfer.relay')],
   ];
   const stTabs: Array<[StatusFilter, string, number]> = [
-    ['all', '全部', tf.items.length],
-    ['active', '进行中', tf.runningCount + tf.queuedCount],
-    ['done', '已完成', tf.doneCount],
-    ['error', '失败', tf.errorCount],
+    ['all', tt('transfer.all'), tf.items.length],
+    ['active', tt('transfer.active'), tf.runningCount + tf.queuedCount],
+    ['done', tt('transfer.doneFilter'), tf.doneCount],
+    ['error', tt('transfer.errorFilter'), tf.errorCount],
   ];
 
   return (
@@ -296,8 +291,8 @@ export function TransferDrawer() {
       <aside className={`td-drawer ${full ? 'full' : ''}`}>
         <header className="td-header">
           <div className="td-title">
-            <h2>传输中心</h2>
-            {tf.runningCount > 0 && <span className="td-live"><i className="td-live-dot" />{tf.runningCount} 个传输中 · 总进度 {overall}%</span>}
+            <h2>{tt('transfer.center')}</h2>
+            {tf.runningCount > 0 && <span className="td-live"><i className="td-live-dot" />{tt('transfer.live', { n: tf.runningCount, p: overall })}</span>}
           </div>
           <div className="td-head-speed num">
             <span className="up"><ArrowUp size={12} strokeWidth={2.2} /> {formatSpeed(upSpeed) || '0 B/s'}</span>
@@ -305,8 +300,8 @@ export function TransferDrawer() {
             <span className="relay"><ArrowLeftRight size={12} strokeWidth={2.2} /> {formatSpeed(relaySpeed) || '0 B/s'}</span>
           </div>
           <div className="td-head-btns">
-            <button className="btn icon-btn" title={full ? '还原' : '全屏'} onClick={() => setFull((v) => !v)}>{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
-            <button className="btn icon-btn" title="关闭" onClick={() => setOpen(false)}><X size={13} /></button>
+            <button className="btn icon-btn" title={full ? tt('transfer.restore') : tt('transfer.fullscreen')} onClick={() => setFull((v) => !v)}>{full ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
+            <button className="btn icon-btn" title={tt('transfer.close')} onClick={() => setOpen(false)}><X size={13} /></button>
           </div>
         </header>
 
@@ -326,15 +321,15 @@ export function TransferDrawer() {
             ))}
           </div>
           <span className="td-spacer" />
-          <button className="btn mini" onClick={tf.pauseAll}>全部暂停</button>
-          <button className="btn mini primary" onClick={tf.resumeAll}>全部继续</button>
-          {tf.errorCount > 0 && <button className="btn mini warn" onClick={tf.retryFailed}>失败全重试</button>}
+          <button className="btn mini" onClick={tf.pauseAll}>{tt('transfer.pauseAll')}</button>
+          <button className="btn mini primary" onClick={tf.resumeAll}>{tt('transfer.resumeAll')}</button>
+          {tf.errorCount > 0 && <button className="btn mini warn" onClick={tf.retryFailed}>{tt('transfer.retryFailed')}</button>}
           {picked.size > 0 && (
             <button className="btn mini danger" onClick={() => { tf.cancelMany([...picked]); setPicked(new Set()); }}>
               取消所选({picked.size})
             </button>
           )}
-          <button className="btn mini" onClick={tf.clearFinished}>清除已完成</button>
+          <button className="btn mini" onClick={tf.clearFinished}>{tt('transfer.clearFinished')}</button>
         </div>
 
         <div className="td-settings-line">
@@ -349,11 +344,11 @@ export function TransferDrawer() {
             />
             <b className="num">{tf.concurrency}</b>
           </label>
-          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyDone} onChange={(e) => tf.setNotifyOpts({ notifyDone: e.target.checked })} />完成通知</label>
-          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyFail} onChange={(e) => tf.setNotifyOpts({ notifyFail: e.target.checked })} />失败通知</label>
-          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.sound} onChange={(e) => tf.setNotifyOpts({ sound: e.target.checked })} />失败提示音</label>
+          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyDone} onChange={(e) => tf.setNotifyOpts({ notifyDone: e.target.checked })} />{tt('transfer.notifyDone')}</label>
+          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.notifyFail} onChange={(e) => tf.setNotifyOpts({ notifyFail: e.target.checked })} />{tt('transfer.notifyFail')}</label>
+          <label className="td-chk"><input type="checkbox" checked={tf.notifyOpts.sound} onChange={(e) => tf.setNotifyOpts({ sound: e.target.checked })} />{tt('transfer.sound')}</label>
           <label className="td-chk">
-            限速
+            {tt('transfer.limit')}
             <input
               className="mini num"
               style={{ width: 52, marginLeft: 4 }}
@@ -373,7 +368,7 @@ export function TransferDrawer() {
         </div>
 
         <div className="td-list">
-          {filtered.length === 0 && <div className="td-empty">暂无传输任务</div>}
+          {filtered.length === 0 && <div className="td-empty">{tt('transfer.empty')}</div>}
           {activeList.slice(0, renderCap).map((t) => (
             <TaskRow key={t.id} t={t} tf={tf} picked={picked} togglePick={togglePick} />
           ))}

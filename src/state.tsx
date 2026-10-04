@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { AuditEntry, Server, ServerConfig, SnapshotPayload, Toast } from './types';
 import { api, isElectron } from './api';
+import i18n from './i18n';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'default' | 'comfy';
@@ -323,9 +324,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const s = servers.find((x) => x.id === id);
       if (!s) continue;
       const label: Record<string, string> = {
-        temp: `GPU 温度过高（${s.name}）`,
-        vram: `显存接近占满（${s.name}）`,
-        zombie: `出现僵尸进程（${s.name}）`,
+        temp: i18n.t('state.tempAlert', { name: s.name }),
+        vram: i18n.t('state.vramAlert', { name: s.name }),
+        zombie: i18n.t('state.zombieAlert', { name: s.name }),
       };
       pushToast({ level: 'warn', title: label[type], detail: nowTime() });
       api?.notify(label[type], `${s.name} · ${nowTime()}`);
@@ -335,7 +336,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [servers, alertsEnabled, thresholds.crit, tempAlert, pushToast]);
 
   const addServer = useCallback(async (cfg: NewServer): Promise<AddResult> => {
-    if (!api) return { ok: false, error: '当前不在桌面端（无 Electron 主进程）' };
+    if (!api) return { ok: false, error: i18n.t('state.desktopOnly') };
     try {
       const res = await api.addServer(cfg);
       if (!res?.ok) return { ok: false, error: res?.error || '主进程返回空结果' };
@@ -367,11 +368,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!api) return;
         api.kill(serverId, pid, signal).then((res) => {
           if (!res.ok) {
-            pushToast({ level: 'error', title: `结束进程 ${pid} 失败`, detail: res.error });
+            pushToast({ level: 'error', title: i18n.t('state.killFail', { pid }), detail: res.error });
             logAudit({ server: s?.name ?? serverId, action, target: String(pid), result: 'failed' });
             return;
           }
-          pushToast({ level: 'info', title: `已发送 SIG${signal} → ${pid}`, detail: s?.name ?? '' });
+          pushToast({ level: 'info', title: i18n.t('state.sigSent', { signal, pid }), detail: s?.name ?? '' });
           logAudit({
             server: s?.name ?? serverId,
             action,
@@ -382,7 +383,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!s || !target) {
-        pushToast({ level: 'error', title: `进程 ${pid} 不存在`, detail: '可能已自行退出' });
+        pushToast({ level: 'error', title: i18n.t('state.procGone', { pid }), detail: i18n.t('state.procGoneDetail') });
         return;
       }
       const m = mockRef.current;
@@ -401,8 +402,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const s = servers.find((x) => x.id === serverId);
       const log = (result: 'ok' | 'failed', detail?: string) => {
         logAudit({ server: s?.name ?? serverId, action: 'systemctl restart', target: service, result });
-        if (result === 'ok') pushToast({ level: 'info', title: `正在重启 ${service}`, detail: s?.name });
-        else pushToast({ level: 'error', title: `重启 ${service} 失败`, detail });
+        if (result === 'ok') pushToast({ level: 'info', title: i18n.t('state.restarting', { service }), detail: s?.name });
+        else pushToast({ level: 'error', title: i18n.t('state.restartFail', { service }), detail });
       };
       if (!demo && api) {
         api.restartService(serverId, service).then((res) => (res.ok ? log('ok') : log('failed', res.error)));

@@ -127,6 +127,13 @@ ipcMain.on('app:show-main', () => {
   mainWindow.focus();
 });
 ipcMain.handle('app:get-settings', () => ({ closeAction }));
+// 语言：主进程通知文案跟随设置里选择的语言
+const lang = require('./lang.cjs');
+ipcMain.handle('app:set-language', (_e, payload) => {
+  lang.setLanguage(payload && typeof payload === 'object' ? payload.lang : payload);
+  return true;
+});
+
 ipcMain.handle('app:check-update', async () => {
   try {
     const res = await fetch('https://api.github.com/repos/Moguifeng-9119/server-console/releases/latest', {

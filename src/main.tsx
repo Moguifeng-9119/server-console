@@ -4,6 +4,7 @@ import App from './App';
 import { StoreProvider } from './state';
 import { TransferProvider } from './transfers';
 import '@xterm/xterm/css/xterm.css';
+import './i18n';
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(

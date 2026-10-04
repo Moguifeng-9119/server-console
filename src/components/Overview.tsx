@@ -1,9 +1,11 @@
 import { useStore } from '../state';
+import { useTranslation } from 'react-i18next';
 import type { Server } from '../types';
 import { Sparkline } from './Sparkline';
 
 function ServerCard({ s, onOpen, onHistory }: { s: Server; onOpen: () => void; onHistory: (s: Server) => void }) {
   const { colorOf } = useStore();
+  const { t } = useTranslation();
   const online = s.status === 'online';
   const avgUtil = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
   const vram = s.gpus.length
@@ -16,7 +18,7 @@ function ServerCard({ s, onOpen, onHistory }: { s: Server; onOpen: () => void; o
     <div
       className="card"
       onClick={onOpen}
-      title="单击进入 · 右键查看 GPU 历史曲线"
+      title={t('overview.cardTitle')}
       onContextMenu={(e) => {
         e.preventDefault();
         onHistory(s);
@@ -27,28 +29,28 @@ function ServerCard({ s, onOpen, onHistory }: { s: Server; onOpen: () => void; o
         <span className="name">{s.name}</span>
         <span className="host mono">{s.host}</span>
         <span className="badge">
-          {online ? `${s.gpus.length} GPU` : s.status === 'timeout' ? '超时' : '离线'}
+          {online ? t('overview.ngpu', { n: s.gpus.length }) : s.status === 'timeout' ? t('overview.timeout') : t('overview.offline')}
         </span>
       </div>
 
       <div className="kpis">
         <div className="kpi">
           <div className="v num">{online ? s.processes.length : '—'}</div>
-          <div className="k">进程数{zombies ? ` · ${zombies} 僵尸` : ''}</div>
+          <div className="k">{t('overview.processes')}{zombies ? ` · ${zombies} ${t('overview.zombies')}` : ''}</div>
         </div>
         <div className="kpi">
           <div className="v num" style={{ color: online ? colorOf(avgUtil) : 'var(--text-faint)' }}>
             {online ? Math.round(avgUtil) : '—'}
             <span style={{ fontSize: '0.45em', opacity: 0.7 }}>%</span>
           </div>
-          <div className="k">平均利用率</div>
+          <div className="k">{t('overview.avgUtil')}</div>
         </div>
         <div className="kpi">
           <div className="v num" style={{ color: online ? colorOf(vramPct) : 'var(--text-faint)' }}>
             {online ? Math.round(vramPct) : '—'}
             <span style={{ fontSize: '0.45em', opacity: 0.7 }}>%</span>
           </div>
-          <div className="k">显存占用</div>
+          <div className="k">{t('overview.vram')}</div>
         </div>
       </div>
 
@@ -75,11 +77,12 @@ function ServerCard({ s, onOpen, onHistory }: { s: Server; onOpen: () => void; o
 
 export function Overview({ onOpen, onHistory }: { onOpen: (id: string) => void; onHistory: (s: Server) => void }) {
   const { servers } = useStore();
+  const { t } = useTranslation();
   const online = servers.filter((s) => s.status === 'online').length;
   return (
     <>
       <div className="dim" style={{ marginBottom: 'var(--gap)' }}>
-        共 {servers.length} 台 · <span style={{ color: 'var(--ok)' }}>{online} 在线</span> · {servers.length - online} 异常
+        {t('overview.total', { total: servers.length, online, bad: servers.length - online })}
       </div>
       <div className="grid">
         {servers.map((s) => (
