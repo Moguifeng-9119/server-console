@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useStore, type Density, type ThemeMode } from '../state';
+import { useTranslation } from 'react-i18next';
+import { LANGUAGES } from '../i18n';
 import type { ForwardingRule, TrustedHost } from '../types';
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
@@ -22,6 +24,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     pushToast,
     refresh,
   } = useStore();
+  const { t, i18n } = useTranslation();
   const [tofu, setTofu] = useState<boolean | null>(null);
   const [hosts, setHosts] = useState<TrustedHost[]>([]);
   const [closeAction, setCloseAction] = useState<'ask' | 'minimize' | 'exit'>('ask');
@@ -44,24 +47,24 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   }, []);
 
   const themes: Array<[ThemeMode, string]> = [
-    ['system', '跟随系统'],
-    ['light', '浅色'],
-    ['dark', '深色'],
+    ['system', t('settings.themeSystem')],
+    ['light', t('settings.themeLight')],
+    ['dark', t('settings.themeDark')],
   ];
   const densities: Array<[Density, string]> = [
-    ['compact', '紧凑'],
-    ['default', '默认'],
-    ['comfy', '宽松'],
+    ['compact', t('settings.densCompact')],
+    ['default', t('settings.densDefault')],
+    ['comfy', t('settings.densComfy')],
   ];
 
   return (
     <>
       <div className="mask" style={{ background: 'rgba(0,0,0,0.25)' }} onClick={onClose} />
       <div className="drawer">
-        <h3>设置</h3>
+        <h3>{t('settings.title')}</h3>
 
         <div className="field">
-          <label>主题</label>
+          <label>{t('settings.theme')}</label>
           <div className="seg">
             {themes.map(([v, l]) => (
               <button key={v} className={theme === v ? 'on' : ''} onClick={() => setTheme(v)}>
@@ -72,7 +75,21 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
-          <label>信息密度</label>
+          <label>{t('settings.language')}</label>
+          <select className="mini" value={i18n.language} onChange={(e) => {
+            i18n.changeLanguage(e.target.value);
+            try { localStorage.setItem('sc.lang', e.target.value); } catch { /* noop */ }
+            document.documentElement.lang = e.target.value;
+            void api?.setAppLanguage(e.target.value);
+          }}>
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>{t('settings.density')}</label>
           <div className="seg">
             {densities.map(([v, l]) => (
               <button key={v} className={density === v ? 'on' : ''} onClick={() => setDensity(v)}>
@@ -83,11 +100,11 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
-          <label>刷新间隔：{refreshMs / 1000}s</label>
+          <label>{t('settings.refresh', { s: refreshMs / 1000 })}</label>
           <select className="mini" value={refreshMs} onChange={(e) => setRefreshMs(Number(e.target.value))}>
             {[1000, 2000, 5000, 10000].map((v) => (
               <option key={v} value={v}>
-                {v / 1000} 秒
+                {t('settings.secOption', { s: v / 1000 })}
               </option>
             ))}
           </select>
@@ -99,7 +116,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           </label>
           <div className="row">
             <span className="mono" style={{ width: 34, color: 'var(--warn)' }}>
-              黄
+              {t('settings.yellow')}
             </span>
             <input
               type="range"
@@ -111,7 +128,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           </div>
           <div className="row">
             <span className="mono" style={{ width: 34, color: 'var(--high)' }}>
-              橙
+              {t('settings.orange')}
             </span>
             <input
               type="range"
@@ -123,7 +140,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           </div>
           <div className="row">
             <span className="mono" style={{ width: 34, color: 'var(--crit)' }}>
-              红
+              {t('settings.red')}
             </span>
             <input
               type="range"
@@ -138,13 +155,13 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         <div className="field">
           <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input type="checkbox" checked={alertsEnabled} onChange={(e) => setAlertsEnabled(e.target.checked)} />
-            启用告警（新异常只通知一次）
+            {t('settings.alertsEnabled')}
           </label>
         </div>
 
         <div className="field">
           <label>
-            温度告警阈值：≥ {tempAlert}°C<span className="faint">（GPU 逐卡判定，驱动未上报温度的卡不参与）</span>
+            {t('settings.tempAlert', { v: tempAlert })}<span className="faint">{t('settings.tempAlertNote')}</span>
           </label>
           <div className="row">
             <input
@@ -162,7 +179,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
-          <label>安全 · 主机指纹校验</label>
+          <label>{t('settings.security')}</label>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               type="checkbox"
@@ -170,15 +187,15 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
               disabled={!api || tofu === null}
               onChange={(e) => api?.securitySet({ tofu: e.target.checked }).then((o) => setTofu(o.tofu))}
             />
-            首次连接自动信任（TOFU）
+            {t('settings.tofu')}
           </label>
           <div className="note" style={{ marginTop: 4 }}>
-            首次连接记录主机指纹；之后指纹不符将拒绝连接（防中间人）。关闭后，未记录指纹的主机一律拒绝。
+            {t('settings.tofuNote')}
           </div>
           {hosts.length > 0 && (
             <div className="audit" style={{ marginTop: 8 }}>
               <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
-                已信任主机（服务器重装/换钥后移除对应条目可重新连接）
+                {t('settings.trustedHosts')}
               </div>
               {hosts.map((h) => (
                 <div className="e" key={h.keyId} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -200,7 +217,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                       a.hostKeysRemove(h.keyId).then(() => a.hostKeysList().then(setHosts));
                     }}
                   >
-                    移除
+                    {t('settings.remove')}
                   </button>
                 </div>
               ))}
@@ -209,7 +226,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
-          <label>关窗行为</label>
+          <label>{t('settings.closeAction')}</label>
           <select
             className="mini"
             value={closeAction}
@@ -219,21 +236,21 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
               api?.setAppSettings({ closeAction: v });
             }}
           >
-            <option value="ask">有传输时询问，无传输直接退出</option>
-            <option value="minimize">关闭 = 隐藏到托盘（传输继续）</option>
-            <option value="exit">直接退出</option>
+            <option value="ask">{t('settings.caAsk')}</option>
+            <option value="minimize">{t('settings.caMinimize')}</option>
+            <option value="exit">{t('settings.caExit')}</option>
           </select>
         </div>
 
         <div className="field">
-          <label>告警 Webhook（钉钉 / 飞书 / 企微机器人，可选）</label>
+          <label>{t('settings.webhook')}</label>
           <div className="row" style={{ gap: 6 }}>
             <input
               className="mini mono"
               style={{ flex: 1 }}
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://oapi.dingtalk.com/robot/send?access_token=…"
+              placeholder={t('settings.webhookPh')}
             />
             <button
               className="btn"
@@ -246,20 +263,20 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
               title="发送一条测试消息"
               onClick={() => api?.webhookSend({ title: 'ServerConsole', body: '这是一条测试告警' })}
             >
-              测试
+              {t('settings.webhookTest')}
             </button>
           </div>
         </div>
 
         <div className="field">
-          <label>快速命令片段（服务器页顶部可一键执行）</label>
+          <label>{t('settings.snippets')}</label>
           {snippets.map((sn, i) => (
             <div className="row" style={{ gap: 6, marginBottom: 6 }} key={sn.id}>
               <input
                 className="mini"
                 style={{ width: 130 }}
                 value={sn.name}
-                placeholder="名称"
+                placeholder={t('settings.snippetName')}
                 onChange={(e) =>
                   setSnippets((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
                 }
@@ -268,13 +285,13 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 className="mini mono"
                 style={{ flex: 1 }}
                 value={sn.cmd}
-                placeholder="命令"
+                placeholder={t('settings.snippetCmd')}
                 onChange={(e) =>
                   setSnippets((prev) => prev.map((x, j) => (j === i ? { ...x, cmd: e.target.value } : x)))
                 }
               />
               <button className="btn mini danger" onClick={() => setSnippets((prev) => prev.filter((_, j) => j !== i))}>
-                删
+                {t('settings.del')}
               </button>
             </div>
           ))}
@@ -283,20 +300,20 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
               className="btn mini"
               onClick={() => setSnippets((prev) => [...prev, { id: `sn_${Date.now().toString(36)}`, name: '', cmd: '' }])}
             >
-              添加片段
+              {t('settings.addSnippet')}
             </button>
             <span style={{ flex: 1 }} />
             <button
               className="btn mini primary"
-              onClick={() => api?.snippetsSet(snippets.filter((s) => s.name.trim() && s.cmd.trim())).then(() => pushToast({ level: 'info', title: '快速命令已保存' }))}
+              onClick={() => api?.snippetsSet(snippets.filter((s) => s.name.trim() && s.cmd.trim())).then(() => pushToast({ level: 'info', title: t('settings.snippetsSaved') }))}
             >
-              保存片段
+              {t('settings.saveSnippets')}
             </button>
           </div>
         </div>
 
         <div className="field">
-          <label>本地端口转发（等价 ssh -L）</label>
+          <label>{t('settings.portForward')}</label>
           {rules.length > 0 && (
             <div className="audit">
               {rules.map((r) => {
@@ -310,22 +327,22 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                       style={{ color: r.status === 'listening' ? 'var(--ok)' : r.status === 'error' ? 'var(--crit)' : 'var(--text-faint)' }}
                       title={r.error}
                     >
-                      {r.status === 'listening' ? '监听中' : r.status === 'error' ? '错误' : '已停止'}
+                      {r.status === 'listening' ? t('settings.fwListening') : r.status === 'error' ? t('settings.fwError') : t('settings.fwStopped')}
                     </span>
                     {r.status === 'listening' ? (
                       <button className="btn mini" onClick={() => api?.forwardingsStop(r.id)}>
-                        停止
+                        {t('settings.fwStop')}
                       </button>
                     ) : (
                       <button className="btn mini" onClick={() => api?.forwardingsStart(r.id).then((x) => x && !x.ok && pushToast({ level: 'error', title: '启动失败', detail: x.error }))}>
-                        启动
+                        {t('settings.fwStart')}
                       </button>
                     )}
                     <button
                       className="btn mini danger"
                       onClick={() => api?.forwardingsRemove(r.id)}
                     >
-                      删
+                      {t('settings.fwDel')}
                     </button>
                   </div>
                 );
@@ -334,16 +351,16 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           )}
           <div className="row" style={{ gap: 6, marginTop: 6 }}>
             <select className="mini" value={newRule.serverId} onChange={(e) => setNewRule((p) => ({ ...p, serverId: e.target.value }))}>
-              <option value="">服务器…</option>
+              <option value="">{t('settings.fwServer')}</option>
               {configs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
-            <input className="mini num" style={{ width: 76 }} placeholder="本地端口" value={newRule.localPort} onChange={(e) => setNewRule((p) => ({ ...p, localPort: e.target.value }))} />
-            <input className="mini mono" style={{ width: 110 }} placeholder="远程 host" value={newRule.remoteHost} onChange={(e) => setNewRule((p) => ({ ...p, remoteHost: e.target.value }))} />
-            <input className="mini num" style={{ width: 76 }} placeholder="远程端口" value={newRule.remotePort} onChange={(e) => setNewRule((p) => ({ ...p, remotePort: e.target.value }))} />
+            <input className="mini num" style={{ width: 76 }} placeholder={t('settings.fwLocalPort')} value={newRule.localPort} onChange={(e) => setNewRule((p) => ({ ...p, localPort: e.target.value }))} />
+            <input className="mini mono" style={{ width: 110 }} placeholder={t('settings.fwRemoteHost')} value={newRule.remoteHost} onChange={(e) => setNewRule((p) => ({ ...p, remoteHost: e.target.value }))} />
+            <input className="mini num" style={{ width: 76 }} placeholder={t('settings.fwRemotePort')} value={newRule.remotePort} onChange={(e) => setNewRule((p) => ({ ...p, remotePort: e.target.value }))} />
             <button
               className="btn mini primary"
               onClick={() => {
@@ -356,7 +373,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                   remotePort: Number(newRule.remotePort),
                   enabled: true,
                 }).then((r) => {
-                  if (r && !r.ok) pushToast({ level: 'error', title: '添加失败', detail: r.error });
+                  if (r && !r.ok) pushToast({ level: 'error', title: t('settings.fwAddFail'), detail: r.error });
                   else {
                     setNewRule({ serverId: '', localPort: '', remoteHost: '127.0.0.1', remotePort: '' });
                     a.forwardingsList().then(setRules);
@@ -364,15 +381,15 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 });
               }}
             >
-              添加
+              {t('settings.fwAdd')}
             </button>
           </div>
         </div>
 
         <div className="field">
-          <label>操作审计日志</label>
+          <label>{t('settings.audit')}</label>
           <div className="audit">
-            {audit.length === 0 && <div className="faint">暂无操作记录</div>}
+            {audit.length === 0 && <div className="faint">{t('settings.auditEmpty')}</div>}
             {audit.map((e) => (
               <div className="e" key={e.id}>
                 {e.time} · {e.server} · {e.action} · {e.target}
@@ -382,21 +399,21 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="field">
-          <label>帮助 · 快捷键与操作</label>
+          <label>{t('settings.help')}</label>
           <div className="help-list">
-            <div className="e"><b>双击侧栏服务器</b><span>直达该机的文件管理</span></div>
-            <div className="e"><b>Ctrl/点击 · Shift/点击</b><span>文件列表多选 / 范围选择</span></div>
-            <div className="e"><b>Ctrl+A / Esc</b><span>全选当前面板 / 清空选择</span></div>
-            <div className="e"><b>右键文件或进程</b><span>更多操作（下载、互传、压缩、结束进程…）</span></div>
-            <div className="e"><b>拖拽文件到右侧面板</b><span>上传到远程当前目录</span></div>
-            <div className="e"><b>Esc（传输中心）</b><span>无活跃传输时可关闭抽屉</span></div>
+            <div className="e"><b>{t('settings.helpDblClick')}</b><span>{t('settings.helpDblClickV')}</span></div>
+            <div className="e"><b>{t('settings.helpCtrlClick')}</b><span>{t('settings.helpCtrlClickV')}</span></div>
+            <div className="e"><b>{t('settings.helpCtrlA')}</b><span>{t('settings.helpCtrlAV')}</span></div>
+            <div className="e"><b>{t('settings.helpRightClick')}</b><span>{t('settings.helpRightClickV')}</span></div>
+            <div className="e"><b>{t('settings.helpDrag')}</b><span>{t('settings.helpDragV')}</span></div>
+            <div className="e"><b>{t('settings.helpEsc')}</b><span>{t('settings.helpEscV')}</span></div>
           </div>
         </div>
 
         <div className="field">
-          <label>关于</label>
+          <label>{t('settings.about')}</label>
           <div className="body" style={{ color: 'var(--text-dim)' }}>
-            ServerConsole <b className="num">v{__APP_VERSION__}</b> · 本地优先的多服务器 GPU 监控 / SFTP / 互传工具，数据只经你的本机与你的服务器。
+            <b>ServerConsole</b> <span className="num">v{__APP_VERSION__}</span> · {t('settings.aboutDesc')}
             <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console" target="_blank" rel="noreferrer">GitHub 仓库</a>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console/issues" target="_blank" rel="noreferrer">反馈问题</a>
@@ -405,14 +422,14 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }}
                 onClick={() =>
                   api?.checkUpdate().then((r) => {
-                    if (r?.ok && r.data?.isNew) pushToast({ level: 'info', title: '发现新版本 ' + (r.data.latest || ''), detail: '即将打开发布页' });
-                    else if (r?.ok) pushToast({ level: 'info', title: '已是最新版本（' + (r.data?.current || '') + '）' });
-                    else pushToast({ level: 'error', title: '检查更新失败', detail: r?.error });
+                    if (r?.ok && r.data?.isNew) pushToast({ level: 'info', title: t('settings.newVersion', { v: r.data.latest || '' }), detail: t('settings.openingRelease') });
+                    else if (r?.ok) pushToast({ level: 'info', title: t('settings.upToDate', { v: r.data?.current || '' }) });
+                    else pushToast({ level: 'error', title: t('settings.updateFail'), detail: r?.error });
                     if (r?.ok && r.data?.isNew && r.data.url) window.open(r.data.url, '_blank');
                   })
                 }
               >
-                检查更新
+                {t('settings.checkUpdate')}
               </button>
             </div>
             <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -420,7 +437,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 className="mini"
                 style={{ flex: 1 }}
                 type="password"
-                placeholder="导出/导入口令（用于加密凭据）"
+                placeholder={t('settings.exportPassPh')}
                 value={exportPass}
                 onChange={(e) => setExportPass(e.target.value)}
               />
@@ -429,12 +446,12 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 disabled={!exportPass}
                 onClick={() =>
                   api?.configExport(exportPass).then((r) => {
-                    if (r?.ok && r.data) pushToast({ level: 'info', title: '已导出到', detail: r.data });
-                    else if (r && !r.ok) pushToast({ level: 'error', title: '导出失败', detail: r.error });
+                    if (r?.ok && r.data) pushToast({ level: 'info', title: t('settings.exportedTo'), detail: r.data });
+                    else if (r && !r.ok) pushToast({ level: 'error', title: t('settings.exportFail'), detail: r.error });
                   })
                 }
               >
-                导出
+                {t('settings.export')}
               </button>
               <button
                 className="btn mini"
@@ -442,20 +459,20 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 onClick={() =>
                   api?.configImport(exportPass).then((r) => {
                     if (r?.ok && Number(r.data) >= 0) {
-                      pushToast({ level: 'info', title: '导入完成', detail: '新增 ' + r.data + ' 台服务器' });
+                      pushToast({ level: 'info', title: t('settings.importDone'), detail: t('settings.importedN', { n: r.data }) });
                       refresh();
-                    } else if (r && !r.ok) pushToast({ level: 'error', title: '导入失败', detail: r.error });
+                    } else if (r && !r.ok) pushToast({ level: 'error', title: t('settings.importFail'), detail: r.error });
                   })
                 }
               >
-                导入
+                {t('settings.import')}
               </button>
             </div>
           </div>
         </div>
 
         <button className="btn" style={{ width: '100%' }} onClick={onClose}>
-          关闭
+          {t('settings.close')}
         </button>
       </div>
     </>

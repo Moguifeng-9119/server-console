@@ -1,9 +1,11 @@
 import { useStore } from '../state';
+import { useTranslation } from 'react-i18next';
 import type { Server } from '../types';
 
 // 详细历史占用曲线：数据来自持久化的 GPU 平均利用率（720 点上限）
 export function HistoryDialog({ s, onClose }: { s: Server | null; onClose: () => void }) {
   const { histories, refreshMs } = useStore();
+  const { t } = useTranslation();
   if (!s) return null;
   const data = histories[s.id] || [];
   const n = data.length;
@@ -30,22 +32,22 @@ export function HistoryDialog({ s, onClose }: { s: Server | null; onClose: () =>
     <div className="mask" onClick={onClose}>
       <div className="dialog" style={{ width: 840 }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          GPU 利用率历史 · {s.name}
+          {t('history.title', { name: s.name })}
           <span className="mono" style={{ color: 'var(--text-faint)', fontSize: 11 }}>{s.host}</span>
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ color: 'var(--text-faint)', fontSize: 11 }}>{spanText}</span>
         </h3>
         {n < 2 ? (
           <div className="body" style={{ color: 'var(--text-faint)', padding: '24px 0', textAlign: 'center' }}>
-            历史数据采集中，稍后再看（应用运行期间持续记录，重启不丢）。
+            {t('history.collecting')}
           </div>
         ) : (
           <div className="body hist-body">
             <div className="hist-stats">
-              <span>当前 <b className="num" style={{ color: 'var(--accent)' }}>{cur}%</b></span>
-              <span>平均 <b className="num">{avg}%</b></span>
-              <span>最低 <b className="num">{min}%</b></span>
-              <span>最高 <b className="num" style={{ color: 'var(--high)' }}>{max}%</b></span>
+              <span>{t('history.current')} <b className="num" style={{ color: 'var(--accent)' }}>{cur}%</b></span>
+              <span>{t('history.avg')} <b className="num">{avg}%</b></span>
+              <span>{t('history.min')} <b className="num">{min}%</b></span>
+              <span>{t('history.max')} <b className="num" style={{ color: 'var(--high)' }}>{max}%</b></span>
             </div>
             <svg viewBox={`0 0 ${W} ${H}`} className="hist-chart">
               {[0, 25, 50, 75, 100].map((v) => (
@@ -57,16 +59,16 @@ export function HistoryDialog({ s, onClose }: { s: Server | null; onClose: () =>
               <line x1={x(n - 1)} y1={padT} x2={x(n - 1)} y2={H - padB} stroke="var(--accent)" strokeOpacity="0.35" />
               <path d={area} fill="var(--accent)" fillOpacity="0.14" stroke="none" />
               <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
-              <text x={padL} y={H - 8} fontSize="10" fill="var(--text-faint)">{n > 1 ? `${seconds} 秒前` : ''}</text>
-              <text x={W - padR} y={H - 8} textAnchor="end" fontSize="10" fill="var(--text-faint)">现在</text>
+              <text x={padL} y={H - 8} fontSize="10" fill="var(--text-faint)">{n > 1 ? t('history.ago', { s: seconds }) : ''}</text>
+              <text x={W - padR} y={H - 8} textAnchor="end" fontSize="10" fill="var(--text-faint)">{t('history.now')}</text>
             </svg>
           </div>
         )}
         <div className="foot">
           <span style={{ color: 'var(--text-faint)', fontSize: 11, marginRight: 'auto' }}>
-            采样间隔随「设置 → 刷新间隔」；左键点击卡片为进入机器。
+            {t('history.sampleNote')}
           </span>
-          <button className="btn primary" onClick={onClose}>关闭</button>
+          <button className="btn primary" onClick={onClose}>{t('history.close')}</button>
         </div>
       </div>
     </div>

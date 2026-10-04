@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../state';
+import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../format';
 
 const EDIT_MAX = 1024 * 1024; // 超过 1MB 的文件只读
@@ -20,6 +21,7 @@ export function TextViewer({
   onClose: () => void;
 }) {
   const { pushToast } = useStore();
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const [saved, setSaved] = useState('');
   const [tail, setTail] = useState(false);
@@ -57,9 +59,9 @@ export function TextViewer({
     if (r.ok) {
       setSaved(text);
       setDirty(false);
-      pushToast({ level: 'info', title: '已保存到服务器', detail: rp });
+      pushToast({ level: 'info', title: t('textViewer.savedToast'), detail: rp });
     } else {
-      pushToast({ level: 'error', title: '保存失败', detail: r.error });
+      pushToast({ level: 'error', title: t('textViewer.saveFail'), detail: r.error });
     }
   };
 
@@ -73,16 +75,16 @@ export function TextViewer({
           <span style={{ flex: 1 }} />
           <div className="seg">
             <button className={!tail ? 'on' : ''} onClick={() => { setTail(false); load(false); }}>
-              开头
+              {t('textViewer.head')}
             </button>
             <button className={tail ? 'on' : ''} onClick={() => { setTail(true); load(true); }}>
-              最后 500 行
+              {t('textViewer.last500')}
             </button>
           </div>
         </h3>
         <div className="viewer-body">
           {loading ? (
-            <div className="empty">读取中…</div>
+            <div className="empty">{t('textViewer.reading')}</div>
           ) : err ? (
             <div className="empty" style={{ color: 'var(--crit)' }}>{err}</div>
           ) : editable ? (
@@ -102,14 +104,14 @@ export function TextViewer({
         <div className="foot">
           {editable && (
             <button className="btn primary" disabled={!dirty || saving} onClick={save}>
-              {saving ? '保存中…' : dirty ? '保存到服务器' : '已保存'}
+              {saving ? t('textViewer.saving') : dirty ? t('textViewer.saveToServer') : t('textViewer.saved')}
             </button>
           )}
           <button className="btn" onClick={() => navigator.clipboard?.writeText(text)}>
-            复制全部
+            {t('textViewer.copyAll')}
           </button>
           <button className="btn" onClick={onClose}>
-            关闭
+            {t('textViewer.close')}
           </button>
         </div>
       </div>

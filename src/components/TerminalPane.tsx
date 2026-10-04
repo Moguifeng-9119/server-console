@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
+import { useTranslation } from 'react-i18next';
 import type { TerminalSessionInfo } from '../types';
 
 // 单个终端会话：xterm 绑定主进程会话（termId）。切走 tab 时脱离（会话保留），回来时回放缓冲。
@@ -16,6 +17,7 @@ export function TerminalPane({
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<'attaching' | 'live' | 'closed'>('attaching');
+  const { t } = useTranslation();
 
   useEffect(() => {
     const a = api;
@@ -160,7 +162,7 @@ export function TerminalPane({
   return (
     <div className="term-host-wrap">
       {status !== 'live' && (
-        <div className="term-status">{status === 'attaching' ? '挂接会话中…' : '会话已结束'}</div>
+        <div className="term-status">{status === 'attaching' ? t('terminal.attaching') : t('terminal.sessionEnded')}</div>
       )}
       <div ref={hostRef} className="term-host" />
     </div>
@@ -170,6 +172,7 @@ export function TerminalPane({
 // 会话条 + 多开管理：自动创建首个会话；会话在主进程持有，切 tab / 多开互不影响
 export function TerminalSessions({ serverId }: { serverId: string }) {
   const { pushToast } = useStore();
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [active, setActive] = useState('');
@@ -239,10 +242,10 @@ export function TerminalSessions({ serverId }: { serverId: string }) {
             onClick={() => setActive(s.termId)}
             title="点击切换会话"
           >
-            终端 {i + 1}
+            {t('terminal.termN', { n: i + 1 })}
             <button
               className="term-chip-x"
-              title="结束此会话"
+              title={t('terminal.closeSession')}
               onClick={(e) => {
                 e.stopPropagation();
                 closeSession(s.termId);
@@ -252,7 +255,7 @@ export function TerminalSessions({ serverId }: { serverId: string }) {
             </button>
           </span>
         ))}
-        <button className="term-chip add" title="新建终端会话（多开）" onClick={create}>
+        <button className="term-chip add" title={t('terminal.newSession')} onClick={create}>
           <Plus size={13} />
         </button>
         <span style={{ flex: 1 }} />
