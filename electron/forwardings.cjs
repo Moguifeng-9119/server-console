@@ -27,6 +27,9 @@ class ForwardingManager {
     this.getConn = getConn;
     this.onChange = onChange || (() => {});
     this.servers = new Map(); // ruleId -> net.Server
+    this.sockets = new Map(); // ruleId -> active local sockets
+    this.generations = new Map(); // latest requested lifecycle operation
+    this.listenerQueues = new Map(); // serialize local bind/close, never SSH handshakes
     this.status = new Map(); // ruleId -> 'listening' | 'error' | 'stopped'
     this.errors = new Map(); // ruleId -> 错误信息
   }
@@ -41,6 +44,22 @@ class ForwardingManager {
 
   _emit() {
     this.onChange(this.list());
+  }
+
+  _invalidate(id) {
+    const token = (this.generations.get(id) || 0) + 1;
+    this.generations.set(id, token);
+    return token;
+  }
+
+  _current(id, token) { return this.generations.get(id) === token; }
+
+  async _withListenerLock(id, operation) {
+    const previous = this.listenerQueues.get(id) || Promise.resolve();
+    const pending = previous.catch(() => {}).then(operation);
+    this.listenerQueues.set(id, pending);
+    try { return await pending; }
+    finally { if (this.listenerQueues.get(id) === pending) this.listenerQueues.delete(id); }
   }
 
   async upsert(rule) {
@@ -61,70 +80,112 @@ class ForwardingManager {
     if (idx >= 0) list[idx] = clean;
     else list.push(clean);
     save(this.dataDir, list);
-    // 已在监听的旧实例先停，按新配置重启
-    await this.stop(id);
-    if (clean.enabled) await this.start(clean);
+    const token = this._invalidate(id);
+    if (clean.enabled) await this._start(clean, token);
+    else await this._withListenerLock(id, () => this._current(id, token) && this._stopListener(id));
     this._emit();
     return id;
   }
 
   async remove(id) {
-    await this.stop(id);
     save(this.dataDir, load(this.dataDir).filter((r) => r.id !== id));
-    this.status.delete(id);
-    this.errors.delete(id);
+    const token = this._invalidate(id);
+    await this._withListenerLock(id, async () => {
+      if (!this._current(id, token)) return;
+      await this._stopListener(id);
+      if (this._current(id, token)) { this.status.delete(id); this.errors.delete(id); }
+    });
     this._emit();
     return true;
   }
 
   async start(rule) {
-    await this.stop(rule.id);
+    return this._start(rule, this._invalidate(rule.id));
+  }
+
+  async _start(rule, token) {
+    try { await this._startCurrent(rule, token); }
+    catch (error) { if (this._current(rule.id, token)) throw error; }
+  }
+
+  async _startCurrent(rule, token) {
+    await this._withListenerLock(rule.id, () => this._current(rule.id, token) && this._stopListener(rule.id));
+    if (!this._current(rule.id, token)) return;
     const conn = await this.getConn(rule.serverId);
+    if (!this._current(rule.id, token)) return;
     if (!conn) throw new Error('服务器连接不可用');
-    const client = await new Promise((resolve, reject) => {
-      conn.connect().then(() => resolve(conn.client)).catch(reject);
-    });
+    await conn.connect();
+    if (!this._current(rule.id, token)) return;
+    const client = conn.client;
     if (!client) throw new Error('SSH 客户端未就绪');
-    const server = net.createServer((socket) => {
-      client.forwardOut('127.0.0.1', 0, rule.remoteHost, rule.remotePort, (err, stream) => {
-        if (err) {
-          socket.destroy();
-          return;
-        }
-        stream.pipe(socket).pipe(stream);
-        socket.on('error', () => stream.end());
-        stream.on('error', () => socket.destroy());
+    await this._withListenerLock(rule.id, async () => {
+      if (!this._current(rule.id, token)) return;
+      const sockets = new Set();
+      const server = net.createServer((socket) => {
+        sockets.add(socket);
+        socket.once('close', () => sockets.delete(socket));
+        client.forwardOut('127.0.0.1', 0, rule.remoteHost, rule.remotePort, (err, stream) => {
+          if (err) {
+            socket.destroy();
+            return;
+          }
+          if (socket.destroyed) { stream.destroy(); return; }
+          stream.once('close', () => socket.destroy());
+          stream.pipe(socket).pipe(stream);
+          socket.once('close', () => stream.destroy());
+          socket.on('error', () => stream.end());
+          stream.on('error', () => socket.destroy());
+        });
+        socket.on('error', () => socket.destroy());
       });
-      socket.on('error', () => socket.destroy());
-    });
-    await new Promise((resolve, reject) => {
-      server.once('error', reject);
-      server.listen({ port: Number(rule.localPort), host: '127.0.0.1' }, () => resolve());
-    });
-    server.on('error', (e) => {
-      this.status.set(rule.id, 'error');
-      this.errors.set(rule.id, e.message);
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen({ port: Number(rule.localPort), host: '127.0.0.1' }, () => resolve());
+      });
+      if (!this._current(rule.id, token)) {
+        const closed = new Promise((resolve) => server.close(resolve));
+        for (const socket of sockets) socket.destroy();
+        await closed;
+        return;
+      }
+      server.on('error', (e) => {
+        if (this.servers.get(rule.id) !== server) return;
+        this.status.set(rule.id, 'error');
+        this.errors.set(rule.id, e.message);
+        this._emit();
+      });
+      this.servers.set(rule.id, server);
+      this.sockets.set(rule.id, sockets);
+      this.status.set(rule.id, 'listening');
+      this.errors.delete(rule.id);
       this._emit();
     });
-    this.servers.set(rule.id, server);
-    this.status.set(rule.id, 'listening');
-    this.errors.delete(rule.id);
-    this._emit();
   }
 
   async stop(id) {
+    const token = this._invalidate(id);
+    await this._withListenerLock(id, () => this._current(id, token) && this._stopListener(id));
+  }
+
+  async _stopListener(id) {
     const server = this.servers.get(id);
     if (server) {
       this.servers.delete(id);
-      await new Promise((resolve) => server.close(() => resolve()));
+      const sockets = this.sockets.get(id);
+      this.sockets.delete(id);
+      const closed = new Promise((resolve) => server.close(() => resolve()));
+      for (const socket of sockets || []) socket.destroy();
+      await closed;
     }
-    if (this.status.get(id) === 'listening') this.status.set(id, 'stopped');
+    if (!this.servers.has(id) && this.status.get(id) === 'listening') this.status.set(id, 'stopped');
+    this._emit();
   }
 
   // 应用启动时恢复所有启用中的规则（单条失败不阻塞其余）
   async startAll() {
-    for (const rule of load(this.dataDir)) {
-      if (!rule.enabled) continue;
+    for (const { id } of load(this.dataDir)) {
+      const rule = load(this.dataDir).find((entry) => entry.id === id);
+      if (!rule?.enabled) continue;
       try {
         await this.start(rule);
       } catch (e) {

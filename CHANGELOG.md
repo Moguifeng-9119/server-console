@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.1 — 2026-10-05
+
+- Stop and replace active port forwards promptly by closing their local sockets and SSH channels.
+- Cancel obsolete forwarding starts during connection setup, SSH handshake and local bind. Serialize listener changes, preserve the latest disable/remove intent and propagate remote channel closure.
+- Disable electron-builder auto-publication explicitly for every desktop packaging command; tag builds no longer require a publishing token.
+- Run packaged native IPC/SSH checks in the manual Windows/Linux/macOS build workflow, with isolated test data and credentials.
+- Expand native checks to terminal resize, SSH forwarding, active-tunnel stop, credential encryption policy and authenticated restart, history and host-trust persistence. Distinguish Windows DPAPI from Playwright's macOS MockKeychain.
+
+Local Windows validation: 84 tests in 9 files, 22 browser checks and 16 packaged native checks passed, as did type checking, production build and SFTP smoke. Cross-platform native results and published assets are recorded separately in the [validation ledger](docs/VALIDATION-0.11.1.md).
+
 ## 0.11.0 — 2026-10-05
 
 - Find GPUs by single-card free memory, model and owner; open monitor/terminal/files directly. Show freshness and default multi-card views to a compact matrix.

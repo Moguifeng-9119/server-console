@@ -9,6 +9,7 @@ const { generateKeyPairSync } = require('node:crypto');
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
+const net = require('node:net');
 
 const PORT = Number(process.env.FAKE_SSH_PORT || 2222);
 
@@ -251,13 +252,17 @@ function attachSftp(sftpStream, rootDir) {
   });
 }
 
-function attachSession(client, rootDir) {
+function attachSession(client, rootDir, onWindowChange) {
   client.on('session', (accept) => {
     const session = accept();
     // 客户端请求 PTY（xterm 终端必须），直接接受
     session.on('pty', (accept, reject, info) => {
       console.log('[fake-sshd] pty ok, cols=' + info.cols);
       accept();
+    });
+    session.on('window-change', (accept, _reject, info) => {
+      onWindowChange?.(info);
+      if (accept) accept();
     });
     // 真实 shell（终端 e2e 测试用）：把 ssh 流接到本机 shell 子进程
     session.on('shell', (acceptShell) => {
@@ -294,13 +299,28 @@ function attachSession(client, rootDir) {
 }
 
 // 起一个假 sshd。port=0 时由系统分配并从返回的 server 上取实际端口。
-function createFakeSshd({ port = PORT, root = SFTP_ROOT, hostKeyBuf } = {}) {
+function createFakeSshd({ port = PORT, root = SFTP_ROOT, hostKeyBuf, onWindowChange, tcpPorts = [], credentials } = {}) {
   const rootDir = path.resolve(root);
   fs.mkdirSync(rootDir, { recursive: true });
   const srv = new Server({ hostKeys: [hostKeyBuf || hostKey()] }, (client) => {
     client
-      .on('authentication', (ctx) => ctx.accept())
-      .on('ready', () => attachSession(client, rootDir))
+      .on('authentication', (ctx) => {
+        if (!credentials || (ctx.method === 'password' && ctx.username === credentials.username && ctx.password === credentials.password)) ctx.accept();
+        else ctx.reject(['password']);
+      })
+      .on('ready', () => attachSession(client, rootDir, onWindowChange))
+      .on('tcpip', (accept, reject, info) => {
+        if (info.destIP !== '127.0.0.1' || !tcpPorts.includes(info.destPort)) { reject(); return; }
+        let stream;
+        const socket = net.connect(info.destPort, '127.0.0.1');
+        socket.once('connect', () => {
+          stream = accept(); socket.pipe(stream).pipe(socket);
+          stream.once('close', () => socket.destroy());
+          stream.on('error', () => socket.destroy());
+        });
+        socket.on('error', () => { if (stream) stream.destroy(); else reject(); });
+        client.once('close', () => socket.destroy());
+      })
       .on('error', () => {
         /* noop */
       });
