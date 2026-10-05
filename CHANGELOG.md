@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0 — source changes, not yet published
+## 0.11.0 — 2026-10-05
 
 - Find GPUs by single-card free memory, model and owner; open monitor/terminal/files directly. Show freshness and default multi-card views to a compact matrix.
 - Group settings, expose credential mode/backend, add active/resolved alert details and suppress demo notifications. Limit toasts to two with dismissal.
@@ -17,4 +17,4 @@
 - Update README positioning/download entry/media, add architecture/validation/benchmarks/localization/roadmap/contribution/security documents and issue forms.
 - Add production browser checks, 10/30-session synthetic benchmarks, macOS verification CI and manual unsigned packaging without auto-publication.
 
-Local checks passed: 76 behavioral tests, 22 browser checks and 9 Windows packaged native checks. A local unsigned Windows preview is built separately from publication. Real GPUs, remote rsync, OS key stores and macOS/Linux packaging remain separate validation gates. See [VALIDATION](docs/VALIDATION.md).
+Local checks passed: 76 behavioral tests, 22 browser checks and 9 Windows packaged native checks. The release provides the locally validated unsigned Windows x64 portable package. Real GPUs, remote rsync, OS key stores and macOS/Linux packaging remain separate validation gates. See [VALIDATION](docs/VALIDATION.md).

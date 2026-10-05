@@ -1,6 +1,6 @@
 # 0.11.0 项目改进记录
 
-这一轮围绕“找到合适 GPU 后直接开始 SSH 工作”调整产品体验，并修复会误导监控判断或损坏传输目标的具体问题。公开 GitHub 仓库和 Release 尚未更新，本记录对应本地源码与 Windows 预览。
+这一轮围绕“找到合适 GPU 后直接开始 SSH 工作”调整产品体验，并修复会误导监控判断或损坏传输目标的具体问题。本记录对应 v0.11.0 源码与 Windows 便携版；发布入口见 [GitHub Release](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0)。
 
 | 角度 | 已落地的变化 | 对使用者的意义 |
 | --- | --- | --- |

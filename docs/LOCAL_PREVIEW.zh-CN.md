@@ -1,6 +1,6 @@
 # 本地 Windows 预览
 
-本轮版本为 0.11.0，尚未发布到 GitHub Release。桌面包位于被 Git 忽略的 release/0.11.0-local/，使用 Electron 44.5.1、Windows x64，未签名。
+本轮版本为 0.11.0，发布入口为 [GitHub Release](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0)。桌面包位于被 Git 忽略的 release/0.11.0-local/，使用 Electron 44.5.1、Windows x64，未签名。
 
 - 便携版：`release/0.11.0-local/ServerConsole 0.11.0.exe`。
 - 已执行原生检查的解包程序：`release/0.11.0-local/win-unpacked/ServerConsole.exe`；运行时需要保留整个 win-unpacked 文件夹。

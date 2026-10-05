@@ -9,7 +9,7 @@
 
 ![按单卡空闲显存和占用用户找资源的工作台](assets/screenshots/workbench-light.png)
 
-*截图来自 v0.11.0 源码界面，使用明确标注的模拟数据。GitHub 已发布桌面版本可能较早，请核对 Release 版本号和实际附件。*
+*截图来自 v0.11.0，使用明确标注的模拟数据。[v0.11.0](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0) 提供 Windows x64 便携版；其他系统以 Release 的实际附件为准。*
 
 ## 适合解决什么问题？
 

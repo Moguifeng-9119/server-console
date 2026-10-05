@@ -1,6 +1,6 @@
 # Validation ledger — 0.11.0 source change
 
-Checked locally on Windows x64 with Node.js 22, Chrome and a locally packaged Electron 44.5.1 app. This ledger distinguishes source checks, Windows native checks and remote/platform validation. The manual packaging workflow has been added but not dispatched by this change; no GitHub release was published.
+Checked locally on Windows x64 with Node.js 22, Chrome and a locally packaged Electron 44.5.1 app. This ledger distinguishes source checks, Windows native checks and remote/platform validation. This local ledger was completed before publication. The v0.11.0 release uses the validated Windows portable package; see the [release](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0). GitHub CI and other platform builds are subsequent checks, not results established by the local receipts.
 
 | Layer | Command / evidence | Scope |
 | --- | --- | --- |
@@ -41,4 +41,4 @@ Fleet render; no demo anomaly toast; wide viewport; single-card 40 GiB predicate
 
 The native script requires an explicit **unpacked app** executable path and rejects mismatched package versions/code/assets. The portable wrapper cannot be instrumented by Playwright's Electron launcher in this environment; its separate CDP startup check passed. Native checks run with isolated userData and an isolated instance lock, use only fake credentials, and verify computed shell output rather than echoed input. The fake shell is a pipe-based fixture, not a full PTY or remote Linux host. Windows results do not establish other platforms or real GPU accuracy. Re-run relevant native checks before publication.
 
-Local unsigned Windows preview files live in ignored `release/0.11.0-local/`. They are not a public release. [checks-local.json](evidence/checks-local.json) records the final local check scope; binary sizes/hashes are recorded in [windows-package-local.json](evidence/windows-package-local.json).
+Local unsigned Windows preview files live in ignored `release/0.11.0-local/`. The matching portable binary is provided in v0.11.0; the local receipts retain their original pre-publication timestamps/status. [checks-local.json](evidence/checks-local.json) records the final local check scope; binary sizes/hashes are recorded in [windows-package-local.json](evidence/windows-package-local.json).
