@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-05T12:55:25.238Z",
+  "version": "0.11.0",
+  "platform": "win32",
+  "arch": "x64",
+  "signed": false,
+  "published": false,
+  "electron": "44.5.1",
+  "build": "electron-builder portable, prepackaged from SHA-256/native-checked win-unpacked folder",
+  "artifacts": [
+    {
+      "path": "release/0.11.0-local/ServerConsole 0.11.0.exe",
+      "bytes": 106226098,
+      "sha256": "71bc6369e5c9c9f082a6a0facb9b6c7f1075a2557d39194ad4d6396b60b17246"
+    },
+    {
+      "path": "release/0.11.0-local/win-unpacked/ServerConsole.exe",
+      "bytes": 245726208,
+      "sha256": "49b61a030a520fc36a4b8fa5cce53fb4e935a7bdbbe4b80e9222f598e49cc7fa"
+    },
+    {
+      "path": "release/0.11.0-local/win-unpacked/resources/app.asar",
+      "bytes": 38985335,
+      "sha256": "d1491606132dabe84f3672625f35006624deb078effead0ab9c1e7349da710c1"
+    }
+  ]
+}

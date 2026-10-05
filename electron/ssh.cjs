@@ -8,6 +8,7 @@ const COLLECT_CMD = [
   'nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits 2>/dev/null',
   'echo __SYS__',
   'cat /proc/loadavg; nproc; free -b',
+  'echo __CPU__; head -n 1 /proc/stat',
   'echo __PS__',
   'ps -eo pid,user,pcpu,pmem,rss,stat,etime,args --no-headers',
 ].join('; ');
@@ -58,10 +59,10 @@ function section(out, marker, next) {
 
 const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 
-function parseSnapshot(out) {
+function parseSnapshot(out, previousCpu = null) {
   const gpuRaw = section(out, '', '__APPS__').trim();
   const appRaw = section(out, '__APPS__', '__SYS__').trim();
-  const sysRaw = section(out, '__SYS__', '__PS__').trim();
+  const sysRaw = section(out, '__SYS__', out.includes('__CPU__') ? '__CPU__' : '__PS__').trim();
   const psRaw = section(out, '__PS__').trim();
 
   // GPU：index,uuid,name,util,memUsed,memTotal,temp,power,fan
@@ -92,11 +93,16 @@ function parseSnapshot(out) {
     if (f.length < 3) continue;
     const idx = uuidToIndex.get(f[0]);
     if (idx === undefined) continue;
-    pidToGpu.set(num(f[1]), { index: idx, memMb: num(f[2]) });
+    const pid = num(f[1]);
+    const cards = pidToGpu.get(pid) || [];
+    cards.push({ index: idx, memMb: num(f[2]) });
+    pidToGpu.set(pid, cards);
   }
-  for (const [pid, info] of pidToGpu) {
-    const g = gpus.find((x) => x.index === info.index);
-    if (g) g.procs.push({ pid, name: '', memMb: info.memMb });
+  for (const [pid, cards] of pidToGpu) {
+    for (const info of cards) {
+      const g = gpus.find((x) => x.index === info.index);
+      if (g) g.procs.push({ pid, name: '', memMb: info.memMb });
+    }
   }
 
   // 系统：loadavg / nproc / free -b
@@ -122,7 +128,8 @@ function parseSnapshot(out) {
       state: m[6].charAt(0),
       started: m[7],
       command: m[8],
-      gpu: pidToGpu.has(pid) ? pidToGpu.get(pid).index : null,
+      gpu: pidToGpu.has(pid) ? pidToGpu.get(pid)[0].index : null,
+      gpuIndices: (pidToGpu.get(pid) || []).map((card) => card.index),
     });
   }
 
@@ -130,16 +137,26 @@ function parseSnapshot(out) {
   for (const g of gpus) {
     g.procs = g.procs.map((p) => {
       const hit = processes.find((x) => x.pid === p.pid);
-      return { ...p, name: hit ? hit.command.split(/\s+/)[0].split('/').pop() : 'unknown' };
+      return { ...p, user: hit?.user, name: hit ? hit.command.split(/\s+/)[0].split('/').pop() : 'unknown' };
     });
   }
 
+  const cpuFields = section(out, '__CPU__', '__PS__').trim().split(/\s+/);
+  const cpuValues = cpuFields[0] === 'cpu' ? cpuFields.slice(1, 9).map(Number) : [];
+  const cpuSample = cpuValues.length >= 4 && cpuValues.every(Number.isFinite)
+    ? { total: cpuValues.reduce((a, b) => a + b, 0), idle: cpuValues[3] + (cpuValues[4] || 0) } : null;
+  const totalDelta = cpuSample && previousCpu ? cpuSample.total - previousCpu.total : 0;
+  const idleDelta = cpuSample && previousCpu ? cpuSample.idle - previousCpu.idle : 0;
   return {
     gpus,
     processes,
     cpuCores,
     loadAvg: [load[0] || 0, load[1] || 0, load[2] || 0],
-    cpuUsage: Math.min(100, Math.round(((load[0] || 0) / cpuCores) * 100)),
+    cpuUsage: totalDelta > 0 && idleDelta >= 0 && idleDelta <= totalDelta
+      ? Math.round((1 - idleDelta / totalDelta) * 100) : null,
+    cpuSample,
+    collectedAt: Date.now(),
+    gpuError: undefined,
     memUsed: toGb(memLine[2]),
     memTotal: toGb(memLine[1]),
     swapUsed: toGb(swapLine[2]),
@@ -157,7 +174,7 @@ class Connection {
     this._hostKeyError = '';
     this._fails = 0; // 连续失败次数（指数退避）
     this._nextRetryAt = 0;
-    this._gcDone = false;
+    this._cpuSample = null;
   }
 
   // 退避窗口内跳过重连尝试，避免对宕机服务器每个采集周期都发起 10s 超时的连接
@@ -170,8 +187,8 @@ class Connection {
   }
 
   connect() {
-    if (this.client) return Promise.resolve();
     if (this.pending) return this.pending;
+    if (this.client && this.status === 'online') return Promise.resolve();
     this.pending = (async () => {
       try {
         /** @type {Record<string, any>} */
@@ -223,13 +240,13 @@ class Connection {
           const client = new Client();
           client
             .on('ready', () => {
+              this._cpuSample = null;
               this.status = 'online';
               this.error = '';
               this._fails = 0;
               this._nextRetryAt = 0;
               this.pending = null;
               resolve();
-              this._scheduleGc();
             })
             .on('error', (err) => {
               // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
@@ -293,23 +310,9 @@ class Connection {
       }
       this.client = null;
     }
-    this._gcDone = false;
   }
 
-  // 异步机会性 GC：清理由于客户端非正常退出（掉电/杀进程）残留的历史一次性临时直传密钥与临时目录
-  // 匹配两种格式：新版 sckey-xxxxxxxx（v0.10.1+）与旧版 scxxxxxxxx（v0.9.x 遗留）
-  // 均要求行尾精确匹配，不会影响用户自有密钥的常规注释（如邮箱、主机名）
-  _scheduleGc() {
-    if (this._gcDone) return;
-    this._gcDone = true;
-    setTimeout(() => {
-      if (this.status !== 'online') return;
-      this.exec(
-        'if [ -f ~/.ssh/authorized_keys ]; then sed -i -E "/ sckey-[a-z0-9]{8}$/d; / sc[a-z0-9]{8}$/d" ~/.ssh/authorized_keys; fi; rm -rf /tmp/.sckey-* /tmp/.sc[a-z0-9]* 2>/dev/null',
-        8000,
-      ).catch(() => {});
-    }, 5000);
-  }
+  // Direct-transfer cleanup is owned by its task. Never sweep other live sessions on connect.
 
   close() {
     this.dispose();
@@ -405,7 +408,9 @@ class Connection {
 
   async collect() {
     const { stdout } = await this.exec(COLLECT_CMD);
-    const snap = parseSnapshot(stdout);
+    const parsed = parseSnapshot(stdout, this._cpuSample);
+    this._cpuSample = parsed.cpuSample;
+    const { cpuSample, ...snap } = parsed;
     if (!snap.gpus.length) {
       // 没有 nvidia-smi 或驱动异常时，不要当成整体失败
       snap.gpuError = /nvidia-smi/i.test(stdout) ? '未获取到 GPU 数据（驱动异常或无 NVIDIA 显卡）' : undefined;
@@ -431,7 +436,8 @@ class Connection {
   // ===== SFTP 文件管理 =====
   sftp() {
     if (this._sftp) return Promise.resolve(this._sftp);
-    return this.connect().then(
+    if (this._sftpPending) return this._sftpPending;
+    const pending = this.connect().then(
       () =>
         new Promise((resolve, reject) => {
           this.client.sftp((err, sftp) => {
@@ -444,6 +450,10 @@ class Connection {
           });
         }),
     );
+    this._sftpPending = pending;
+    const clear = () => { if (this._sftpPending === pending) this._sftpPending = null; };
+    pending.then(clear, clear);
+    return pending;
   }
 
   async homePath() {

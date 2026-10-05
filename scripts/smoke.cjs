@@ -116,7 +116,7 @@ async function main() {
   ]);
   const rUp1 = await waitTask(tm, tUp1.id);
   const rUp2 = await waitTask(tm, tUp2.id);
-  assert.strictEqual(rUp1.status, 'done');
+   assert.strictEqual(rUp1.status, 'done', rUp1.error);
   assert.strictEqual(rUp2.status, 'done');
   const upBig = await fsp.readFile(path.join(rootA, 'up/big.bin'));
   assert.ok(upBig.equals(bigData), '上传内容逐字节一致');

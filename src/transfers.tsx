@@ -179,15 +179,13 @@ export function TransferProvider({ children }: { children: ReactNode }) {
   const retry = useCallback((id: string) => void api?.transferRetry(id), []);
   const remove = useCallback(
     (id: string) => {
-      api?.transferRemove(id);
-      setItems((prev) => prev.filter((x) => x.id !== id));
+      void api?.transferRemove(id).then(refresh).catch(() => refresh());
     },
-    [],
+    [refresh],
   );
   const clearFinished = useCallback(() => {
-    api?.transferClear();
-    setItems((prev) => prev.filter((x) => !['done', 'canceled'].includes(x.status)));
-  }, []);
+    void api?.transferClear().then(refresh).catch(() => refresh());
+  }, [refresh]);
 
   const pauseAll = useCallback(() => {
     api?.transferPauseAll();

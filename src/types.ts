@@ -4,6 +4,7 @@ export interface GpuProc {
   pid: number;
   name: string;
   memMb: number;
+  user?: string;
 }
 
 export interface Gpu {
@@ -28,7 +29,12 @@ export interface ProcessItem {
   started: string;
   command: string;
   gpu: number | null;
+  gpuIndices?: number[];
 }
+
+export interface HistoryPoint { at: number; value: number | null }
+export interface AlertRecord { id: string; serverId: string; serverName: string; type: string; createdAt: number; resolvedAt?: number }
+export interface CredentialInfo { encryptionAvailable: boolean; backend: string; mode: 'encrypted' | 'session'; migrationError?: string }
 
 export type ServerStatus = 'online' | 'offline' | 'auth' | 'timeout';
 
@@ -42,7 +48,8 @@ export interface Server {
   processes: ProcessItem[];
   history: number[];
   cpuCores: number;
-  cpuUsage: number;
+  cpuUsage: number | null;
+  collectedAt?: number;
   loadAvg: [number, number, number];
   memUsed: number;
   memTotal: number;
@@ -71,7 +78,8 @@ export interface SnapshotPayload {
   gpus: Gpu[];
   processes: ProcessItem[];
   cpuCores: number;
-  cpuUsage: number;
+  cpuUsage: number | null;
+  collectedAt?: number;
   loadAvg: [number, number, number];
   memUsed: number;
   memTotal: number;
@@ -147,6 +155,9 @@ export interface TransferItem {
   peerName?: string;
   startedAt?: number;
   finishedAt?: number;
+  verification?: 'not-requested' | 'verified' | 'unavailable' | 'failed';
+  resumable?: boolean;
+  persistenceError?: string;
 }
 
 export interface SshKeyCandidate {

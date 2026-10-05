@@ -6,7 +6,6 @@
 const { Server } = require('ssh2');
 const { STATUS_CODE } = require('ssh2/lib/protocol/SFTP.js'); // ssh2 未从顶层导出，仅 dev/测试脚本使用
 const { generateKeyPairSync } = require('node:crypto');
-const { readFileSync } = require('node:fs');
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
@@ -14,16 +13,12 @@ const path = require('node:path');
 const PORT = Number(process.env.FAKE_SSH_PORT || 2222);
 
 function hostKey() {
-  try {
-    return readFileSync(require('node:os').homedir() + '/.ssh/id_rsa');
-  } catch {
     const { privateKey } = generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
     });
     return privateKey;
-  }
 }
 
 const GPU_CSV = [
@@ -73,7 +68,7 @@ function convertStats(stats) {
 function attachSftp(sftpStream, rootDir) {
   const realPath = makeRealPath(rootDir);
   const handles = new Map(); // hex -> { fd?, dir?, done? }
-  const replyFail = (reqId, msg) => sftpStream.status(reqId, STATUS_CODE.FAILURE, msg);
+  const replyFail = (reqId, msg) => sftpStream.status(reqId, /ENOENT/.test(msg) ? STATUS_CODE.NO_SUCH_FILE : STATUS_CODE.FAILURE, msg);
   const openFlags = (flags) => {
     const READ = 1, WRITE = 2, APPEND = 4, CREAT = 8, TRUNC = 16;
     if (flags & READ && !(flags & WRITE)) return 'r';
@@ -232,7 +227,7 @@ function attachSftp(sftpStream, rootDir) {
     }
   });
 
-  sftpStream.on('UNLINK', async (reqId, p) => {
+  sftpStream.on('REMOVE', async (reqId, p) => {
     const abs = realPath(p);
     if (!abs) return replyFail(reqId, 'path escapes root');
     try {
@@ -269,13 +264,17 @@ function attachSession(client, rootDir) {
       const stream = acceptShell();
       const { spawn } = require('node:child_process');
       const exe = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash');
-      const child = spawn(exe, ['-NoLogo', '-NonInteractive', '-Command', '-'], { stdio: ['pipe', 'pipe', 'pipe'] });
+      const args = process.platform === 'win32' ? ['-NoLogo', '-NonInteractive', '-Command', '-'] : [];
+      const child = spawn(exe, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
       stream.write('\r\nfake-shell ready\r\n');
       stream.on('data', (d) => {
-        try { child.stdin.write(d); } catch { /* noop */ }
+        // Pipes do not perform the PTY's CR -> LF input translation for POSIX shells.
+        const input = process.platform === 'win32' ? d : d.toString('utf8').replace(/\r\n?/g, '\n');
+        try { child.stdin.write(input); } catch { /* noop */ }
       });
       child.stdout.on('data', (d) => stream.write(d));
       child.stderr.on('data', (d) => stream.write(d));
+      child.on('error', (error) => { stream.write('Shell failed: ' + error.message); stream.end(); });
       child.on('close', () => stream.end());
       stream.on('close', () => {
         try { child.kill(); } catch { /* noop */ }

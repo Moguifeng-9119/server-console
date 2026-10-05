@@ -8,9 +8,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { AuditEntry, Server, ServerConfig, SnapshotPayload, Toast } from './types';
+import type { AlertRecord, HistoryPoint, AuditEntry, Server, ServerConfig, SnapshotPayload, Toast } from './types';
 import { api, isElectron } from './api';
 import i18n from './i18n';
+import { appendSample, normalizeHistory } from './history';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'default' | 'comfy';
@@ -51,6 +52,7 @@ export interface AddResult {
 
 interface Store {
   servers: Server[];
+  sampleNow: number;
   configs: ServerConfig[];
   demo: boolean;
   setDemo: (v: boolean) => void;
@@ -72,9 +74,11 @@ interface Store {
   tempAlert: number;
   setTempAlert: (n: number) => void;
   toasts: Toast[];
+  dismissToast: (id: number) => void;
+  alertRecords: AlertRecord[];
   pushToast: (t: Omit<Toast, 'id'>) => void;
   audit: AuditEntry[];
-  histories: Record<string, number[]>;
+  histories: Record<string, HistoryPoint[]>;
   kill: (serverId: string, pid: number, signal: 'TERM' | 'KILL') => void;
   restartService: (serverId: string, service: string) => void;
   colorOf: (pct: number) => string;
@@ -87,12 +91,14 @@ function nowTime() {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const [sampleNow, setSampleNow] = useState(Date.now);
+  useEffect(() => { const timer = setInterval(() => setSampleNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const [demo, setDemo] = useState(!isElectron);
   const [demoServers, setDemoServers] = useState<Server[]>([]);
   const mockRef = useRef<typeof import('./mock') | null>(null);
   const [configs, setConfigs] = useState<ServerConfig[]>([]);
   const [snaps, setSnaps] = useState<Record<string, SnapshotPayload>>({});
-  const [histories, setHistories] = useState<Record<string, number[]>>({});
+  const [histories, setHistories] = useState<Record<string, HistoryPoint[]>>({});
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const v = localStorage.getItem('sc.theme.user');
     return v === 'light' || v === 'dark' || v === 'system' ? v : 'light';
@@ -114,6 +120,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadPref('sc.tempAlert', 85, (v) => Number.isFinite(v) && Number(v) >= 40 && Number(v) <= 120),
   );
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [alertRecords, setAlertRecords] = useState<AlertRecord[]>([]);
+  const dismissToast = useCallback((id: number) => setToasts((prev) => prev.filter((item) => item.id !== id)), []);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const seq = useRef(1);
   const knownAlerts = useRef<Set<string>>(new Set());
@@ -165,7 +173,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const pushToast = useCallback((t: Omit<Toast, 'id'>) => {
     const id = seq.current++;
-    setToasts((prev) => [...prev.slice(-3), { ...t, id }]);
+    setToasts((prev) => [...prev.slice(-1), { ...t, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500);
   }, []);
 
@@ -200,9 +208,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!api || demo) return;
     const offSnap = api.onSnapshot((s) => {
-      setSnaps((prev) => ({ ...prev, [s.id]: s }));
+      const at = s.collectedAt || Date.now();
+      setSnaps((prev) => ({ ...prev, [s.id]: { ...s, collectedAt: at } }));
+      const value = s.gpus.length ? s.gpus.reduce((sum, g) => sum + g.util, 0) / s.gpus.length : null;
+      setHistories((prev) => ({ ...prev, [s.id]: appendSample(prev[s.id] || [], { at, value }) }));
     });
     const offStatus = api.onStatus((st) => {
+      setHistories((prev) => ({ ...prev, [st.id]: appendSample(prev[st.id] || [], { at: Date.now(), value: null }) }));
       setSnaps((prev) => {
         const cur = prev[st.id];
         return {
@@ -214,7 +226,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             gpus: cur?.gpus ?? [],
             processes: cur?.processes ?? [],
             cpuCores: cur?.cpuCores ?? 0,
-            cpuUsage: cur?.cpuUsage ?? 0,
+            cpuUsage: null,
+            collectedAt: cur?.collectedAt,
             loadAvg: cur?.loadAvg ?? [0, 0, 0],
             memUsed: cur?.memUsed ?? 0,
             memTotal: cur?.memTotal ?? 0,
@@ -230,37 +243,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [demo]);
 
-  // 历史曲线单独维护，避免快照对象每次都被替换
-  const lastAvg = useRef<Record<string, number>>({});
-  useEffect(() => {
-    if (demo) return;
-    const next: Record<string, number[]> = {};
-    let changed = false;
-    for (const [id, s] of Object.entries(snaps)) {
-      const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
-      if (lastAvg.current[id] === avg) continue;
-      lastAvg.current[id] = avg;
-      next[id] = [...(histories[id] ?? []), avg].slice(-720); // 持久化后放宽到 720 点
-      changed = true;
-    }
-    if (changed) setHistories((prev) => ({ ...prev, ...next }));
-  }, [snaps, demo, histories]);
-
   // 历史曲线持久化：启动恢复 + 每 30 秒落盘（无变化不写）
   const historiesRef = useRef(histories);
   historiesRef.current = histories;
   useEffect(() => {
-    if (!api) return;
+    if (!api || demo) return;
     const a = api;
     a.historyLoad().then((saved) => {
-      if (saved && Object.keys(saved).length) setHistories((prev) => ({ ...saved, ...prev }));
-    });
+      if (saved && Object.keys(saved).length) setHistories((prev) => {
+        const next = { ...prev };
+        for (const [id, values] of Object.entries(saved)) next[id] = normalizeHistory([...(values || []), ...(prev[id] || [])]);
+        return next;
+      });
+    }).catch((error) => pushToast({level: 'error', title: i18n.t('workbench.historySaveFail'), detail: String(error)}));
     const timer = setInterval(() => {
       const cur = historiesRef.current;
-      if (Object.keys(cur).length) void a.historySave(cur);
+      const live = Object.fromEntries(Object.entries(cur).filter(([id]) => !id.startsWith('demo:')));
+      if (Object.keys(live).length) void a.historySave(live).catch((error) => pushToast({ level: 'error', title: i18n.t('workbench.historySaveFail'), detail: String(error) }));
     }, 30000);
     return () => clearInterval(timer);
-  }, []);
+  }, [demo, pushToast]);
 
   useEffect(() => {
     if (!api || demo) return;
@@ -297,9 +299,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         status: s?.status ?? 'offline',
         gpus: s?.gpus ?? [],
         processes: s?.processes ?? [],
-        history: histories[c.id] ?? [],
+        history: (histories[c.id] ?? []).flatMap((point) => point.value == null ? [] : [point.value]),
+        collectedAt: s?.collectedAt,
         cpuCores: s?.cpuCores ?? 0,
-        cpuUsage: s?.cpuUsage ?? 0,
+        cpuUsage: s?.cpuUsage ?? null,
         loadAvg: s?.loadAvg ?? [0, 0, 0],
         memUsed: s?.memUsed ?? 0,
         memTotal: s?.memTotal ?? 0,
@@ -309,32 +312,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, [demo, demoServers, configs, snaps, histories]);
 
-  // 告警：新异常只通知一次，持续异常不重复打扰
+  useEffect(() => {
+    if (!demo) return;
+    const at = Date.now();
+    setHistories((prev) => {
+      const next = { ...prev };
+      for (const s of demoServers) next[s.id] = appendSample(prev[s.id] || [], {
+        at, value: s.status === 'online' && s.gpus.length ? s.gpus.reduce((sum, g) => sum + g.util, 0) / s.gpus.length : null,
+      });
+      return next;
+    });
+  }, [demo, demoServers]);
+
+  // One summary per polling cycle; detailed active/resolved records remain available.
   useEffect(() => {
     if (!alertsEnabled) return;
     const keys = new Set<string>();
     for (const s of servers) {
-      if (s.status !== 'online') continue;
-      if (s.gpus.some((g) => (g.temp ?? 0) >= tempAlert)) keys.add(`temp:${s.id}`);
-      if (s.gpus.some((g) => (g.memUsed / (g.memTotal || 1)) * 100 >= thresholds.crit)) keys.add(`vram:${s.id}`);
-      if (s.processes.some((p) => p.state === 'Z')) keys.add(`zombie:${s.id}`);
+      if (s.status !== 'online') {
+        if (s.collectedAt) keys.add('offline:' + s.id);
+        for (const key of knownAlerts.current) if (key.slice(key.indexOf(':') + 1) === s.id && !key.startsWith('offline:')) keys.add(key);
+        continue;
+      }
+      if (s.gpus.some((g) => (g.temp ?? 0) >= tempAlert)) keys.add('temp:' + s.id);
+      if (s.gpus.some((g) => (g.memUsed / (g.memTotal || 1)) * 100 >= thresholds.crit)) keys.add('vram:' + s.id);
+      if (s.processes.some((p) => p.state === 'Z')) keys.add('zombie:' + s.id);
     }
-    for (const k of keys) {
-      if (knownAlerts.current.has(k)) continue;
-      const [type, id] = k.split(':');
-      const s = servers.find((x) => x.id === id);
-      if (!s) continue;
-      const label: Record<string, string> = {
-        temp: i18n.t('state.tempAlert', { name: s.name }),
-        vram: i18n.t('state.vramAlert', { name: s.name }),
-        zombie: i18n.t('state.zombieAlert', { name: s.name }),
-      };
-      pushToast({ level: 'warn', title: label[type], detail: nowTime() });
-      api?.notify(label[type], `${s.name} · ${nowTime()}`);
-      api?.webhookSend({ title: label[type], body: `${s.name} · ${nowTime()}` });
+    const at = Date.now();
+    const newRecords: AlertRecord[] = [];
+    for (const key of keys) {
+      if (knownAlerts.current.has(key)) continue;
+      const separator = key.indexOf(':');
+      const type = key.slice(0, separator), serverId = key.slice(separator + 1);
+      const server = servers.find((s) => s.id === serverId);
+      if (server) newRecords.push({ id: key + ':' + at, type, serverId, serverName: server.name, createdAt: at });
+    }
+    const resolved = [...knownAlerts.current].some((key) => !keys.has(key));
+    if (newRecords.length || resolved) setAlertRecords((prev) => [
+      ...newRecords,
+      ...prev.map((item) => !item.resolvedAt && !keys.has(item.type + ':' + item.serverId) && (item.type === 'offline' || servers.find((server) => server.id === item.serverId)?.status === 'online') ? { ...item, resolvedAt: at } : item),
+    ].slice(0, 100));
+    if (newRecords.length && !demo) {
+      const title = i18n.t('workbench.alertSummary', { n: newRecords.length });
+      const body = [...new Set(newRecords.map((item) => item.serverName))].join(', ');
+      pushToast({ level: 'warn', title, detail: body });
+      void api?.notify(title, body);
+      void api?.webhookSend({ title, body });
     }
     knownAlerts.current = keys;
-  }, [servers, alertsEnabled, thresholds.crit, tempAlert, pushToast]);
+  }, [servers, demo, alertsEnabled, thresholds.crit, tempAlert, pushToast]);
 
   const addServer = useCallback(async (cfg: NewServer): Promise<AddResult> => {
     if (!api) return { ok: false, error: i18n.t('state.desktopOnly') };
@@ -429,6 +455,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Store>(
     () => ({
       servers,
+      sampleNow,
       configs,
       demo,
       setDemo,
@@ -450,6 +477,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       tempAlert,
       setTempAlert,
       toasts,
+      dismissToast,
+      alertRecords,
       pushToast,
       audit,
       histories,
@@ -459,6 +488,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       servers,
+      sampleNow,
       configs,
       demo,
       refresh,
@@ -478,6 +508,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       tempAlert,
       setTempAlert,
       toasts,
+      dismissToast,
+      alertRecords,
       pushToast,
       audit,
       histories,

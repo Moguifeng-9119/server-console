@@ -49,6 +49,7 @@ let activeServerId = null; // 当前前端聚焦的服务器 ID（null=在总览
 async function tick() {
   if (ticking) return;
   ticking = true;
+  try {
   // 采集错峰：把各服务器的采集起点按索引摊开，避免同刻打满本机与对端
   const stagger = Math.min(250, Math.floor((intervalMs * 0.8) / Math.max(1, servers.length)));
   const now = Date.now();
@@ -78,7 +79,7 @@ async function tick() {
       }
     }),
   );
-  ticking = false;
+  } finally { ticking = false; }
 }
 
 function start() {
@@ -88,8 +89,9 @@ function start() {
   tick();
 }
 
-function persist() {
-  store.save(servers);
+function persist(next = servers) {
+  store.save(next);
+  servers = next;
   start();
 }
 
@@ -180,7 +182,7 @@ function registerIpc() {
     if (Notification.isSupported()) new Notification({ title, body }).show();
   });
 
-  ipcMain.handle('store:info', () => ({ encryptionAvailable: store.encryptionAvailable() }));
+  ipcMain.handle('store:info', () => store.info());
 
   ipcMain.handle('audit:list', () => audit.loadRecent());
   ipcMain.handle('audit:append', (_e, entry) => {
@@ -209,9 +211,8 @@ function registerIpc() {
   ipcMain.handle('servers:add', (_e, cfg) => {
     try {
       const v = validateServerCfg(cfg);
-      const full = { id: `srv_${Date.now().toString(36)}`, ...cfg, ...v };
-      servers.push(full);
-      persist();
+      const full = { ...cfg, ...v, id: `srv_${nodeCrypto.randomUUID()}` };
+      persist([...servers, full]);
       return { ok: true, server: store.publicView(full) };
     } catch (e) {
       return { ok: false, error: e.message };
@@ -229,8 +230,9 @@ function registerIpc() {
         if (!patch[k]) delete patch[k];
       }
       const v = validateServerCfg({ ...servers[i], ...patch });
-      servers[i] = { ...servers[i], ...patch, ...v };
-      persist();
+      const next = [...servers];
+      next[i] = { ...servers[i], ...patch, ...v };
+      persist(next);
       pool.remove(servers[i].id); // 凭据/端口可能已变，丢弃旧连接让下个采集周期用新配置重建
       return { ok: true, server: store.publicView(servers[i]) };
     } catch (e) {
@@ -239,9 +241,8 @@ function registerIpc() {
   });
 
   ipcMain.handle('servers:remove', (_e, id) => {
-    servers = servers.filter((s) => s.id !== id);
+    persist(servers.filter((s) => s.id !== id));
     pool.remove(id);
-    persist();
     return true;
   });
 
@@ -666,7 +667,9 @@ function registerIpc() {
   });
   ipcMain.handle('history:save', (_e, map) => {
     fs.mkdirSync(path.dirname(historyFile()), { recursive: true });
-    fs.writeFileSync(historyFile(), JSON.stringify(map || {}), 'utf8');
+    const temp = historyFile() + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify(map || {}), { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(temp, historyFile());
     return true;
   });
 
@@ -693,13 +696,16 @@ function registerIpc() {
     decipher.setAuthTag(buf.subarray(buf.length - 16));
     const plain = Buffer.concat([decipher.update(buf.subarray(0, buf.length - 16)), decipher.final()]).toString('utf8');
     const imported = JSON.parse(plain);
+    if (!Array.isArray(imported)) throw new Error('Invalid server configuration list');
+    const next = [...servers];
     let count = 0;
     for (const s of imported) {
-      if (servers.some((x) => x.name === s.name && x.host === s.host)) continue; // 重名同主机跳过
-      servers.push({ ...s, id: 'srv_' + Date.now().toString(36) + '_' + count });
+      if (next.some((x) => x.name === s.name && x.host === s.host)) continue; // 重名同主机跳过
+      const valid = validateServerCfg(s);
+      next.push({ ...s, ...valid, id: 'srv_' + nodeCrypto.randomUUID() });
       count += 1;
     }
-    persist();
+    persist(next);
     return count;
   }));
 

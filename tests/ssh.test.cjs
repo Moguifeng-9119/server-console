@@ -43,8 +43,8 @@ describe('parseSnapshot', () => {
   });
 
   it('maps compute apps onto GPUs by uuid and skips unknown uuids', () => {
-    expect(snap.gpus[0].procs).toEqual([{ pid: 2311, name: 'python', memMb: 40231 }]);
-    expect(snap.gpus[1].procs).toEqual([{ pid: 3102, name: 'python', memMb: 2048 }]);
+    expect(snap.gpus[0].procs).toEqual([{ pid: 2311, name: 'python', memMb: 40231, user: 'lin' }]);
+    expect(snap.gpus[1].procs).toEqual([{ pid: 3102, name: 'python', memMb: 2048, user: 'zhao' }]);
     expect(snap.gpus[2].procs).toEqual([]);
   });
 
@@ -60,6 +60,24 @@ describe('parseSnapshot', () => {
     expect(snap.memUsed).toBe(291);
     expect(snap.swapUsed).toBe(2);
     expect(snap.swapTotal).toBe(64);
+    expect(snap.cpuUsage).toBe(null); // No CPU time sample: never substitute load average.
+  });
+
+  it('retains a single process on every GPU it occupies', () => {
+    const multiple = SAMPLE.replace('GPU-bbbb, 3102, 2048', 'GPU-bbbb, 2311, 2048');
+    const s = parseSnapshot(multiple);
+    expect(s.gpus[0].procs.some((p) => p.pid === 2311)).toBe(true);
+    expect(s.gpus[1].procs.some((p) => p.pid === 2311)).toBe(true);
+    expect(s.processes.find((p) => p.pid === 2311).gpuIndices).toEqual([0, 1]);
+  });
+
+  it('computes CPU utilization from time deltas, independently of load', () => {
+    const cpu = SAMPLE.replace('__PS__', '__CPU__\ncpu 100 0 50 700 50 0 0 0 0 0\n__PS__');
+    const first = parseSnapshot(cpu);
+    expect(first.cpuUsage).toBe(null);
+    const second = parseSnapshot(cpu.replace('100 0 50 700', '150 0 50 750'), first.cpuSample);
+    expect(second.cpuUsage).toBe(50);
+    expect(parseSnapshot(cpu, second.cpuSample).cpuUsage).toBe(null); // counter rollback
   });
 
   it('marks zombie state', () => {

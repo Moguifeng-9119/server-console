@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ArrowDown,
   ArrowLeftRight,
@@ -12,23 +12,25 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import { useTransfers } from '../transfers';
 import { useTranslation } from 'react-i18next';
 import { formatBytes, formatDuration, formatSpeed, etaSeconds, pctOf } from '../format';
 import type { TransferItem, TransferKind } from '../types';
 
-const KIND_META: Record<TransferKind, { icon: LucideIcon; label: string; cls: string }> = {
-  upload: { icon: ArrowUp, label: '上传', cls: 'up' },
-  download: { icon: ArrowDown, label: '下载', cls: 'down' },
-  relay: { icon: ArrowLeftRight, label: '互传', cls: 'relay' },
+const KIND_META: Record<TransferKind, { icon: LucideIcon; cls: string }> = {
+  upload: { icon: ArrowUp, cls: 'up' },
+  download: { icon: ArrowDown, cls: 'down' },
+  relay: { icon: ArrowLeftRight, cls: 'relay' },
 };
 
 // 瞬时速度曲线（按自身最大值自适应，不做百分比裁剪）
 function SpeedChart({ values, color = 'var(--accent)' }: { values: number[]; color?: string }) {
+  const tt = useTranslation().t;
   const w = 100;
   const h = 36;
-  if (values.length < 2) return <div className="td-chart-empty">速度采样中…</div>;
+  if (values.length < 2) return <div className="td-chart-empty">{tt('workbench.speedSampling')}</div>;
   const max = Math.max(...values, 1);
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - (v / max) * (h - 3) - 1}`);
   return (
@@ -40,11 +42,12 @@ function SpeedChart({ values, color = 'var(--accent)' }: { values: number[]; col
 }
 
 function CopyBtn({ text }: { text: string }) {
+  const tt = useTranslation().t;
   const [ok, setOk] = useState(false);
   return (
     <button
       className="td-copy"
-      title="复制路径"
+      title={tt('transfer.copy')}
       onClick={() => {
         navigator.clipboard
           .writeText(text)
@@ -55,7 +58,7 @@ function CopyBtn({ text }: { text: string }) {
           .catch(() => {});
       }}
     >
-      {ok ? '已复制' : '复制'}
+      {tt(ok ? 'transfer.copied' : 'transfer.copy')}
     </button>
   );
 }
@@ -129,8 +132,8 @@ function TaskRow({ t, tf, picked, togglePick }: {
             </>
           )}
           {t.status === 'running' && <button className="btn mini" onClick={() => tf.pause(t.id)}>{tt('transfer.pauseBtn')}</button>}
-          {t.status === 'paused' && <button className="btn mini primary" onClick={() => tf.resume(t.id)}>{tt('transfer.resumeBtn')}</button>}
-          {t.status === 'error' && <button className="btn mini primary" onClick={() => tf.retry(t.id)}>{tt('transfer.retryBtn')}</button>}
+          {t.status === 'paused' && t.resumable !== false && <button className="btn mini primary" onClick={() => tf.resume(t.id)}>{tt('transfer.resumeBtn')}</button>}
+          {t.status === 'error' && t.resumable !== false && <button className="btn mini primary" onClick={() => tf.retry(t.id)}>{tt('transfer.retryBtn')}</button>}
           {['queued', 'running'].includes(t.status) && <button className="btn mini danger" onClick={() => tf.cancel(t.id)}>{tt('transfer.cancel')}</button>}
           {['done', 'canceled', 'error', 'paused'].includes(t.status) && <button className="btn mini" onClick={() => tf.remove(t.id)}>{tt('transfer.removeBtn')}</button>}
         </span>
@@ -145,42 +148,44 @@ function TaskRow({ t, tf, picked, togglePick }: {
           <div className="td-detail-grid">
             <div className="td-meter">
               <div className="td-meter-top">
-                <span>瞬时速度</span>
+                <span>{tt('transfer.speed')}</span>
                 <span className="num td-big">{t.status === 'running' ? formatSpeed(t.speed) || '0 B/s' : '—'}</span>
               </div>
               <SpeedChart values={hist} />
             </div>
             <div className="td-stats">
-              <div><span>进度</span><b className="num">{t.size ? `${formatBytes(t.transferred)} / ${formatBytes(t.size)} (${Math.round(pct)}%)` : `${formatBytes(t.transferred)} · 总量统计中`}</b></div>
-              <div><span>剩余</span><b className="num">{eta != null ? formatDuration(eta) : (t.size ? '—' : '总量统计中')}</b></div>
-              <div><span>已用</span><b className="num">{formatDuration(elapsed)}</b></div>
-              <div><span>文件</span><b className="num">{t.filesTotal ? `${t.filesDone ?? 0} / ${t.filesTotal}` : `${t.filesDone ?? 0} 个已完成`}</b></div>
-              {t.kind === 'relay' && <div><span>方式</span><b>{t.direct ? `服务器直传 · ${t.directMode || '探测中'}` : '本机中继'}</b></div>}
+              <div><span>{tt('transfer.progress')}</span><b className="num">{t.size ? `${formatBytes(t.transferred)} / ${formatBytes(t.size)} (${Math.round(pct)}%)` : `${formatBytes(t.transferred)} · ${tt('transfer.totalUnknown')}`}</b></div>
+              <div><span>{tt('transfer.eta')}</span><b className="num">{eta != null ? formatDuration(eta) : (t.size ? '—' : tt('transfer.totalUnknown'))}</b></div>
+              <div><span>{tt('transfer.elapsed')}</span><b className="num">{formatDuration(elapsed)}</b></div>
+              <div><span>{tt('transfer.filesCount')}</span><b className="num">{t.filesTotal ? `${t.filesDone ?? 0} / ${t.filesTotal}` : tt('workbench.filesCompleted', {n: t.filesDone ?? 0})}</b></div>
+              {t.kind === 'relay' && <div><span>{tt('transfer.method')}</span><b>{t.direct ? tt('transfer.direct', {mode: t.directMode ? ' · ' + t.directMode : ''}) : tt('transfer.relayTip')}</b></div>}
             </div>
           </div>
 
           <div className="td-path">
-            <div className="td-path-line"><span className="td-path-tag">源</span><span className="mono">{t.srcPath || '—'}</span><CopyBtn text={t.srcPath || ''} /></div>
-            <div className="td-path-line"><span className="td-path-tag dst">目标</span><span className="mono">{t.dstPath || '—'}</span><CopyBtn text={t.dstPath || ''} /></div>
+            <div className="td-path-line"><span className="td-path-tag">{tt('transfer.src')}</span><span className="mono">{t.srcPath || '—'}</span><CopyBtn text={t.srcPath || ''} /></div>
+            <div className="td-path-line"><span className="td-path-tag dst">{tt('transfer.dst')}</span><span className="mono">{t.dstPath || '—'}</span><CopyBtn text={t.dstPath || ''} /></div>
           </div>
 
           {t.kind === 'relay' && t.directNote && (
-            <div className="td-note mono" title="能力探测与回退诊断">诊断：{t.directNote}</div>
+            <div className="td-note mono">{tt('workbench.diagnostic', {note: t.directNote})}</div>
           )}
-          {t.status === 'error' && <div className="td-err">失败原因：{t.error || '未知错误'}</div>}
+          {t.error && <div className="td-err">{tt('workbench.transferError', {error: t.error})}</div>}
+          {t.persistenceError && <div className="td-err">{tt('workbench.persistenceError', {error: t.persistenceError})}</div>}
+          <div className="td-note">{tt('workbench.verification')}: {tt('workbench.verification_' + (t.verification || 'not-requested').replace(/-/g, '_'))}</div>
 
           <div className="td-files">
             <div className="td-files-head">
-              <span>最近传输文件（{t.filesDone ?? 0}{t.filesTotal ? ` / ${t.filesTotal}` : ''}）</span>
+              <span>{tt('transfer.recentFiles', {done: t.filesDone ?? 0, sep: t.filesTotal ? ' / ' : '', total: t.filesTotal || ''})}</span>
               <input
                 className="td-files-search"
-                placeholder="过滤本任务最近文件…"
+                placeholder={tt('transfer.recentFilesFilter')}
                 value={fileQ}
                 onChange={(e) => setFileQ(e.target.value)}
               />
             </div>
             <div className="td-files-list">
-              {files.length === 0 && <div className="td-files-empty">暂无逐文件记录（rsync 直传与本机中继会实时回传，scp 兜底模式仅显示字节进度）</div>}
+              {files.length === 0 && <div className="td-files-empty">{tt('transfer.noPerFile')}</div>}
               {files.map((f, i) => (
                 <div key={`${f.at}-${i}`} className="td-file-line mono" title={f.name}>
                   <span className="td-file-ok"><Check size={12} strokeWidth={2.4} /></span>{f.name}
@@ -225,15 +230,8 @@ export function TransferDrawer() {
     return () => window.removeEventListener('sc:show-transfers', show);
   }, []);
 
-  // Esc 收起；有任务传输中时钉住，避免误关（关闭按钮始终可用）
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && tf.runningCount === 0) setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, tf.runningCount]);
+  const ref = useRef<HTMLElement>(null);
+  useDialogFocus(open, ref, () => { if (tf.runningCount === 0) setOpen(false); });
 
   const togglePick = (id: string) =>
     setPicked((prev) => {
@@ -288,7 +286,7 @@ export function TransferDrawer() {
 
   return (
     <div className="td-root" onMouseDown={(e) => { if (e.target === e.currentTarget && tf.runningCount === 0) setOpen(false); }}>
-      <aside className={`td-drawer ${full ? 'full' : ''}`}>
+      <aside ref={ref} role="dialog" aria-modal="true" aria-label={tt('transfer.center')} tabIndex={-1} className={`td-drawer ${full ? 'full' : ''}`}>
         <header className="td-header">
           <div className="td-title">
             <h2>{tt('transfer.center')}</h2>
@@ -326,7 +324,7 @@ export function TransferDrawer() {
           {tf.errorCount > 0 && <button className="btn mini warn" onClick={tf.retryFailed}>{tt('transfer.retryFailed')}</button>}
           {picked.size > 0 && (
             <button className="btn mini danger" onClick={() => { tf.cancelMany([...picked]); setPicked(new Set()); }}>
-              取消所选({picked.size})
+              {tt('transfer.cancelSelected', {n: picked.size})}
             </button>
           )}
           <button className="btn mini" onClick={tf.clearFinished}>{tt('transfer.clearFinished')}</button>
@@ -334,7 +332,7 @@ export function TransferDrawer() {
 
         <div className="td-settings-line">
           <label className="td-conc">
-            全局并发
+            {tt('transfer.concurrency')}
             <input
               type="range"
               min={1}
@@ -355,16 +353,16 @@ export function TransferDrawer() {
               type="number"
               min={0}
               value={tf.limitMB || ''}
-              placeholder="不限"
+              placeholder={tt('transfer.unlimited')}
               onChange={(e) => tf.setLimitMB(Number(e.target.value) || 0)}
             />
             MB/s
           </label>
-          <label className="td-chk" title="单文件传输完成后对比 MD5（远端需有 md5sum；目录树不校验）">
-            <input type="checkbox" checked={verifyOn} onChange={(e) => setVerify(e.target.checked)} />MD5 校验
+          <label className="td-chk" title={tt('transfer.verifyTip')}>
+            <input type="checkbox" checked={verifyOn} onChange={(e) => setVerify(e.target.checked)} />{tt('transfer.verify')}
           </label>
           <span className="td-spacer" />
-          {tf.runningCount > 0 && <span className="td-pin">传输中已钉住，不会被误关</span>}
+          {tf.runningCount > 0 && <span className="td-pin">{tt('transfer.pinned')}</span>}
         </div>
 
         <div className="td-list">
@@ -374,14 +372,14 @@ export function TransferDrawer() {
           ))}
           {st === 'all' && finishedList.length > 0 && (
             <button className="td-fold" onClick={() => setFinishedOpen((v) => !v)}>
-              {finishedList.length} 条已完成/已取消 {finishedOpen ? '▾' : '▸'}
+              {tt('transfer.foldFinished', {n: finishedList.length})} {finishedOpen ? '▾' : '▸'}
             </button>
           )}
           {(st === 'done' || finishedOpen) &&
             finishedList.slice(0, renderCap).map((t) => <TaskRow key={t.id} t={t} tf={tf} picked={picked} togglePick={togglePick} />)}
           {(activeList.length > renderCap || (showFinished && finishedList.length > renderCap)) && (
             <button className="td-fold" onClick={() => setRenderCap((v) => v + 300)}>
-              继续加载（还有 {Math.max(0, activeList.length - renderCap) + (showFinished ? Math.max(0, finishedList.length - renderCap) : 0)} 条）
+              {tt('transfer.loadMore', {n: Math.max(0, activeList.length - renderCap) + (showFinished ? Math.max(0, finishedList.length - renderCap) : 0)})}
             </button>
           )}
         </div>

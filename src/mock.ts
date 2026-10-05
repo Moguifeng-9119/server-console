@@ -90,15 +90,22 @@ export function createServers(): Server[] {
     const gpus = Array.from({ length: spec.gpus }, (_, g) => makeGpu(g, spec.gpuName, spec.memTotal));
     const processCount = rndInt(180, 420);
     const processes = Array.from({ length: processCount }, () => makeProcess(spec.gpus));
+    // Use the same PID/user relationship as live GPU telemetry in the demo.
+    for (const gpu of gpus) for (const proc of gpu.procs) {
+      proc.user = spec.users[gpu.index % spec.users.length];
+      processes.push({ pid: proc.pid, user: proc.user, cpu: rndInt(20, 90), mem: 1.5,
+        rssMb: 2048, state: 'R', started: '09:00', command: 'python train.py', gpu: gpu.index, gpuIndices: [gpu.index] });
+    }
     const avg = gpus.reduce((s, g) => s + g.util, 0) / gpus.length;
     return {
-      id: `s${i + 1}`,
+      id: `demo:s${i + 1}`,
       name: spec.name,
       host: spec.host,
       status: (i === 4 ? 'timeout' : 'online') as Server['status'],
       gpus,
       processes,
       history: Array.from({ length: 48 }, () => Math.max(0, Math.min(100, avg + (Math.random() - 0.5) * 18))),
+      collectedAt: Date.now(),
       cpuCores: spec.cores,
       cpuUsage: Math.round(Math.random() * 70 + 10),
       loadAvg: [Math.round(Math.random() * 40) / 10, Math.round(Math.random() * 40) / 10, Math.round(Math.random() * 40) / 10],
@@ -139,7 +146,8 @@ export function tick(s: Server): Server {
     gpus,
     processes,
     history: [...s.history.slice(-59), avg],
-    cpuUsage: Math.round(Math.max(0, Math.min(100, s.cpuUsage + (Math.random() - 0.5) * 8))),
+    cpuUsage: Math.round(Math.max(0, Math.min(100, (s.cpuUsage ?? 0) + (Math.random() - 0.5) * 8))),
+    collectedAt: Date.now(),
     memUsed: Math.round(Math.max(0, Math.min(s.memTotal, s.memUsed + (Math.random() - 0.5) * 4)) * 10) / 10,
   };
 }

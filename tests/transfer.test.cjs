@@ -52,13 +52,13 @@ describe('TransferManager queue state machine', () => {
     expect(tm.queue.slice(0, 3)).toEqual([c.id, a.id, b.id]);
   });
 
-  it('remove drops the task, but not a running one', () => {
+  it('remove drops the task, but not a running one', async () => {
     const [a] = tm.addMany([job('a')]);
-    expect(tm.remove(a.id)).toBe(true);
+    expect(await tm.remove(a.id)).toBe(true);
     expect(tm.tasks.has(a.id)).toBe(false);
     const [b] = tm.addMany([job('b')]);
     tm.tasks.get(b.id).status = 'running'; // 白盒模拟运行态
-    expect(tm.remove(b.id)).toBe(false);
+    expect(await tm.remove(b.id)).toBe(false);
     expect(tm.tasks.has(b.id)).toBe(true);
   });
 
@@ -95,6 +95,30 @@ describe('TransferManager queue state machine', () => {
     tm._schedule();
     expect(tm.tasks.get(b.id).status).toBe('running');
     expect(tm.tasks.get(b.id)._waitConflict).toBe(false);
+  });
+
+  it('locks normalized local targets and overlapping directory roots across transfer kinds', () => {
+    const tm = makeTm().tm;
+    const target = path.join(os.tmpdir(), 'sc-lock', 'target');
+    const alias = path.dirname(target) + path.sep + '.' + path.sep + 'target';
+    const [a, b] = tm.addMany([
+      { kind: 'download', serverId: 's1', srcRemote: '/a', dstLocal: target },
+      { kind: 'download', serverId: 's1', srcRemote: '/b', dstLocal: alias },
+    ]);
+    tm.tasks.get(a.id).status = 'running'; tm.maxConcurrent = 2; tm._schedule();
+    expect(tm.tasks.get(b.id).status).toBe('queued');
+    expect(tm._targetsConflict({kind:'upload',serverId:'s1',dstRemote:'/tree'}, {kind:'relay',peerId:'s1',dstRemote:'/tree/child'})).toBe(true);
+    expect(tm._targetsConflict({kind:'upload',serverId:'s1',dstRemote:'/tree'}, {kind:'relay',peerId:'s1',dstRemote:'/trees/child'})).toBe(false);
+  });
+
+  it('retains the staging manifest when removal cannot clean a temporary file', async () => {
+    const tm = makeTm().tm;
+    const [task] = tm.addMany([job('fixture')]); tm.tasks.get(task.id).status = 'canceled';
+    tm._cleanup = async (t) => { t.error = 'fixture cleanup failure'; return false; };
+    expect(await tm.remove(task.id)).toBe(false);
+    expect(tm.tasks.has(task.id)).toBe(true);
+    expect(await tm.clearFinished()).toBe(false);
+    expect(tm.tasks.has(task.id)).toBe(true);
   });
 
   it('hasActive reflects running/queued tasks (关窗确认依据)', () => {

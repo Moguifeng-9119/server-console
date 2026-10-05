@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
+import { freeGiB, gpuOwners, isFreshSample } from '../resources';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
@@ -22,7 +24,7 @@ function KpiStrip({ s }: { s: Server }) {
     { k: t('kpi.avgGpu'), v: `${Math.round(avg)}%`, color: colorOf(avg) },
     { k: t('kpi.vram'), v: `${Math.round(vram)}%`, color: colorOf(vram) },
     { k: t('kpi.load'), v: s.loadAvg[0].toFixed(1) },
-    { k: t('kpi.cpu', { cores: s.cpuCores }), v: `${s.cpuUsage}%`, color: colorOf(s.cpuUsage) },
+    { k: t('kpi.cpu', { cores: s.cpuCores }), v: s.cpuUsage == null ? 'N/A' : `${s.cpuUsage}%`, color: s.cpuUsage == null ? undefined : colorOf(s.cpuUsage) },
     { k: t('kpi.mem'), v: `${Math.round(s.memUsed)}/${Math.round(s.memTotal)}G`, color: colorOf((s.memUsed / s.memTotal) * 100) },
     { k: t('kpi.swap'), v: `${s.swapUsed}/${s.swapTotal}G` },
   ];
@@ -45,9 +47,10 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
   const { t } = useTranslation();
   const [matrix, setMatrix] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('sc.gpu.matrix') === 'true';
+      const saved = localStorage.getItem('sc.gpu.matrix');
+      return saved === null ? s.gpus.length >= 4 : saved === 'true';
     } catch {
-      return false;
+      return s.gpus.length >= 4;
     }
   });
 
@@ -63,11 +66,12 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
     <>
       {s.gpus.length >= 4 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-          <button className="btn mini" onClick={toggleMatrix} title="切换标准详细卡片与紧凑网格矩阵">
-            {matrix ? '视图：详细卡片' : '视图：紧凑矩阵'}
+          <button className="btn mini" onClick={toggleMatrix} title={t('workbench.gpuLayout')}>
+            {t(matrix ? 'workbench.detailed' : 'workbench.compact')}
           </button>
         </div>
       )}
+      <p className="gpu-model-heading">{[...new Set(s.gpus.map((g) => g.name))].join(' / ')}</p>
       <div className={`gpu-list ${matrix ? 'matrix' : ''}`}>
       {s.gpus.map((g) => {
         const memPct = (g.memUsed / g.memTotal) * 100;
@@ -75,14 +79,14 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
           <div className="gpu-card" key={g.index}>
             <div className="h">
               <span className="idx">GPU {g.index}</span>
-              <span className="nm">{g.name}</span>
+              <span className="nm">{gpuOwners(s, g).join(', ') || t('workbench.noProcesses')}</span>
             </div>
 
             <div className="metric-line">
               <span className="num" style={{ fontSize: 'calc(var(--fs-kpi) - 6px)', color: colorOf(g.util) }}>
                 {g.util}%
               </span>
-              <span className="note">利用率</span>
+              <span className="note">{t('gpu.util')}</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
               <i style={{ width: `${g.util}%`, background: colorOf(g.util) }} />
@@ -98,6 +102,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
               <i style={{ width: `${memPct}%`, background: colorOf(memPct) }} />
             </div>
 
+            <div className="gpu-free"><strong className="num">{freeGiB(g).toFixed(1)} GiB</strong><span>{t('workbench.freeMemory')}</span></div>
             <div className="metrics">
               <div>
                 {t('gpu.temp')}<b style={g.temp == null ? undefined : { color: colorOf(g.temp) }}>{g.temp == null ? t('gpu.na') : `${g.temp}°C`}</b>
@@ -105,13 +110,13 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
               <div>
                 {t('gpu.power')}<b>{g.power == null ? t('gpu.na') : `${g.power} W`}</b>
               </div>
-              <div title={g.fan == null ? '该显卡未向驱动报告风扇转速（机房/被动散热卡常见），不是 0 转' : undefined}>
+              <div title={g.fan == null ? t('gpu.fanNaTip') : undefined}>
                 {t('gpu.fan')}<b>{g.fan == null ? t('gpu.na') : `${g.fan}%`}</b>
               </div>
             </div>
 
             <div className="gpu-procs">
-              {g.procs.length === 0 && <span className="faint">无进程占用</span>}
+              {g.procs.length === 0 && <span className="faint">{t('workbench.noProcesses')}</span>}
               {g.procs.map((p) => (
                 <div
                   key={p.pid}
@@ -124,10 +129,10 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
                   <span className="mono" style={{ color: 'var(--text)' }}>
                     {p.pid}
                   </span>
-                  <span>{p.name}</span>
+                  <span title={p.name}>{p.user || s.processes.find((item) => item.pid === p.pid)?.user || p.name}</span>
                   <span className="mono" style={{ marginLeft: 'auto' }}>
                     {(p.memMb / 1024).toFixed(1)} GiB
-                  </span>
+                  </span><button className="btn mini proc-action" aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button>
                 </div>
               ))}
             </div>
@@ -177,8 +182,7 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
         }
       }}
     >
-      {label}
-      {sortKey === key ? (asc ? ' ▲' : ' ▼') : ''}
+      <button className="table-sort">{label}{sortKey === key ? (asc ? ' ▲' : ' ▼') : ''}</button>
     </th>
   );
 
@@ -187,12 +191,12 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
       <div className="toolbar">
         <input
           className="mini"
-          placeholder="搜索 PID / 用户 / 命令行…"
+          placeholder={t('proc.searchPh')} aria-label={t('proc.searchPh')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <select className="mini" value={user} onChange={(e) => setUser(e.target.value)}>
-          <option value="all">全部用户</option>
+          <option value="all">{t('proc.allUsers')}</option>
           {users.map((u) => (
             <option key={u} value={u}>
               {u}
@@ -219,7 +223,7 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
               {th('rssMb', 'RSS', 90)}
               {th('state', 'STAT', 60)}
               <th style={{ width: 60 }}>GPU</th>
-              <th>COMMAND</th>
+              <th>COMMAND</th><th aria-label={t('workbench.actions')} />
             </tr>
           </thead>
           <tbody>
@@ -239,10 +243,10 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
                 <td className="mono" style={{ color: p.state === 'Z' ? 'var(--crit)' : undefined }}>
                   {p.state}
                 </td>
-                <td className="mono">{p.gpu === null ? '' : p.gpu}</td>
+                <td className="mono">{(p.gpuIndices || (p.gpu == null ? [] : [p.gpu])).join(', ')}</td>
                 <td className="mono" title={p.command}>
                   {p.command}
-                </td>
+                </td><td><button className="btn mini proc-action" aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button></td>
               </tr>
             ))}
           </tbody>
@@ -263,8 +267,9 @@ export function ServerPanel({
   tab: 'gpu' | 'proc' | 'files' | 'term';
   onTab: (t: 'gpu' | 'proc' | 'files' | 'term') => void;
 }) {
-  const { kill, restartService } = useStore();
+  const { kill, restartService, demo, refreshMs, sampleNow } = useStore();
   const { t } = useTranslation();
+  const fresh = isFreshSample(s, demo, refreshMs, sampleNow);
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
   const [restartAsk, setRestartAsk] = useState(false);
@@ -278,16 +283,22 @@ export function ServerPanel({
 
   const runSnippet = async (sn: { id: string; name: string; cmd: string }) => {
     if (!api) return;
-    setSnipOut({ name: sn.name, output: '执行中…', running: true });
+    setSnipOut({ name: sn.name, output: t('server.running'), running: true });
     const r = await api.exec(s.id, sn.cmd);
     if (r.ok && r.data) {
-      const out = (r.data.stdout + (r.data.stderr ? `\n${r.data.stderr}` : '')).trim() || '（无输出）';
+      const out = (r.data.stdout + (r.data.stderr ? `\n${r.data.stderr}` : '')).trim() || t('server.noOutput');
       setSnipOut({ name: sn.name, output: out, running: false });
     } else {
-      setSnipOut({ name: sn.name, output: r.error || '执行失败', running: false });
+      setSnipOut({ name: sn.name, output: r.error || t('server.execFail'), running: false });
     }
   };
 
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const restartRef = useRef<HTMLDivElement>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(!!confirm, confirmRef, () => setConfirm(null));
+  useDialogFocus(restartAsk, restartRef, () => setRestartAsk(false));
+  useDialogFocus(!!snipOut, outputRef, () => setSnipOut(null));
   const target = confirm ? s.processes.find((p) => p.pid === confirm.pid) : undefined;
 
   const doRestart = () => {
@@ -301,7 +312,7 @@ export function ServerPanel({
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 'var(--gap)' }}>
         <button className="btn" onClick={onBack}>
-          ← 总览
+          ← {t('nav.overview')}
         </button>
         <span style={{ fontWeight: 600, fontSize: 'calc(var(--fs) + 2px)' }}>{s.name}</span>
         <span className="mono faint">
@@ -312,14 +323,14 @@ export function ServerPanel({
           <select
             className="mini"
             value=""
-            title="一键执行快速命令（设置中管理）"
+            title={t('server.quickCommands')}
             onChange={(e) => {
               const sn = snippets.find((x) => x.id === e.target.value);
               if (sn) runSnippet(sn);
               e.target.value = '';
             }}
           >
-            <option value="">快速命令…</option>
+            <option value="">{t('server.quickCommands')}</option>
             {snippets.map((sn) => (
               <option key={sn.id} value={sn.id}>
                 {sn.name}
@@ -331,11 +342,11 @@ export function ServerPanel({
 
       {s.status !== 'online' ? (
         <div className="empty">
-          该节点当前不可达（{s.status === 'timeout' ? '连接超时' : '离线'}），无法采集数据。
+          {t('server.offline', {status: t(s.status === 'timeout' ? 'server.timeout' : 'server.offlineWord')})}
         </div>
       ) : (
         <>
-          <KpiStrip s={s} />
+          {fresh ? <KpiStrip s={s} /> : <div className="inline-status" role="status">{t('workbench.staleDetail')}</div>}
           <div className="tabs">
             <button className={tab === 'gpu' ? 'on' : ''} onClick={() => onTab('gpu')}>
               {t('server.gpuTab', { n: s.gpus.length })}
@@ -350,15 +361,15 @@ export function ServerPanel({
               {t('server.termTab')}
             </button>
             <span className="note" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-              {tab === 'files' ? '双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传' : '右键任意进程行可执行操作'}
+              {t(tab === 'files' ? 'server.filesHint' : 'workbench.processHint')}
             </span>
           </div>
           {/* 终端会话常驻挂载（切 tab 只隐藏不卸载，xterm 与输出保留） */}
           <div style={{ display: tab === 'term' ? 'block' : 'none' }}>
             <TerminalSessions serverId={s.id} visible={tab === 'term'} />
           </div>
-          {tab === 'gpu' && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
-          {tab === 'proc' && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'gpu' && fresh && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'proc' && fresh && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
           {tab === 'files' && <FileManager serverId={s.id} />}
         </>
       )}
@@ -416,7 +427,7 @@ export function ServerPanel({
 
       {confirm && (
         <div className="mask" onClick={() => setConfirm(null)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="dialog" ref={confirmRef} role="dialog" aria-modal="true" aria-label={t('ctx.proc', {pid: confirm?.pid})} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ color: 'var(--crit)' }}>
               {t('ctx.confirmKillTitle', { force: confirm.signal === 'KILL' ? t('ctx.forceWord') : '', pid: confirm.pid })}
             </h3>
@@ -449,7 +460,7 @@ export function ServerPanel({
 
       {restartAsk && (
         <div className="mask" onClick={() => setRestartAsk(false)}>
-          <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+          <div className="dialog" ref={restartRef} role="dialog" aria-modal="true" aria-label={t('restart.title')} tabIndex={-1} style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
             <h3>{t('restart.title')}</h3>
             <div className="field">
               <label>{t('restart.svcName')}</label>
@@ -479,8 +490,8 @@ export function ServerPanel({
 
       {snipOut && (
         <div className="mask" onClick={() => setSnipOut(null)}>
-          <div className="dialog" style={{ width: 680 }} onClick={(e) => e.stopPropagation()}>
-            <h3>快速命令 · {snipOut.name}</h3>
+          <div className="dialog" ref={outputRef} role="dialog" aria-modal="true" aria-label={t('server.quickCommands')} tabIndex={-1} style={{ width: 680 }} onClick={(e) => e.stopPropagation()}>
+            <h3>{t('server.quickTitle', {name: snipOut.name})}</h3>
             <div className="body">
               <pre className="mono" style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 360, overflow: 'auto', fontSize: 12 }}>
                 {snipOut.output}
@@ -488,10 +499,10 @@ export function ServerPanel({
             </div>
             <div className="foot">
               <button className="btn" onClick={() => navigator.clipboard?.writeText(snipOut.output)}>
-                复制输出
+                {t('server.copyOutput')}
               </button>
               <button className="btn primary" onClick={() => setSnipOut(null)}>
-                关闭
+                {t('settings.close')}
               </button>
             </div>
           </div>

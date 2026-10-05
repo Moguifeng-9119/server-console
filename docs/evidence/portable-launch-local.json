@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-05T12:58:48.469Z",
+  "scope": "Portable wrapper launches app, renders UI and exposes real preload bridge via CDP",
+  "result": {
+    "bridge": "function",
+    "title": "ServerConsole",
+    "version": "ServerConsole\nv0.11.0"
+  }
+}

@@ -18,3 +18,4 @@ _cdp_*
 .env
 .env.*
 .zcode/
+test-artifacts/

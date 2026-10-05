@@ -1,16 +1,18 @@
 // 传输引擎：多任务队列 + 任务级并发 + 进度/速度 + 暂停/取消 + 断点续传
 // 支持：upload（本地→远程）、download（远程→本地，先写 .scpart 完成后改名）、
 //      relay（服务器 A→服务器 B，本机内存流中继、不落盘）
-// 顺序流式 + 大 chunk + 任务级并发：顺序写使“目标当前大小 == 已连续完成字节”，断点续传严格正确。
+// Sequential streams resume only from verified task-owned staging files.
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { serializeTask, canResume } = require('./task-store.cjs');
+const { verifiedOffset, verifiedRemoteOffset, remoteStat, uploadPart, commitUpload, assertActive } = require('./safe-files.cjs');
 
 const DEFAULT_CONCURRENCY = 15; // 同时传输的顶层任务数（默认，可在设置中 1-15 调整）
 const MAX_CONCURRENT_TASKS = DEFAULT_CONCURRENCY;
 const RECENT_KEEP = 120; // 每个任务保留的最近传输文件名条数（环形，避免广播/内存膨胀）
-const RELAY_FILE_CONCURRENCY = 6; // 单个目录中继任务内同时传输的文件数（真机基准：6 路即吃满链路，再高无益）
+const RELAY_FILE_CONCURRENCY = 6; // Bounded concurrency within one directory task; tune from measured workloads.
 const DIR_LIST_TIMEOUT = 30000; // 列举单个远程目录的超时，避免异常目录无限挂起
 const STREAM_CHUNK = 128 * 1024; // 单流读块大小
 const PART_SUFFIX = '.scpart';
@@ -62,10 +64,9 @@ function makeGate() {
 
 // 给 SFTP 操作加超时，防止异常目录/网络抖动让任务无限 pending
 function withTimeout(p, ms, label) {
-  return Promise.race([
-    p,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label || '操作'}超时（${Math.round(ms / 1000)}s）`)), ms)),
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label || '操作'}超时（${Math.round(ms / 1000)}s）`)), ms); });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
 function humanErr(e) {
@@ -150,6 +151,7 @@ class TransferManager {
     this.queue = [];
     this.running = 0;
     this.listener = null;
+    this.persistenceError = '';
     this._saveTimer = null;
     this._load();
   }
@@ -189,7 +191,7 @@ class TransferManager {
     let srcPath = '';
     let dstPath = '';
     if (t.kind === 'upload') {
-      srcPath = t.srcLocal || '';
+      srcPath = t.srcLocal || t.srcPath || '';
       dstPath = `${t.serverName || ''}:${t.dstRemote || ''}`;
     } else if (t.kind === 'download') {
       srcPath = `${t.serverName || ''}:${t.srcRemote || ''}`;
@@ -222,6 +224,9 @@ class TransferManager {
       waitConflict: !!t._waitConflict,
       startedAt: t.startedAt,
       finishedAt: t.finishedAt,
+      verification: t.verification || 'not-requested',
+      resumable: canResume(t),
+      persistenceError: this.persistenceError,
     };
   }
 
@@ -250,7 +255,7 @@ class TransferManager {
     const active = [];
     const rest = [];
     for (const t of this.tasks.values()) {
-      if (t.status === 'running' || t.status === 'queued') active.push(t);
+      if (!['done', 'canceled'].includes(t.status) || t.stagedUploads?.length || t.stagedDownloads?.length || t._cleaning) active.push(t);
       else rest.push(t);
     }
     if (rest.length <= KEEP_FINISHED) return false;
@@ -283,22 +288,25 @@ class TransferManager {
       return;
     }
     this._writing = true;
+    const previousError = this.persistenceError;
     try {
       this._prune();
       // recentFiles 仅用于实时展示，不落盘（避免大目录把 transfers.json 撑大）
       const data = [...this.tasks.values()].map((t) => {
-        const p = this.pub(t);
-        delete p.recentFiles;
-        return p;
+        return serializeTask(t, this.pub(t));
       });
       const tmp = this.storeFile + '.tmp';
       await fsp.mkdir(path.dirname(this.storeFile), { recursive: true });
       await fsp.writeFile(tmp, JSON.stringify(data), 'utf8');
       await fsp.rename(tmp, this.storeFile);
-    } catch {
-      /* ignore */
+      this.persistenceError = '';
+    } catch (error) {
+      this.persistenceError = `Unable to save transfer recovery data: ${error.message}`;
     } finally {
       this._writing = false;
+      if (this.listener && previousError !== this.persistenceError) {
+        for (const task of this.tasks.values()) this.listener(this.pub(task));
+      }
       if (this._dirty) {
         this._dirty = false;
         this._persistNow();
@@ -315,6 +323,10 @@ class TransferManager {
         // 版本兼容/坏数据防护：缺关键字段的条目直接丢弃
         if (!t || !kinds.includes(t.kind) || typeof t.id !== 'string') continue;
         if (t.status === 'running' || t.status === 'queued') t.status = 'paused';
+        if (!canResume(t) && !['done', 'canceled'].includes(t.status)) {
+          t.status = 'error';
+          t.error = 'This older task has no recovery inputs. Start a new transfer from the file manager.';
+        }
         t.speed = 0;
         this.tasks.set(t.id, t);
       }
@@ -348,8 +360,8 @@ class TransferManager {
     });
   }
 
-  // 传输完成后的完整性校验：返回 true/false；无法校验（远端无 md5sum 等）返回 null 视为通过
-  async _verifyChecksum(t) {
+  // Verify staging before replacing a completed destination. null means unavailable.
+  async _verifyChecksum(t, stagedRemote, stagedLocal) {
     const remoteMd5 = async (conn, p) => {
       const r = await conn.exec(`md5sum ${shq(p)}`, 60000);
       const h = (r.stdout || '').trim().split(/\s+/)[0] || '';
@@ -357,17 +369,25 @@ class TransferManager {
     };
     if (t.kind === 'upload') {
       const conn = await this._conn(t.serverId);
-      const [local, remote] = await Promise.all([this._md5Local(t.srcLocal), remoteMd5(conn, t.dstRemote)]);
+      const [local, remote] = await Promise.all([this._md5Local(t.srcLocal), remoteMd5(conn, stagedRemote || t.dstRemote)]);
       if (!local || !remote) return null;
       return local === remote;
     }
     if (t.kind === 'download') {
       const conn = await this._conn(t.serverId);
-      const [local, remote] = await Promise.all([this._md5Local(t.dstLocal), remoteMd5(conn, t.srcRemote)]);
+      const [local, remote] = await Promise.all([this._md5Local(stagedLocal || t.dstLocal), remoteMd5(conn, t.srcRemote)]);
       if (!local || !remote) return null;
       return local === remote;
     }
     return null;
+  }
+
+  async _checkStaged(t, gate, remotePath, localPath) {
+    if (!this.options.verify) { t.verification = 'not-requested'; return; }
+    const ok = await this._verifyChecksum(t, remotePath, localPath);
+    assertActive(gate);
+    t.verification = ok === null ? 'unavailable' : ok ? 'verified' : 'failed';
+    if (ok === false) throw new Error('Transfer checksum mismatch. The completed destination was preserved.');
   }
 
   _add(job) {
@@ -417,23 +437,37 @@ class TransferManager {
 
   // 任务的目标端唯一键：两个任务写同一目标会交错损坏数据（尤其断点续传的追加写）
   _targetKey(t) {
-    if (t.kind === 'upload') return `U:${t.serverId}:${t.dstRemote}`;
-    if (t.kind === 'download') return `D:${t.dstLocal}`;
-    return `R:${t.peerId}:${t.dstRemote}`;
+    const target = this._target(t);
+    return `${target.endpoint}:${target.path}`;
+  }
+
+  _target(t) {
+    if (t.kind === 'download') {
+      const resolved = path.resolve(t.dstLocal || '.');
+      return { endpoint: 'local', path: process.platform === 'win32' ? resolved.toLowerCase() : resolved, separator: path.sep };
+    }
+    return { endpoint: 'remote:' + (t.kind === 'relay' ? t.peerId : t.serverId),
+      path: path.posix.normalize(t.dstRemote || '.').replace(/\/$/, '') || '/', separator: '/' };
+  }
+
+  _targetsConflict(a, b) {
+    const first = this._target(a), second = this._target(b);
+    if (first.endpoint !== second.endpoint) return false;
+    const prefix = (target) => target.path.endsWith(target.separator) ? target.path : target.path + target.separator;
+    return first.path === second.path || first.path.startsWith(prefix(second)) || second.path.startsWith(prefix(first));
   }
 
   _schedule() {
-    const runningKeys = new Set();
+    const runningTasks = [];
     for (const t of this.tasks.values()) {
-      if (t.status === 'running') runningKeys.add(this._targetKey(t));
+      if (t.status === 'running' || t._cleaning) runningTasks.push(t);
     }
     let deferred = 0; // 本轮被互斥推迟的任务数；等于队列长度时说明全冲突，避免空转
     while (this.running < this.maxConcurrent && this.queue.length && deferred < this.queue.length) {
       const id = this.queue.shift();
       const t = this.tasks.get(id);
       if (!t || t.status !== 'queued') continue;
-      const key = this._targetKey(t);
-      if (runningKeys.has(key)) {
+      if (runningTasks.some((active) => this._targetsConflict(t, active))) {
         // 同目标互斥：推回队尾，等占用者结束后由其 finally 的 _schedule 再次调度
         this.queue.push(id);
         if (!t._waitConflict) {
@@ -443,7 +477,7 @@ class TransferManager {
         deferred += 1;
         continue;
       }
-      runningKeys.add(key);
+      runningTasks.push(t);
       this._launch(t);
     }
   }
@@ -455,9 +489,9 @@ class TransferManager {
     t.error = '';
     t.speed = 0;
     t.startedAt = t.startedAt || Date.now();
-    this.emit(t);
     const gate = makeGate();
     t._gate = gate;
+    this.emit(t);
     const makeProgress = () => {
       let last = Date.now();
       let lastBytes = t.transferred || 0;
@@ -475,23 +509,18 @@ class TransferManager {
       };
     };
     try {
+      if (t._cleanupPromise) await t._cleanupPromise;
+      assertActive(gate);
       if (t.kind === 'upload') await this._runUpload(t, gate, makeProgress());
       else if (t.kind === 'download') await this._runDownload(t, gate, makeProgress());
       else if (t.kind === 'relay') await this._runRelay(t, gate);
       else throw new Error('未知任务类型');
-      t.status = 'done';
       t.speed = 0;
       t.transferred = t.size;
       t.finishedAt = Date.now();
-      // 可选完整性校验：仅单文件（目录树代价过高）；远端无 md5sum 时静默跳过
-      if (this.options.verify && !t._isTree && (t.kind === 'upload' || t.kind === 'download')) {
-        this.emit(t);
-        const ok = await this._verifyChecksum(t).catch(() => null);
-        if (ok === false) {
-          t.status = 'error';
-          t.error = '传输完成但 MD5 校验失败，建议删除目标文件后重试';
-        }
-      }
+      if (this.options.verify && (t._isTree || t.kind === 'relay')) t.verification = 'unavailable';
+      assertActive(gate);
+      t.status = 'done';
     } catch (e) {
       t.speed = 0;
       if (e && e.aborted) {
@@ -508,6 +537,7 @@ class TransferManager {
       }
     } finally {
       t._gate = null;
+      t._restart = false;
       this.running = Math.max(0, this.running - 1);
       this.emit(t);
       if (t.status === 'done' && this.notify && this.options.notifyDone) this.notify(t, false);
@@ -550,12 +580,29 @@ class TransferManager {
   }
 
   async _cleanup(t) {
-    try {
-      if (t.dstLocal && fs.existsSync(t.dstLocal + PART_SUFFIX)) await fsp.unlink(t.dstLocal + PART_SUFFIX);
-    } catch {
-      /* noop */
+    const errors = [];
+    for (const local of t.stagedDownloads || []) {
+      try { await fsp.unlink(local); }
+      catch (error) { if (error.code !== 'ENOENT') errors.push(error.message); }
     }
+    for (const remote of t.stagedUploads || []) {
+      try {
+        const sftp = await (await this._conn(t.kind === 'relay' ? t.peerId : t.serverId)).sftp();
+        await withTimeout(new Promise((resolve, reject) => sftp.unlink(remote, (error) => error ? reject(error) : resolve())), 10000, 'Staging cleanup');
+      } catch (error) { if (error.code !== 2 && error.code !== 'ENOENT') errors.push(error.message); }
+    }
+    if (errors.length) t.error = 'Could not remove all temporary transfer files: ' + errors[0];
+    else { t.stagedUploads = []; t.stagedDownloads = []; }
+    return errors.length === 0;
   }
+
+  _stage(t, key, target) {
+    if (!t[key]) t[key] = [];
+    if (!t[key].includes(target)) t[key].push(target);
+    this.saveSoon();
+  }
+
+  _unstage(t, key, target) { t[key] = (t[key] || []).filter((item) => item !== target); }
 
   async _conn(id) {
     const c = await this.getConn(id);
@@ -571,17 +618,31 @@ class TransferManager {
     const sftp = await conn.sftp();
     t.size = localStat.size;
     await conn.mkdirpRemote(posixDir(t.dstRemote));
-    const offset = await remoteFileOffset(sftp, t.dstRemote, t.size);
+    const version = `${localStat.size}:${localStat.mtimeMs}`;
+    if (t.sourceVersion && t.sourceVersion !== version) throw new Error('Source file changed since this transfer started. Start a new transfer.');
+    t.sourceVersion = version;
+    const staged = uploadPart(t.dstRemote, t.id);
+    this._stage(t, 'stagedUploads', staged);
+    const offset = t._restart ? 0 : await verifiedOffset(sftp, t.srcLocal, staged, t.size, true, gate);
     t._baseOffset = offset;
     t.transferred = offset;
     this.emit(t);
-    await this._uploadOneFile(gate, sftp, t.srcLocal, t.dstRemote, t.size, offset, (abs) =>
+    await this._uploadOneFile(gate, sftp, t.srcLocal, staged, t.size, offset, (abs) =>
       onProgress(abs - offset, t.size),
     );
+    const finalStat = await fsp.stat(t.srcLocal);
+    if (`${finalStat.size}:${finalStat.mtimeMs}` !== version) throw new Error('Source file changed during upload. Destination was not replaced.');
+    if ((await remoteStat(sftp, staged)).size !== t.size) throw new Error('Staged upload size mismatch');
+    await this._checkStaged(t, gate, staged);
+    assertActive(gate);
+    await commitUpload(sftp, staged, t.dstRemote);
+    this._unstage(t, 'stagedUploads', staged);
   }
 
   // 上传单个文件：0 字节直接建空文件（避免空流触发 SFTP Failure）；offset 由调用方算好传入
   async _uploadOneFile(gate, sftp, localAbs, remoteAbs, size, offset, onBytes) {
+    assertActive(gate);
+    if (size > 0 && offset === size) { if (onBytes) onBytes(size); return; }
     if (size === 0 && offset === 0) {
       await new Promise((res, rej) => sftp.writeFile(remoteAbs, Buffer.alloc(0), (e) => (e ? rej(e) : res())));
       if (onBytes) onBytes(0);
@@ -593,7 +654,8 @@ class TransferManager {
       flags: offset ? 'a' : 'w',
       chunkSize: STREAM_CHUNK,
     });
-    await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+    const bytes = await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+    if (bytes !== size - offset) throw new Error('Source upload length changed');
   }
 
   // 目录上传：本地 readdir 渐进展开 + 有界文件并发，总量/文件数随遍历回填
@@ -635,8 +697,18 @@ class TransferManager {
       },
       // 传输一个文件：逐文件断点续传（远程已有部分则追加）
       async (j, report) => {
-        const offset = await remoteFileOffset(sftp, j.remote, j.size);
-        await this._uploadOneFile(gate, sftp, j.abs, j.remote, j.size, offset, report);
+        const before = await fsp.stat(j.abs);
+        if (before.size !== j.size) throw new Error('Source file changed since directory listing');
+        const staged = uploadPart(j.remote, t.id);
+        this._stage(t, 'stagedUploads', staged);
+        const offset = t._restart ? 0 : await verifiedOffset(sftp, j.abs, staged, j.size, true, gate);
+        await this._uploadOneFile(gate, sftp, j.abs, staged, j.size, offset, report);
+        const after = await fsp.stat(j.abs);
+        if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new Error('Source file changed during directory upload');
+        if ((await remoteStat(sftp, staged)).size !== j.size) throw new Error('Staged upload size mismatch');
+        assertActive(gate);
+        await commitUpload(sftp, staged, j.remote);
+        this._unstage(t, 'stagedUploads', staged);
       },
       (j) => j.abs.slice(srcRoot.length).split(path.sep).join('/').replace(/^\/+/, ''),
     );
@@ -649,29 +721,44 @@ class TransferManager {
     if (rstat.type === 'dir') return this._downloadTree(t, gate);
     const sftp = await conn.sftp();
     t.size = rstat.size;
+    const version = `${rstat.size}:${rstat.mtime}`;
+    if (t.sourceVersion && t.sourceVersion !== version) throw new Error('Source file changed since this transfer started. Start a new transfer.');
+    t.sourceVersion = version;
     await fsp.mkdir(path.dirname(t.dstLocal), { recursive: true });
-    const part = t.dstLocal + PART_SUFFIX;
-    const offset = await partOffset(part, t.size);
+    const part = uploadPart(t.dstLocal, t.id);
+    this._stage(t, 'stagedDownloads', part);
+    const before = await remoteStat(sftp, t.srcRemote);
+    if (`${before.size}:${before.mtime * 1000}` !== version) throw new Error('Source file changed before download');
+    const offset = t._restart ? 0 : await verifiedOffset(sftp, part, t.srcRemote, t.size, false, gate);
     t._baseOffset = offset;
     t.transferred = offset;
     this.emit(t);
     await this._downloadOneFile(gate, sftp, t.srcRemote, t.dstLocal, t.size, offset, (abs) =>
-      onProgress(abs - offset, t.size),
-    );
+      onProgress(abs - offset, t.size), before, () => this._checkStaged(t, gate, undefined, part), part);
+    this._unstage(t, 'stagedDownloads', part);
   }
 
   // 下载单个文件：写 .scpart，完成后原子改名；offset 由调用方算好传入
-  async _downloadOneFile(gate, sftp, remoteAbs, localAbs, size, offset, onBytes) {
-    const part = localAbs + PART_SUFFIX;
+  async _downloadOneFile(gate, sftp, remoteAbs, localAbs, size, offset, onBytes, before, verify, stagedPath) {
+    assertActive(gate);
+    before = before || await remoteStat(sftp, remoteAbs);
+    if (before.size !== size) throw new Error('Source file changed before download');
+    const part = stagedPath || localAbs + PART_SUFFIX;
     if (size === 0 && offset === 0) {
       await fsp.writeFile(part, Buffer.alloc(0));
-      await fsp.rename(part, localAbs);
       if (onBytes) onBytes(0);
-      return;
+    } else if (offset < size) {
+      const remote = sftp.createReadStream(remoteAbs, { start: offset, chunkSize: STREAM_CHUNK });
+      const local = fs.createWriteStream(part, { flags: offset ? 'a' : 'w' });
+      const bytes = await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+      if (bytes !== size - offset) throw new Error('Source download length changed. Destination was preserved.');
+    } else if (onBytes) onBytes(size);
+    const after = await remoteStat(sftp, remoteAbs);
+    if (before.size !== after.size || before.mtime !== after.mtime || (await fsp.stat(part)).size !== size) {
+      throw new Error('Source file changed during download. Destination was preserved.');
     }
-    const remote = sftp.createReadStream(remoteAbs, { start: offset, chunkSize: STREAM_CHUNK });
-    const local = fs.createWriteStream(part, { flags: offset ? 'a' : 'w' });
-    await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+    if (verify) await verify();
+    assertActive(gate);
     await fsp.rename(part, localAbs);
   }
 
@@ -699,8 +786,13 @@ class TransferManager {
       },
       // 传输一个文件：逐文件 .scpart 断点续传
       async (j, report) => {
-        const offset = await partOffset(j.local + PART_SUFFIX, j.size);
-        await this._downloadOneFile(gate, sftp, j.remote, j.local, j.size, offset, report);
+        const before = await remoteStat(sftp, j.remote);
+        if (before.size !== j.size) throw new Error('Source file changed since directory listing');
+        const part = uploadPart(j.local, t.id);
+        this._stage(t, 'stagedDownloads', part);
+        const offset = t._restart ? 0 : await verifiedOffset(sftp, part, j.remote, j.size, false, gate);
+        await this._downloadOneFile(gate, sftp, j.remote, j.local, j.size, offset, report, before, undefined, part);
+        this._unstage(t, 'stagedDownloads', part);
       },
       (j) => j.remote.slice(srcRoot.length).replace(/^\/+/, ''),
     );
@@ -800,7 +892,7 @@ class TransferManager {
       }
       // 5) 目标落点目录
       await connB.exec(`mkdir -p ${q(isDir ? t.dstRemote : posixDir(t.dstRemote))}`);
-      // 6) 两端能力探测：rsync 需两端都安装；tar-over-ssh 通用性最好；scp 最后兜底
+      // Safe direct path requires rsync on both ends; otherwise use staged SFTP relay.
       const dst = user + '@' + host;
       const cap = await connA.exec(
         `s(){ command -v $1 >/dev/null 2>&1 && echo y || echo n; }; echo "src rsync=$(s rsync) tar=$(s tar) scp=$(s scp)"; ` +
@@ -810,7 +902,7 @@ class TransferManager {
       const capText = (cap.stdout || '').replace(/\s+/g, ' ').trim();
       const has = (side, tool) => new RegExp(side + ' .*?' + tool + '=y').test(capText);
       const useRsync = has('src', 'rsync') && has('dst', 'rsync');
-      const useTar = has('src', 'tar') && has('dst', 'tar');
+      if (!useRsync) throw new Error('Safe direct transfer requires rsync on both servers; using local SFTP relay');
       const logf = dir + '/out.log';
       const notefile = dir + '/note';
       const modefile = dir + '/mode';
@@ -823,26 +915,11 @@ class TransferManager {
       if (useRsync) {
         // rsync：两端都有时最优，支持增量续传；--out-format 逐文件回传已完成文件名（@@前缀，stdout 实时流出），错误仍进日志
         // 同步模式（ignoreExisting）仅 rsync 支持
-        const flags = '-aW --partial --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '');
+        const flags = '-aW --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '');
         modeLines +=
           `if rsync ${flags} --out-format='@@%n' -e ${q(sshVar)} -- ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
           `else echo "rsync:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       }
-      if (useTar) {
-        // tar over ssh：不依赖 rsync，远端只需 tar+ssh；目录打包内容解到目标，单文件按原名解到目标父目录
-        const tarCmd = isDir
-          ? `tar c -C ${q(t.srcRemote)} . | ${sshVar} ${q(dst)} ${q(`mkdir -p ${t.dstRemote} && tar x -C ${t.dstRemote}`)}`
-          : `SB=$(basename ${q(t.srcRemote)}); tar c -C $(dirname ${q(t.srcRemote)}) -- "$SB" | ${sshVar} ${q(dst)} ${q(
-              `DP=$(dirname ${t.dstRemote}); mkdir -p "$DP" && tar x -C "$DP"`,
-            )}`;
-        modeLines +=
-          `if ${tarCmd} >>${logf} 2>&1; then echo tar >${modefile}; echo 0 >${rcfile}; exit 0; ` +
-          `else echo "tar:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
-      }
-      const scpOpt = `-i ${key} -P ${port} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${khfile} -o BatchMode=yes`;
-      modeLines +=
-        `if scp -r ${scpOpt} -- ${rsyncSrc} ${rsyncDst} >>${logf} 2>&1; then echo scp >${modefile}; echo 0 >${rcfile}; exit 0; ` +
-        `else echo "scp:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       modeLines += `echo 1 >${rcfile}\n`;
       const body = '#!/bin/bash\nset +e\nrm -f ' + logf + ' ' + notefile + ' ' + modefile + '\n' + modeLines;
       await wf(sa, script, Buffer.from(body));
@@ -948,7 +1025,10 @@ class TransferManager {
       return;
     }
     t.size = top.size;
-    await this._relayOneFile(gate, sa, sb, t.srcRemote, t.dstRemote, top.size, (d) => {
+    const version = `${top.size}:${top.mtime}`;
+    if (t.sourceVersion && t.sourceVersion !== version) throw new Error('Relay source changed since this transfer started');
+    t.sourceVersion = version;
+    await this._relayOneFile(t, gate, sa, sb, t.srcRemote, t.dstRemote, top.size, (d) => {
       t.transferred = d;
       this.emit(t);
     });
@@ -958,26 +1038,32 @@ class TransferManager {
   }
 
   // 单个文件中继（断点续传；0 字节直接建空文件，避免空流触发 SFTP Failure）
-  async _relayOneFile(gate, sa, sb, srcAbs, dstAbs, size, onBytes) {
-    let offset = 0;
-    try {
-      const ex = await new Promise((res, rej) => sb.stat(dstAbs, (e, r) => (e ? rej(e) : res(r))));
-      if (ex.size > 0 && ex.size < size) offset = ex.size;
-    } catch {
-      /* 目标不存在 → 全新 */
-    }
+  async _relayOneFile(t, gate, sa, sb, srcAbs, dstAbs, size, onBytes) {
+    assertActive(gate);
+    const before = await remoteStat(sa, srcAbs);
+    if (before.size !== size) throw new Error('Relay source changed before transfer');
+    const staged = uploadPart(dstAbs, t.id);
+    this._stage(t, 'stagedUploads', staged);
+    const offset = t._restart ? 0 : await verifiedRemoteOffset(sa, sb, srcAbs, staged, size, gate);
+    assertActive(gate);
     if (size === 0 && offset === 0) {
-      await new Promise((res, rej) => sb.writeFile(dstAbs, Buffer.alloc(0), (e) => (e ? rej(e) : res())));
+      await new Promise((res, rej) => sb.writeFile(staged, Buffer.alloc(0), (e) => (e ? rej(e) : res())));
       onBytes && onBytes(0);
-      return;
+    } else if (offset < size) {
+      const bytes = await pump(
+        sa.createReadStream(srcAbs, { start: offset, chunkSize: STREAM_CHUNK }),
+        sb.createWriteStream(staged, { start: offset, flags: offset ? 'a' : 'w', chunkSize: STREAM_CHUNK }),
+        (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n),
+      );
+      if (bytes !== size - offset) throw new Error('Relay source length changed');
+    } else if (onBytes) onBytes(size);
+    const after = await remoteStat(sa, srcAbs);
+    if (after.size !== before.size || after.mtime !== before.mtime || (await remoteStat(sb, staged)).size !== size) {
+      throw new Error('Relay source changed. Destination was preserved.');
     }
-    await pump(
-      sa.createReadStream(srcAbs, { start: offset, chunkSize: STREAM_CHUNK }),
-      sb.createWriteStream(dstAbs, { start: offset, flags: offset ? 'a' : 'w', chunkSize: STREAM_CHUNK }),
-      (d) => onBytes && onBytes(offset + d),
-      gate,
-      (n) => this._limitTake(n),
-    );
+    assertActive(gate);
+    await commitUpload(sb, staged, dstAbs);
+    this._unstage(t, 'stagedUploads', staged);
   }
 
   // 目录任务的通用骨架：BFS 边遍历边传 + 有界文件并发 + 节流进度/速度 + 单文件错误汇总。
@@ -1029,39 +1115,47 @@ class TransferManager {
         emit(false);
       } else {
         inflight.set(j.key, 0);
+        let succeeded = false;
         try {
           await transferFile(j, (absInFile) => {
             inflight.set(j.key, absInFile);
             emit(false);
           });
+          succeeded = true;
         } catch (e) {
           if (e && e.aborted) throw e;
           if (errors.length < 100) errors.push(`${j.key}: ${e && e.message ? e.message : e}`);
           else errorsDropped += 1;
         } finally {
           inflight.delete(j.key);
-          doneFilesBytes += j.size || 0;
-          filesDone += 1;
-          this._pushRecent(t, relName(j) || j.key);
+          if (succeeded) {
+            doneFilesBytes += j.size || 0;
+            filesDone += 1;
+            this._pushRecent(t, relName(j) || j.key);
+          }
           emit(false);
         }
       }
     };
     await new Promise((resolve, reject) => {
       let stop = false;
+      let failure;
       const schedule = () => {
+        if (stop) { if (running === 0) reject(failure); return; }
         while (!stop && running < RELAY_FILE_CONCURRENCY && jobs.length) {
           const j = jobs.shift();
           running += 1;
           handle(j).then(
             () => {
               running -= 1;
-              if (stop) return;
               schedule();
             },
             (err) => {
+              running -= 1;
               stop = true;
-              reject(err);
+              failure = failure || err;
+              gate.abort();
+              schedule();
             },
           );
         }
@@ -1097,7 +1191,7 @@ class TransferManager {
         }));
       },
       async (j, report) => {
-        await this._relayOneFile(gate, sa, sb, j.src, j.dst, j.size, report);
+        await this._relayOneFile(t, gate, sa, sb, j.src, j.dst, j.size, report);
       },
       (j) => (j.src.startsWith(srcRoot) ? j.src.slice(srcRoot.length).replace(/^\/+/, '') : j.src),
     );
@@ -1123,10 +1217,10 @@ class TransferManager {
     const t = this.tasks.get(id);
     if (!t) return false;
     t._wantCancel = true;
-    if (t.status === 'queued') {
+    if (['queued', 'paused', 'error'].includes(t.status)) {
       this.queue = this.queue.filter((x) => x !== id);
       t.status = 'canceled';
-      this._cleanup(t);
+      t._cleanupPromise = this._cleanup(t).then(() => this.emit(t));
       this.emit(t);
       return true;
     }
@@ -1141,11 +1235,14 @@ class TransferManager {
   resume(id, reset = false) {
     const t = this.tasks.get(id);
     if (!t) return false;
+    if (!canResume(t)) return false;
+    if (t._cleaning) return false;
     if (t.status === 'running') return true;
     if (reset) {
       t.transferred = 0;
       t._baseOffset = 0;
-      this._cleanup(t);
+      t._restart = true;
+      t.sourceVersion = undefined;
     }
     t.status = 'queued';
     t.speed = 0;
@@ -1157,23 +1254,27 @@ class TransferManager {
     return true;
   }
 
-  remove(id) {
+  async remove(id) {
     const t = this.tasks.get(id);
     if (!t) return false;
-    if (t.status === 'running') return false;
-    this._cleanup(t); // 下载半成品随任务一起清掉（任务没了就再也没机会续传）
-    this.tasks.delete(id);
-    this.queue = this.queue.filter((x) => x !== id);
-    this.saveSoon();
-    return true;
+    if (t.status === 'running' || t._cleaning) return false;
+    t._cleaning = true;
+    try {
+      if (t._cleanupPromise) await t._cleanupPromise;
+      if (!await this._cleanup(t)) { this.emit(t); return false; }
+      this.tasks.delete(id);
+      this.queue = this.queue.filter((x) => x !== id);
+      this.saveSoon();
+      return true;
+    } finally { t._cleaning = false; this._schedule(); }
   }
 
-  clearFinished() {
-    for (const [id, t] of this.tasks) {
-      if (['done', 'canceled'].includes(t.status)) this.tasks.delete(id);
+  async clearFinished() {
+    let success = true;
+    for (const [id, t] of [...this.tasks]) {
+      if (['done', 'canceled'].includes(t.status) && !await this.remove(id)) success = false;
     }
-    this.saveSoon();
-    return true;
+    return success;
   }
 }
 
@@ -1183,27 +1284,5 @@ function posixDir(p) {
 }
 
 const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
-
-// 远程目标已有内容时返回可续传的字节偏移（目标不存在/更大/为 0 一律从头）
-async function remoteFileOffset(sftp, remotePath, size) {
-  try {
-    const rs = await new Promise((res, rej) => sftp.stat(remotePath, (e, r) => (e ? rej(e) : res(r))));
-    if (rs.size > 0 && rs.size < size) return rs.size;
-  } catch {
-    /* 远程不存在 → 全新 */
-  }
-  return 0;
-}
-
-// 本地 .scpart 半成品可续传的字节偏移
-async function partOffset(partPath, size) {
-  try {
-    const ps = await fsp.stat(partPath);
-    if (ps.size > 0 && ps.size < size) return ps.size;
-  } catch {
-    /* 无半成品 → 全新 */
-  }
-  return 0;
-}
 
 module.exports = { TransferManager, MAX_CONCURRENT_TASKS };

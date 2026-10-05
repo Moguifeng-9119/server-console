@@ -1,4 +1,5 @@
 import i18n from 'i18next';
+import { api } from '../api';
 import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
 import zhCN from './locales/zh-CN.json';
@@ -53,7 +54,7 @@ export function saveLanguage(code: string) {
   }
   document.documentElement.lang = code;
   // 主进程通知也需要语言
-  void import('../api').then(({ api }) => void api?.setAppLanguage(code));
+  void api?.setAppLanguage(code);
 }
 
 const resources = {
@@ -79,6 +80,6 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
-void import('../api').then(({ api }) => void api?.setAppLanguage(lng));
+void api?.setAppLanguage(lng);
 
 export default i18n;

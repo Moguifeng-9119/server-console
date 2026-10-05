@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-05T12:14:49.810Z",
+  "scope": "Synthetic loopback SSH, real transport, simulated GPU/ps metrics. Node includes fake servers and clients; no Electron renderer.",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v22.22.3",
+    "cpus": 32,
+    "cpuModel": "AMD Ryzen 9 8945HX with Radeon Graphics        "
+  },
+  "results": [
+    {
+      "servers": 10,
+      "rounds": 5,
+      "coldConnectAndCollectMs": 101.33,
+      "warmCollectMedianMs": 19.56,
+      "warmCollectMaxMs": 24.71,
+      "snapshotBytesPerFleetRound": 15110,
+      "nodeRssMiB": 68.84,
+      "eventLoopP99Ms": 21.14
+    },
+    {
+      "servers": 30,
+      "rounds": 5,
+      "coldConnectAndCollectMs": 185.73,
+      "warmCollectMedianMs": 45.93,
+      "warmCollectMaxMs": 57.88,
+      "snapshotBytesPerFleetRound": 45330,
+      "nodeRssMiB": 74.96,
+      "eventLoopP99Ms": 42.01
+    }
+  ]
+}

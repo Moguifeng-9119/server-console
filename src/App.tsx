@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Search, Terminal } from 'lucide-react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { ArrowUpDown, Search, Terminal, Bell } from 'lucide-react';
 import { useStore } from './state';
 import { useTranslation } from 'react-i18next';
+import { isFreshSample } from './resources';
 import { api } from './api';
 import type { Server } from './types';
+import { AlertCenter } from './components/AlertCenter';
+import { useDialogFocus } from './hooks/useDialogFocus';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
 import { SettingsDrawer } from './components/SettingsDrawer';
@@ -37,11 +40,13 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'serv
 }
 
 export default function App() {
-  const { servers, theme, setTheme, toasts, demo, configs } = useStore();
+  const { servers, theme, setTheme, toasts, dismissToast, alertRecords, demo, configs, sampleNow, refreshMs } = useStore();
   const { t } = useTranslation();
+  const tClose = t('settings.close');
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
   const [view, setView] = useState<{ kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -95,12 +100,17 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   // 打开服务器：同一台保留当前 tab，换台回到 GPU；tab 状态提升到这里，避免切 tab 重挂载丢文件面板状态
-  const openServer = (id: string, tab?: ServerTab) =>
+  const openServer = useCallback((id: string, tab?: ServerTab) =>
     setView((v) => ({
       kind: 'server',
       id,
       tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
-    }));
+    })), []);
+
+  const quitRef = useRef<HTMLDivElement>(null);
+  const kiRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(quitAsk, quitRef, () => setQuitAsk(false));
+  useDialogFocus(!!kiAsk, kiRef, () => { if (kiAsk) void api?.submitInteractive(kiAsk.reqId, kiAsk.prompts.map(() => '')); setKiAsk(null); });
 
   const paletteActions = useMemo<PaletteAction[]>(
     () => [
@@ -170,8 +180,8 @@ export default function App() {
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
-    return [...map.entries()].map(([key, items]) => ({ key, name: key === '__ungrouped__' ? '未分组' : key, items }));
-  }, [servers]);
+    return [...map.entries()].map(([key, items]) => ({ key, name: key === '__ungrouped__' ? t('workbench.ungrouped') : key, items }));
+  }, [servers, t]);
 
   const renderServerItem = (s: Server) => {
     const avg = s.gpus.length ? s.gpus.reduce((a, g) => a + g.util, 0) / s.gpus.length : 0;
@@ -180,22 +190,20 @@ export default function App() {
         key={s.id}
         className={`nav-item ${view.kind === 'server' && view.id === s.id ? 'active' : ''}`}
         style={{ cursor: 'pointer' }}
-        title="单击查看监控 · 双击或点右侧“文件”直达文件管理"
-        onClick={() => openServer(s.id)}
-        onDoubleClick={() => openServer(s.id, 'files')}
+
       >
         <i className={`dot ${s.status}`} />
-        <span>{s.name}</span>
-        <span className="sub mono">{s.status === 'online' ? `${Math.round(avg)}%` : '—'}</span>
+        <button className="nav-server" onClick={() => openServer(s.id)} onDoubleClick={() => openServer(s.id, 'files')} aria-current={view.kind === 'server' && view.id === s.id ? 'page' : undefined}>{s.name}</button>
+        <span className="sub mono">{s.status === 'online' && isFreshSample(s, demo, refreshMs, sampleNow) ? `${Math.round(avg)}%` : '—'}</span>
         <button
           className="nav-files"
-          title="打开文件管理"
+          title={t('nav.files')}
           onClick={(e) => {
             e.stopPropagation();
             openServer(s.id, 'files');
           }}
         >
-          文件
+          {t('nav.files')}
         </button>
       </div>
     );
@@ -222,12 +230,12 @@ export default function App() {
           {hasGroups
             ? groupSections.map((sec) => (
                 <div key={sec.key}>
-                  <div className="group-head" onClick={() => toggleGroup(sec.key)} title="点击折叠/展开">
+                  <button className="group-head" onClick={() => toggleGroup(sec.key)} aria-expanded={!collapsedGroups.has(sec.key)}>
                     <span>{sec.name}</span>
                     <span>
                       {sec.items.length} {collapsedGroups.has(sec.key) ? '▸' : '▾'}
                     </span>
-                  </div>
+                  </button>
                   {!collapsedGroups.has(sec.key) && sec.items.map(renderServerItem)}
                 </div>
               ))
@@ -246,7 +254,7 @@ export default function App() {
         </div>
         <div
           className="sidebar-resizer"
-          title="按住拖拽调节宽度 · 双击恢复默认 224px"
+          role="separator" aria-label={t('workbench.sidebarWidth')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={180} aria-valuemax={480} tabIndex={0} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = Math.max(180, Math.min(480, sidebarWidth + (e.key === 'ArrowRight' ? 16 : -16))); setSidebarWidth(next); localStorage.setItem('sc.sidebar.w', String(next)); } }}
           onMouseDown={onSidebarResizerMouseDown}
           onDoubleClick={() => {
             setSidebarWidth(224);
@@ -263,16 +271,17 @@ export default function App() {
               {t('topbar.demoBanner')}
             </button>
           )}
-          <button className="topbar-search" onClick={() => setPaletteOpen(true)} title="搜索服务器 / 执行动作">
+          <button className="topbar-search" onClick={() => setPaletteOpen(true)} title={t('topbar.search')}>
             <Search size={13} />
             <span>{t('topbar.search')}</span>
             <kbd>Ctrl K</kbd>
           </button>
           <span className="spacer" />
+          <button className="btn alert-entry" onClick={() => setAlertsOpen(true)}><Bell size={14} />{t('workbench.alerts')}{alertRecords.some((a) => !a.resolvedAt) && <span className="alert-count">{alertRecords.filter((a) => !a.resolvedAt).length}</span>}</button>
           <button
             className={`transfer-entry ${activeTransferCount ? 'active' : ''}`}
             onClick={() => window.dispatchEvent(new Event('sc:show-transfers'))}
-            title="打开传输中心"
+            title={t('transfer.center')}
           >
             <span className="transfer-entry-ico"><ArrowUpDown size={13} strokeWidth={2.2} /></span>
             {t('topbar.transfers')}
@@ -295,7 +304,7 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <Overview onOpen={(id) => openServer(id)} onHistory={(s) => setHistoryView(s)} />
+              <Overview onOpen={openServer} onHistory={(s) => setHistoryView(s)} />
             )
           ) : current ? (
             <ServerPanel
@@ -311,15 +320,16 @@ export default function App() {
         </div>
       </main>
 
+      {alertsOpen && <AlertCenter onClose={() => setAlertsOpen(false)} onOpen={openServer} />}
       {settingsOpen && <SettingsDrawer onClose={() => setSettingsOpen(false)} />}
       {managerOpen && <ServerManager onClose={() => setManagerOpen(false)} />}
       {importOpen && <ImportSshConfig onClose={() => setImportOpen(false)} />}
       <TransferDrawer />
 
-      <div className="toasts">
+      <div className="toasts" aria-live="polite" aria-relevant="additions">
         {toasts.map((t) => (
           <div className={`toast ${t.level}`} key={t.id}>
-            <div className="t">{t.title}</div>
+            <button className="toast-close" onClick={() => dismissToast(t.id)} aria-label={String(tClose)}>×</button><div className="t">{t.title}</div>
             {t.detail && <div className="d">{t.detail}</div>}
           </div>
         ))}
@@ -327,8 +337,8 @@ export default function App() {
 
       {quitAsk && (
         <div className="mask" onClick={() => setQuitAsk(false)}>
-          <div className="dialog" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <h3>还有 {activeTransferCount} 个传输任务进行中</h3>
+          <div className="dialog" ref={quitRef} role="dialog" aria-modal="true" aria-labelledby="quit-title" tabIndex={-1} style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="quit-title">{t('quit.title', { n: activeTransferCount })}</h3>
             <div className="body">
               {t('quit.body')}
             </div>
@@ -360,12 +370,12 @@ export default function App() {
       )}
 
       <HistoryDialog s={historyView} onClose={() => setHistoryView(null)} />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} servers={servers} actions={paletteActions} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
 
       {kiAsk && (
         <div className="mask">
-          <div className="dialog" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
-            <h3>{kiAsk.title}</h3>
+          <div className="dialog" ref={kiRef} role="dialog" aria-modal="true" aria-labelledby="ki-title" tabIndex={-1} style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="ki-title">{kiAsk.title}</h3>
             <div className="body" style={{ color: 'var(--text-dim)' }}>
               {t('ki.hint', '服务器要求交互式认证（如二次验证码）。')}
             </div>

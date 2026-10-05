@@ -1,0 +1,32 @@
+name: Bug report / 问题反馈
+description: Report a reproducible UI, monitoring or transfer failure.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App version and OS / 版本与系统
+      placeholder: v0.11.0 source build, Windows 11; remote Ubuntu
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area / 功能
+      options: [Monitoring, Upload or download, Server relay, Terminal, Connection or credentials, Interface]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and observed result / 复现步骤与结果
+      description: Use synthetic host names and remove credentials from logs.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result / 预期结果
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized error or screenshot / 脱敏错误与截图

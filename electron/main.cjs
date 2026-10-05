@@ -200,6 +200,7 @@ function createTray() {
 }
 
 // 单实例锁：双开会互相覆盖 servers.json，第二个实例直接退出并唤起已有窗口
+if (process.env.SC_USER_DATA) app.setPath('userData', process.env.SC_USER_DATA); // Isolate test data and instance lock together.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -213,7 +214,6 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
-    if (process.env.SC_USER_DATA) app.setPath('userData', process.env.SC_USER_DATA); // e2e 测试隔离
     loadAppSettings();
     ipc.init();
     createWindow();

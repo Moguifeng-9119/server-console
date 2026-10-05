@@ -1,0 +1,60 @@
+{
+  "at": "2026-10-05T12:51:30.298Z",
+  "platform": "win32",
+  "arch": "x64",
+  "node": "v22.22.3",
+  "version": "0.11.0",
+  "baseCommit": "a8fd4c1259c12d7abdc30a83cbde341bbab36d63",
+  "checks": [
+    {
+      "command": "npm test",
+      "result": "passed",
+      "files": 8,
+      "tests": 76
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "npm run smoke",
+      "result": "passed",
+      "scope": "real SFTP protocol against two loopback fake SSH servers"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed"
+    },
+    {
+      "command": "npm run test:ui",
+      "result": "passed",
+      "checks": 22,
+      "scope": "production renderer demo"
+    },
+    {
+      "command": "SC_ELECTRON_PATH=<current packaged executable> npm run e2e:terminal",
+      "result": "passed",
+      "checks": 9,
+      "scope": "Native Electron packaged app + real IPC + loopback SSH + local shell; simulated GPU metrics."
+    },
+    {
+      "command": "npm run benchmark",
+      "result": "completed",
+      "scope": "10/30 synthetic loopback sessions; see benchmark-local.json"
+    },
+    {
+      "command": "isolated portable CDP startup check",
+      "result": "passed",
+      "scope": "production window, v0.11.0 and native bridge availability; separate from full unpacked-app E2E"
+    }
+  ],
+  "notEstablished": [
+    "real NVIDIA/CPU hardware observations",
+    "remote rsync/direct-transfer recovery",
+    "macOS/Linux native packages",
+    "actual OS key-store behavior",
+    "signing, installer and update",
+    "GitHub CI or public release"
+  ],
+  "sourceBranch": "codex/serverconsole-0.11-improvements"
+}

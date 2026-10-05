@@ -1,7 +1,7 @@
 {
   "name": "server-console",
   "private": true,
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "Local-first desktop console for GPU servers: SSH monitoring, dual-pane SFTP file manager and high-speed server-to-server transfers",
   "type": "module",
   "main": "electron/main.cjs",
@@ -21,7 +21,9 @@
     "icon": "node scripts/make-icon.mjs",
     "mock:ssh": "node scripts/fake-sshd.cjs",
     "dist:mac": "npm run build && electron-builder --mac --universal",
-    "e2e:terminal": "node scripts/terminal-e2e.cjs"
+    "e2e:terminal": "node scripts/terminal-e2e.cjs",
+    "test:ui": "node scripts/ui-smoke.cjs",
+    "benchmark": "node scripts/benchmark.cjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

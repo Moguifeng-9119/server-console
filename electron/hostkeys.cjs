@@ -6,6 +6,9 @@ let dataDir = '';
 function init(dir) {
   dataDir = dir;
   trust = null;
+  trustFile = null;
+  secFile = null;
+  opts = { tofu: true };
 }
 const fs = require('node:fs');
 const path = require('node:path');
@@ -22,46 +25,46 @@ function trustPath() {
 }
 function secPath() {
   if (!secFile) secFile = path.join(dataDir || require('electron').app.getPath('userData'), 'security.json');
-  return secPath();
+  return secFile;
 }
 
 function load() {
   if (trust) return;
-  trust = new Map();
+  const next = new Map();
   try {
     const raw = JSON.parse(fs.readFileSync(trustPath(), 'utf8'));
-    for (const [k, v] of Object.entries(raw.entries || {})) {
-      if (v && typeof v.fp === 'string' && typeof v.blob === 'string') trust.set(k, v);
+    if (!raw?.entries || typeof raw.entries !== 'object' || Array.isArray(raw.entries)) throw new Error('Invalid host trust store');
+    for (const [k, v] of Object.entries(raw.entries)) {
+      if (!v || typeof v.fp !== 'string' || typeof v.blob !== 'string') throw new Error('Invalid host trust record');
+      next.set(k, v);
     }
-  } catch {
-    /* 首次为空 */
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new Error('Cannot load host trust store: ' + error.message);
   }
   try {
     const o = JSON.parse(fs.readFileSync(secPath(), 'utf8'));
-    if (typeof o.tofu === 'boolean') opts.tofu = o.tofu;
-  } catch {
-    /* 默认 TOFU 开 */
+    if (typeof o.tofu !== 'boolean') throw new Error('Invalid host trust options');
+    opts.tofu = o.tofu;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new Error('Cannot load host trust options: ' + error.message);
   }
+  trust = next;
 }
 
 function saveTrust() {
-  try {
-    fs.mkdirSync(path.dirname(trustPath()), { recursive: true });
-    const entries = {};
-    for (const [k, v] of trust) entries[k] = v;
-    fs.writeFileSync(trustPath(), JSON.stringify({ entries }, null, 2), { mode: 0o600 });
-  } catch {
-    /* ignore */
-  }
+  fs.mkdirSync(path.dirname(trustPath()), { recursive: true });
+  const entries = {};
+  for (const [k, v] of trust) entries[k] = v;
+  const temp = trustPath() + '.tmp';
+  fs.writeFileSync(temp, JSON.stringify({ entries }, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, trustPath());
 }
 
 function saveOpts() {
-  try {
-    fs.mkdirSync(path.dirname(secPath()), { recursive: true });
-    fs.writeFileSync(secPath(), JSON.stringify(opts, null, 2), { mode: 0o600 });
-  } catch {
-    /* ignore */
-  }
+  fs.mkdirSync(path.dirname(secPath()), { recursive: true });
+  const temp = secPath() + '.tmp';
+  fs.writeFileSync(temp, JSON.stringify(opts, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, secPath());
 }
 
 function keyId(host, port) {
@@ -100,7 +103,7 @@ function verify(host, port, keyBuf) {
       throw new Error('尚未信任该主机的指纹，且已关闭「首次连接自动信任」。可在 设置 → 安全 中开启 TOFU 后重连。');
     }
     trust.set(id, { type: keyTypeOf(keyBuf), blob: keyBuf.toString('base64'), fp, firstSeen: Date.now() });
-    saveTrust();
+    try { saveTrust(); } catch (error) { trust.delete(id); throw error; }
     return true;
   }
   if (known.fp !== fp) {
@@ -136,8 +139,11 @@ function list() {
 
 function remove(id) {
   load();
+  const previous = trust.get(id);
   const ok = trust.delete(id);
-  if (ok) saveTrust();
+  if (ok) {
+    try { saveTrust(); } catch (error) { trust.set(id, previous); throw error; }
+  }
   return ok;
 }
 
@@ -148,8 +154,9 @@ function getOpts() {
 
 function setOpts(o = {}) {
   load();
+  const previous = { ...opts };
   if (typeof o.tofu === 'boolean') opts.tofu = o.tofu;
-  saveOpts();
+  try { saveOpts(); } catch (error) { opts = previous; throw error; }
   return { ...opts };
 }
 

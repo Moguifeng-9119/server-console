@@ -1,4 +1,4 @@
-// 凭据存储：safeStorage 加密 + 不可用时 base64 降级（plain: 前缀）。
+// Secure OS storage when available; otherwise credentials stay in memory only.
 // 通过 init({ dataDir, safeStorage }) 注入，避免测试环境依赖 electron。
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,11 +6,42 @@ const path = require('node:path');
 let file = null;
 let dataDir = '';
 let enc = null; // electron safeStorage 适配器
+let sessionSecrets = new Map();
+let migrationError = '';
 
 function init(opts = {}) {
   dataDir = opts.dataDir || '';
   enc = opts.safeStorage || null;
   file = null;
+  sessionSecrets = new Map();
+  migrationError = '';
+  // Upgrade old base64/basic_text records before exposing the server list.
+  const target = storeFile();
+  if (fs.existsSync(target)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(target, 'utf8'));
+      if (!Array.isArray(raw?.servers)) throw new Error('Invalid server store format');
+      for (const server of raw.servers) {
+        if (!server || typeof server !== 'object' || typeof server.id !== 'string' ||
+            ['password', 'passphrase'].some((key) => server[key] != null && typeof server[key] !== 'string')) {
+          throw new Error('Invalid server credential record');
+        }
+      }
+      const weak = (value) => typeof value === 'string' && !!value && (!value.startsWith('enc:') || info().backend === 'basic_text');
+      if (raw.servers.some((server) => weak(server.password) || weak(server.passphrase))) {
+        save(raw.servers.map((server) => ({ ...server, password: decrypt(server.password || ''), passphrase: decrypt(server.passphrase || '') })));
+      }
+    } catch (error) { migrationError = 'Credential migration failed: ' + error.message; }
+  }
+}
+
+function info() {
+  let backend = 'unavailable';
+  try {
+    backend = enc?.getSelectedStorageBackend ? enc.getSelectedStorageBackend() : 'os';
+    const encryptionAvailable = !!(enc && enc.isEncryptionAvailable() && backend !== 'basic_text');
+    return { encryptionAvailable, backend, mode: encryptionAvailable ? 'encrypted' : 'session', migrationError };
+  } catch { return { encryptionAvailable: false, backend, mode: 'session', migrationError }; }
 }
 
 function storeFile() {
@@ -20,11 +51,10 @@ function storeFile() {
 
 function encrypt(v) {
   if (!v) return '';
-  if (enc && enc.isEncryptionAvailable()) {
+  if (info().encryptionAvailable) {
     return `enc:${enc.encryptString(v).toString('base64')}`;
   }
-  // 兜底：无 safeStorage（Linux 无 libsecret / 测试环境）时明文落盘并标记
-  return `plain:${Buffer.from(v, 'utf8').toString('base64')}`;
+  return '';
 }
 
 function decrypt(v) {
@@ -45,8 +75,8 @@ function load() {
     const raw = JSON.parse(fs.readFileSync(storeFile(), 'utf8'));
     return (raw.servers || []).map((s) => ({
       ...s,
-      password: decrypt(s.password || ''),
-      passphrase: decrypt(s.passphrase || ''),
+      password: sessionSecrets.get(s.id)?.password ?? decrypt(s.password || ''),
+      passphrase: sessionSecrets.get(s.id)?.passphrase ?? decrypt(s.passphrase || ''),
     }));
   } catch {
     return [];
@@ -54,15 +84,19 @@ function load() {
 }
 
 function save(servers) {
+  if (migrationError) throw new Error(migrationError + '; repair or restore servers.json before saving');
+  const nextSecrets = new Map();
   const payload = {
-    servers: servers.map(({ password, passphrase, ...rest }) => ({
-      ...rest,
-      password: encrypt(password),
-      passphrase: encrypt(passphrase),
-    })),
+    servers: servers.map(({ password, passphrase, ...rest }) => {
+      nextSecrets.set(rest.id, { password: password || '', passphrase: passphrase || '' });
+      return { ...rest, password: encrypt(password), passphrase: encrypt(passphrase) };
+    }),
   };
   fs.mkdirSync(path.dirname(storeFile()), { recursive: true });
-  fs.writeFileSync(storeFile(), JSON.stringify(payload, null, 2), { mode: 0o600 });
+  const temp = storeFile() + '.tmp';
+  fs.writeFileSync(temp, JSON.stringify(payload, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, storeFile());
+  sessionSecrets = nextSecrets;
 }
 
 // 给渲染进程的列表不含密钥
@@ -76,5 +110,6 @@ module.exports = {
   load,
   save,
   publicView,
-  encryptionAvailable: () => !!(enc && enc.isEncryptionAvailable()),
+  encryptionAvailable: () => info().encryptionAvailable,
+  info,
 };

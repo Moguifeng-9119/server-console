@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import { useStore } from '../state';
 import type { SshConfigInfo, SshHostEntry } from '../types';
@@ -14,6 +15,8 @@ export function ImportSshConfig({
   onClose: () => void;
   preferAliases?: string[];
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, ref, onClose);
   const { configs, addServer, pushToast } = useStore();
   const [info, setInfo] = useState<SshConfigInfo | null>(null);
   const [configPath, setConfigPath] = useState('');
@@ -118,7 +121,7 @@ export function ImportSshConfig({
 
   return (
     <div className="mask" onClick={onClose}>
-      <div className="dialog import-dlg" style={{ width: 720 }} onClick={(e) => e.stopPropagation()}>
+      <div className="dialog import-dlg" ref={ref} role="dialog" aria-modal="true" aria-label="SSH config" tabIndex={-1} style={{ width: 720 }} onClick={(e) => e.stopPropagation()}>
         <h3>从 ~/.ssh/config 导入</h3>
 
         <div className="field" style={{ marginBottom: 10 }}>

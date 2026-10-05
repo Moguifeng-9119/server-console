@@ -1,263 +1,84 @@
-<div align="center">
+# ServerConsole
 
-# 🖥️ ServerConsole
+**Find a GPU with enough free memory, see who is using it, and open your terminal or files from one desktop.**
 
-English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Português (Brasil)](./README.pt-BR.md)
+[Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [简体中文](README.zh-CN.md) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
-# 🖥️ ServerConsole
+![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+![Resource workbench with per-card free memory and owners](assets/screenshots/workbench-en.png)
 
-### One desktop to monitor your GPU fleet, browse files, and move data **between servers at full speed** — all over SSH, fully local.
+*Screenshots show the v0.11.0 source workbench with explicitly simulated metrics. Published desktop releases may be earlier; check the release version and attached files.*
 
-![license](https://img.shields.io/badge/license-MIT-22c55e)
-![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
-![electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)
-![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
-![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
-![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+## Why use it?
 
-**ServerConsole** is a local-first desktop app that centralizes multiple Linux/GPU servers:
-live GPU & process monitoring, a dual-pane SFTP file manager, uploads/downloads, and
-**high-speed server-to-server direct transfer** — built with Electron, React and [`ssh2`](https://github.com/mscdex/ssh2).
-No cloud, no relay of your data: every connection runs straight from your machine.
+ServerConsole is designed for people sharing **Linux servers with NVIDIA GPUs**. It connects from your computer through SSH, combines resource discovery with a terminal and dual-pane SFTP, and needs no monitoring agent on the remote host.
 
-  <p align="center">
-    <img src="assets/screenshots/overview.png" alt="Fleet overview" width="880" />
-  </p>
-  <p align="center">
-    <img src="assets/screenshots/gpu-panel.png" alt="GPU panel" width="430" />&nbsp;
-    <img src="assets/screenshots/processes.png" alt="Process table" width="430" />
-  </p>
-</div>
-
----
-
-## 📑 Table of Contents
-- [✨ Highlights](#-highlights)
-- [🧱 Tech Stack](#-tech-stack)
-- [🚀 Getting Started](#-getting-started)
-- [🏗️ Build & Package](#️-build--package)
-- [🧭 Usage](#-usage)
-- [🏛️ How it works](#️-how-it-works)
-- [🔐 Security & Privacy](#-security--privacy)
-- [📁 Data storage](#-data-storage)
-- [🧪 Development](#-development)
-- [⚠️ Limitations](#️-limitations)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-
----
-
-## ✨ Highlights
-
-### 🧩 Multi-server management
-- **Password & private-key** auth (passphrase supported), with per-server connection tests.
-- Credentials are encrypted at rest with the OS keychain (Windows DPAPI / libsecret) and **never leave your machine**.
-- Sidebar with live reachability, **groups**, configurable auto-refresh (1 / 2 / 5 / 10 s) and Ctrl+K command palette.
-- **Resizable sidebar** (180px–480px, double-click to reset to 224px, auto-persisted).
-- **Differential polling scheduler**: Keeps high-frequency monitoring on the active server while downthrottling background nodes to $\ge 8$s, saving over 70% network and CPU overhead on large clusters.
-
-### 🔑 One-click `~/.ssh/config` import
-- A **real React dialog** (no script injection) parses OpenSSH config: hosts, users, ports and `IdentityFile`s.
-- Browse any config file, assign one shared key or a key per host; existing hosts are auto-skipped.
-- **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
-
-### 🧰 Ops toolkit
-- **Embedded SSH terminal** per server (xterm.js): multiple sessions per server, Windows-style copy/paste (right-click, Ctrl+C/V, multi-line paste), scrollback preserved across tab switches.
-- **Parallel commands**: run one command on N selected servers at once, per-server live output.
-- **Local port forwarding** (ssh -L equivalent) with rule management and auto-restore.
-- **Quick command snippets**, one-click from the server header.
-- Alert **webhooks** (DingTalk / Feishu / WeCom), transfer **rate limit**, optional **MD5 verification**.
-- **Remote text editing** with atomic save-back; relay "sync mode" (skip existing, rsync).
-- ProxyJump bastions, keyboard-interactive (2FA/MFA) and ssh-agent auth; SSH compression; system tray.
-- Encrypted config export/import; update check via GitHub Releases.
-
-### 📊 Real GPU & process monitoring
-- Dashboard KPIs: average GPU utilization, VRAM, CPU, memory, load average and zombie-process count.
-- Per-GPU **utilization, VRAM, temperature, power and fan speed**, plus processes on each card.
-- **4 / 8 / 16-GPU Compact Matrix View**: Toggle high-density matrix mode for HGX/DGX clusters to monitor all accelerators in a single view.
-- Sortable / filterable process table (search by PID, user or command; GPU-only filter).
-- Right-click a process for `SIGTERM` / `SIGKILL`, copy PID/command or restart a service — with confirmation and a **local audit log**.
-- > Temperature, fan and power come **straight from `nvidia-smi`**. Fields the driver doesn't report show `N/A` — values are never estimated or fabricated.
-
-### 🗂️ Dual-pane SFTP file manager
-- **Local ⇄ remote** side-by-side panes: **resizable splitter** (drag to adjust ratio, double-click to reset to 50:50).
-- **Professional keyboard shortcuts**: `Delete` for removal, `F2` to rename, `F5` to reload, `Ctrl+A` to select all, `Esc` to clear selection.
-- **Remote permissions (`chmod`)**: Visual dialog to inspect and update octal permissions (e.g. 755/644).
-- **Drag-and-drop upload**, batch upload/download, recursive folder transfer — folders are enqueued as a single task and transferred **while being walked** (no blocking pre-scan, even for huge trees).
-- Right-click menu: download, view as text, rename, delete, **compress to `.tar.gz`**, extract (tar/zip), send to another server.
-- Remote filename search in the current directory; double-click to descend; Ctrl-click to multi-select, **Shift-click for range selection**.
-
-### ⚡ Server-to-server direct transfer
-- A **visual dual-pane picker** for source and destination — no manual path typing.
-- Prefers a **direct server-to-server path that never bounces through your machine**. It probes both ends for `rsync / tar / scp` and picks the best, falling back automatically; only when neither supports it does it relay locally.
-- Uses an **ephemeral one-time key pair** (generated at runtime, injected into `authorized_keys`, **shredded immediately after**). Your main private key is never used or uploaded.
-- **Automatic Garbage Collection (GC)**: Scans and cleans orphaned temporary keys and directories from unexpected disconnections or client restarts.
-- Large trees are streamed while being walked — no blocking pre-scan, no stuck "adding…".
-- > A transfer is **always a copy**. Files on the source server are never deleted.
-
-### 🚦 Transfer Center drawer
-- A pinned **right-side drawer** (up to fullscreen) opened from a persistent top-bar button with a running-count badge; it stays open while tasks run.
-- Header shows **live aggregate instant speed** (↑ upload / ↓ download / ⇄ relay), active count and overall progress.
-- Filter by **type** (all/upload/download/relay) and **status** (all/active/done/failed).
-- Expand any task for:
-  - **60-second instant-speed sparkline** (instantaneous only — no averaged/peak numbers, no faking);
-  - **ETA**, with an explicit "sizing…" state instead of a guess;
-  - full **source → destination paths** with copy buttons;
-  - a **direct/relay · rsync/tar/scp badge** and capability/fallback diagnostics;
-  - **file x/y count** and a **recent-files stream** (rsync reports each finished file; locally filterable).
-- Queue controls: pause/resume all, multi-select cancel, retry all failed, clear finished, **reorder queued tasks ↑/↓**, global **concurrency 1–15 (default 15)**, system notifications and an optional failure beep.
-
-### 🎛️ Modern, calm UI
-- Dashboard styling with a **clean light theme by default** (follow-system / light / dark) and a cyan accent.
-- **Windows title bar overlay theme synchronization**: Dynamic matching of native caption buttons with dark/light themes.
-- **Full 10-language internationalization (i18n)**: English, Simplified/Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian, Portuguese.
-- Three density levels (**compact by default** / comfortable / roomy); theme and density are remembered only *after* you change them.
-- Crash-safe persistence: transfer records are written atomically and trimmed to prevent oversized state files.
-
----
-
-## 🧱 Tech Stack
-
-| Layer | Technology |
+| A task you need to complete | What the app provides |
 | --- | --- |
-| Shell | **Electron 44** (CommonJS main process) |
-| Renderer | **React 18 + TypeScript (strict) + Vite 5**, hand-written CSS design tokens (no heavy UI kit) |
-| SSH / SFTP | [`ssh2`](https://github.com/mscdex/ssh2) — connections, SFTP, exec, keys |
-| Packaging | `electron-builder` — Windows portable/NSIS, macOS dmg, Linux AppImage |
+| Find one card with 40 GiB free | Per-card memory filtering, GPU model selection, owner search, most-free-first sorting |
+| Understand why a server is busy | GPU/process metrics, owners, multi-GPU PID associations, Linux CPU counters |
+| Start work without switching tools | Terminal/file shortcuts, SSH config import, groups, ProxyJump, quick commands, port forwarding |
+| Move experiments and datasets | Queued uploads/downloads, verified resume prefixes, restart recovery, staged replacement, rsync direct transfer or SFTP relay |
+| Judge whether a reading is recent | Actual sample timestamps, stale indicators, timestamped history with gaps |
+| Track anomalies without flooding the screen | Grouped active/resolved alerts, two dismissible toasts, no external anomaly notifications in demo mode |
 
-The main process owns all SSH/SFTP/local-file work and transfer scheduling; the renderer talks to it only through a controlled `preload` bridge (`window.api`) and never touches Node directly.
+It is a personal desktop workbench. Team accounts, resource reservations, cluster scheduling, AMD/Intel GPU telemetry and a full NVML diagnostic stack are outside the current scope. Free VRAM is an observation, not a reservation.
 
-### Project layout
-```
-.
-├─ electron/            # Main process (CommonJS, not type-checked by tsc)
-│  ├─ main.cjs          #   app/window lifecycle, crash self-recovery
-│  ├─ preload.cjs       #   controlled IPC bridge -> window.api
-│  ├─ ipc.cjs           #   IPC handlers (servers, SFTP, transfers, notifications)
-│  ├─ ssh.cjs           #   ssh2 wrapper: exec/execStream/SFTP/walk
-│  ├─ sshconfig.cjs     #   parse & watch ~/.ssh/config
-│  ├─ transfer.cjs      #   queue/concurrency, direct(rsync/tar/scp), relay, resume
-│  ├─ localfs.cjs       #   local filesystem
-│  └─ store.cjs         #   encrypted credential store (safeStorage + fallback)
-├─ src/                 # Renderer (React + TS)
-│  ├─ App.tsx state.tsx transfers.tsx api.ts types.ts format.ts
-│  └─ components/       #   overview, server panel, file manager, relay, import, drawer…
-├─ scripts/             # icon generator + a local mock SSH server
-├─ build/ assets/       # app icons
-└─ package.json
-```
+<p><img src="assets/screenshots/workbench-dark.png" alt="Dark workbench, simulated data" width="49%"> <img src="assets/screenshots/gpu-matrix.png" alt="Compact GPU matrix, simulated data" width="49%"></p>
 
----
+## Get started
 
-## 🚀 Getting Started
+**Desktop users:** choose an artifact for your OS in [Releases](https://github.com/Moguifeng-9119/server-console/releases). Only attached artifacts count as published packages; macOS/Linux build scripts alone do not prove support. Open **Servers**, test a connection, then add it, or import existing SSH config entries. GPU metrics need working nvidia-smi; Linux system metrics use /proc.
 
-**Requirements:** Node.js ≥ 18 (developed on Node 22) and npm.
+**Try the interface from source** with Node.js 22 and npm:
 
-```bash
-# 1. Install dependencies
-npm install
-
-# 2a. Frontend only in the browser (no main-process capabilities)
+```sh
+git clone https://github.com/Moguifeng-9119/server-console.git
+cd server-console
+npm ci
 npm run dev
+```
 
-# 2b. Full desktop development (Vite + Electron)
+The browser is a clearly labelled demo. Real SSH, credentials, terminals and SFTP require the desktop process:
+
+```sh
 npm run electron:dev
 ```
 
-> On Windows PowerShell, chain commands with `;` instead of `&&`.
+Set the minimum **free GiB per card**, choose a model or search an owner, then use **Inspect**, **Terminal** or **Files**. Settings are grouped into Appearance, Monitoring, Security, Workflow and Activity & help. Ctrl/Cmd+K opens commands; dialogs support Tab, Shift+Tab and Escape.
 
----
+## Transfer integrity and credentials
 
-## 🏗️ Build & Package
+- An arbitrary existing destination is never used as a resume prefix. Uploads, downloads and local relays use task-owned staging; complete SHA-256 prefix comparisons decide whether staged bytes can be resumed.
+- SFTP transfers check byte counts and source size/mtime before replacing the destination. Overlapping target paths are queued. Failures retain staging for retry; cancel/remove clean tracked staging. Cleanup failures retain the recovery record and report an error.
+- Optional MD5 verification runs **before replacement** for single-file uploads/downloads. The UI distinguishes verified, failed, unavailable and not requested. Directory/relay tasks do not claim MD5 verification.
+- Direct relay requires rsync on both ends and source-to-destination reachability. It uses a temporary SSH key and trusted destination fingerprint. Otherwise it uses staged local SFTP; streaming tar/scp overwrite fallbacks are disabled.
+- Passwords/passphrases use OS encryption when a secure backend is available. Otherwise, including Linux basic_text, new credentials stay **in session memory** and must be entered again after restart. Security settings show the actual backend and migration errors. Private keys stay at their existing paths.
 
-```bash
-npm run build          # tsc strict type-check + Vite production build
+Read [security behavior and limitations](SECURITY.md). Size/mtime checks do not lock a concurrently rewritten source. Real remote rsync has not been validated in this source change.
 
-npm run dist:win:lite  # Windows single-file portable .exe
-npm run dist:win:nsis  # Windows NSIS installer
-npm run dist:mac       # macOS universal dmg
-npm run dist:linux     # Linux AppImage
+## Development and evidence
+
+```sh
+npm run typecheck
+npm test
+npm run smoke
+npm run build
+npx playwright-core install chromium  # if no supported local Chrome is available
+npm run test:ui
+npm run benchmark
 ```
 
-<sub>Behind a slow network, point `ELECTRON_MIRROR` and `ELECTRON_BUILDER_BINARIES_MIRROR` to a local mirror.</sub>
+Typecheck covers strict renderer TypeScript and Electron checkJs. Smoke tests use two loopback fake SSH servers with real SFTP transport. UI checks use the production renderer with simulated metrics. Windows packaged IPC and loopback SSH/local-shell checks also pass locally; set SC_ELECTRON_PATH to the current unpacked app executable and run npm run e2e:terminal. Benchmarks use 10/30 synthetic loopback SSH sessions; they make no real-cluster performance or percentage-savings promise.
 
----
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [validation evidence](docs/VALIDATION.md) and [benchmark methodology](docs/BENCHMARKS.md). There is no current ESLint/Hooks lint result.
 
-## 🧭 Usage
-1. **Add a server** — enter host/port/user, choose password or key auth, optionally *Test connection*, then save. Or click **Import from `~/.ssh/config`**.
-2. Pick a node in the sidebar to open its **Overview / GPU / Processes / Files** tabs.
-3. In **Files**, upload/download between the two panes, or select remote items → **Server relay ⇄** and choose the destination server & folder in the dual-pane dialog.
-4. Open the top-bar **Transfers** button any time for live speed, file progress and queue management.
+Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. Packaging, signing and native app checks require target environments.
 
----
+## Languages and contributing
 
-## 🏛️ How it works
+The selector retains English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Русский and Português (Brasil). The redesigned workbench is maintained in English and Simplified Chinese; untranslated new strings fall back to English. Older screens still need translation work. See [localization status](docs/LOCALIZATION.md).
 
-```
-┌────────────────────────────┐         IPC (window.api)          ┌──────────────────────────┐
-│  Renderer (React + TS)     │  ◀──────────────────────────▶   │  Main process (Node)     │
-│  dashboard / file manager  │                                   │  ssh2 · SFTP · scheduler │
-└────────────────────────────┘                                   └───────────┬──────────────┘
-                                                                             │ SSH
-                                              ┌──────────────────────────────┼──────────────────────────────┐
-                                              ▼                              ▼                              ▼
-                                        source server                  destination server              your local disk
-```
-
-**Server-to-server transfer decision**
-
-1. Probe source & destination capabilities (`rsync`, `tar`, `scp`).
-2. Prefer **direct** transfer in the order `rsync → tar → scp`; stream finished filenames back for the x/y counter and recent-file list.
-3. Fall back to a **local relay** only when direct transfer is impossible.
-4. Count files and total size **asynchronously in the background** so the transfer starts immediately.
-
----
-
-## 🔐 Security & Privacy
-- **Host key verification (TOFU)**: the first connection records the server's host-key fingerprint; every later connection is verified against it and a mismatch is rejected with a clear warning. Direct server-to-server transfers carry the destination fingerprint into a temporary `known_hosts` on the source (`StrictHostKeyChecking=yes`). The trust store is manageable in *Settings → Security*.
-- Direct-transfer keys are **ephemeral and shredded after use**; the main private key is never copied or uploaded.
-- Relay is **copy-only** — source data is never deleted; **retry resumes from the breakpoint** instead of deleting the destination.
-- Destructive actions (kill process, delete files) require confirmation and are appended to a **persistent local audit log** (`audit.log`, survives restarts).
-- Passwords are encrypted with the OS safe-storage; only the *path* of a private key is stored, never its contents.
-- Every metric and progress value comes from a real command response — **no fabricated temperature, speed or per-file progress**.
-
----
-
-## 📁 Data storage
-All local data lives in the OS user-data directory (`%AppData%/server-console/` on Windows):
-`servers.json` (connections), `transfers.json` (trimmed history), `hostkeys.json` (TOFU trust store), `security.json` (security options), `audit.log` (operations) and `error.log`.
-Delete that folder to wipe all local state.
-
----
-
-## 🧪 Development
-```bash
-npm run typecheck   # tsc strict (src) + checkJs (electron main process)
-npm test            # vitest unit tests
-npm run smoke       # e2e smoke: 2 mock sshd instances, real SFTP — collect/upload/download/relay/queue
-```
-CI runs all three before packaging.
-
-Without a real GPU box, spin up the built-in **mock SSH server** — it returns fake `nvidia-smi` / `ps` output and serves a real SFTP root, listening on `127.0.0.1` only (any user/password):
-```bash
-npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
-```
-
-## ⚠️ Limitations
-- Direct transfer requires the two servers to be mutually reachable; otherwise it relays through your machine (bounded by your up/down bandwidth).
-- Precise per-file progress requires `rsync` (or local relay); an `scp`-only fallback reports byte-level progress.
-- GPU monitoring requires `nvidia-smi` to be installed and executable on the target host.
-- Fully localized in 10 languages (switchable anytime in Settings).
-
----
-
-## 🤝 Contributing
-Issues and PRs are welcome. Please run `npm run build` (strict type-check) before opening a PR, and never commit real hosts, credentials or keys.
-
-## 📄 License
-Distributed under the **[MIT License](./LICENSE)**.
-
-<div align="center"><sub>Built for engineers who manage many GPU servers and just want transfers to be fast, honest and safe.</sub></div>
+[Contribution guide](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md) · [MIT License](LICENSE)

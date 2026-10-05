@@ -1,5 +1,7 @@
 import type {
   AuditEntry,
+  CredentialInfo,
+  HistoryPoint,
   ConfigChange,
   DirListing,
   FileEntry,
@@ -22,7 +24,7 @@ interface Api {
   forceQuit: () => void;
   setTitleBarTheme: (theme: 'light' | 'dark') => Promise<boolean>;
   notify: (title: string, body: string) => Promise<void>;
-  storeInfo: () => Promise<{ encryptionAvailable: boolean }>;
+  storeInfo: () => Promise<CredentialInfo>;
   auditList: () => Promise<AuditEntry[]>;
   auditAppend: (entry: { time: string; server: string; action: string; target: string; result: 'ok' | 'failed' }) => Promise<boolean>;
   hostKeysList: () => Promise<TrustedHost[]>;
@@ -80,8 +82,8 @@ interface Api {
   onTerminalClosed: (cb: (d: { termId: string }) => void) => () => void;
   onTerminalSessions: (cb: (list: TerminalSessionInfo[]) => void) => () => void;
 
-    historyLoad: () => Promise<Record<string, number[]>>;
-  historySave: (map: Record<string, number[]>) => Promise<boolean>;
+    historyLoad: () => Promise<Record<string, HistoryPoint[]>>;
+  historySave: (map: Record<string, HistoryPoint[]>) => Promise<boolean>;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
 
