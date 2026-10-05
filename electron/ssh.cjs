@@ -297,13 +297,15 @@ class Connection {
   }
 
   // 异步机会性 GC：清理由于客户端非正常退出（掉电/杀进程）残留的历史一次性临时直传密钥与临时目录
+  // 匹配两种格式：新版 sckey-xxxxxxxx（v0.10.1+）与旧版 scxxxxxxxx（v0.9.x 遗留）
+  // 均要求行尾精确匹配，不会影响用户自有密钥的常规注释（如邮箱、主机名）
   _scheduleGc() {
     if (this._gcDone) return;
     this._gcDone = true;
     setTimeout(() => {
       if (this.status !== 'online') return;
       this.exec(
-        'if [ -f ~/.ssh/authorized_keys ]; then sed -i -E "/ sc[a-z0-9]{8}$/d" ~/.ssh/authorized_keys; fi; rm -rf /tmp/.sc[a-z0-9]* 2>/dev/null',
+        'if [ -f ~/.ssh/authorized_keys ]; then sed -i -E "/ sckey-[a-z0-9]{8}$/d; / sc[a-z0-9]{8}$/d" ~/.ssh/authorized_keys; fi; rm -rf /tmp/.sckey-* /tmp/.sc[a-z0-9]* 2>/dev/null',
         8000,
       ).catch(() => {});
     }, 5000);

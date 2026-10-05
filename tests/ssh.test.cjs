@@ -90,9 +90,44 @@ describe('SFTP & Shell safety', () => {
   });
 
   it('gc regex correctly matches server-console temporary direct relay tags only', () => {
-    const regex = / sc[a-z0-9]{8}$/;
-    expect(regex.test('ssh-ed25519 AAAAC3... sc9a1b2c3d')).toBe(true);
-    expect(regex.test('ssh-rsa AAAAB3... user@my-desktop')).toBe(false);
-    expect(regex.test('ssh-ed25519 AAAAC3... sc123')).toBe(false);
+    const oldRegex = / sc[a-z0-9]{8}$/;
+    const newRegex = / sckey-[a-z0-9]{8}$/;
+    // 新格式（v0.10.1+）：sckey- 前缀精确匹配
+    expect(newRegex.test('ssh-ed25519 AAAAC3... sckey-9a1b2c3d')).toBe(true);
+    expect(newRegex.test('ssh-ed25519 AAAAC3... sckey-test1abc')).toBe(true);
+    expect(newRegex.test('ssh-rsa AAAAB3... user@my-desktop')).toBe(false);
+    expect(newRegex.test('ssh-ed25519 AAAAC3... sckey-short')).toBe(false);
+    // 旧格式（v0.9.x 遗留）：仍需清理
+    expect(oldRegex.test('ssh-ed25519 AAAAC3... sc9a1b2c3d')).toBe(true);
+    expect(oldRegex.test('ssh-rsa AAAAB3... user@my-desktop')).toBe(false);
+    expect(oldRegex.test('ssh-ed25519 AAAAC3... sc123')).toBe(false);
+    // 用户自有密钥注释（邮箱/主机名/常见格式）不应被任一模式误删
+    expect(newRegex.test('ssh-ed25519 AAAAC3... user@my-desktop')).toBe(false);
+    expect(oldRegex.test('ssh-ed25519 AAAAC3... scadmin')).toBe(false);
+    expect(oldRegex.test('ssh-ed25519 AAAAC3... sc2024!')).toBe(false);
+  });
+
+  it('differential polling: focused server always collects, background respects bgInterval', () => {
+    // 模拟差异化调度的核心判定逻辑
+    const bgInterval = Math.max(2000 * 4, 8000); // 8000
+    const lastCollectTime = new Map();
+    const now = 1000000;
+
+    const shouldCollect = (serverId, isActive) => {
+      if (isActive) return true;
+      const last = lastCollectTime.get(serverId) || 0;
+      return now - last >= bgInterval;
+    };
+
+    // 活跃服务器每轮都采集
+    expect(shouldCollect('srv-a', true)).toBe(true);
+    // 后台服务器首次也采集（无历史记录）
+    expect(shouldCollect('srv-b', false)).toBe(true);
+    // 刚采集过的后台服务器被跳过
+    lastCollectTime.set('srv-b', now - 4000); // 4s < 8s
+    expect(shouldCollect('srv-b', false)).toBe(false);
+    // 超过 bgInterval 后恢复采集
+    lastCollectTime.set('srv-b', now - 9000); // 9s > 8s
+    expect(shouldCollect('srv-b', false)).toBe(true);
   });
 });

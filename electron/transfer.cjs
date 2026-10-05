@@ -733,7 +733,9 @@ class TransferManager {
     const port = cfgB.port || 22;
     const user = cfgB.username || 'root';
     if (!host) throw new Error('目标缺少主机地址');
-    const tag = 'sc' + Math.random().toString(36).slice(2, 10);
+    // tag 格式：sckey- + 8 位随机 base36（GC 端用 / sckey-[a-z0-9]{8}$/ 精确匹配，
+    // 避免误删 authorized_keys 中碰巧以 sc 开头 8 位的用户自有密钥注释）
+    const tag = 'sckey-' + Math.random().toString(36).slice(2, 10);
     const dir = '/tmp/.' + tag;
     const key = dir + '/k';
     const script = dir + '/run.sh';
