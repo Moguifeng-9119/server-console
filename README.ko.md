@@ -6,9 +6,9 @@ English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) 
 
 # 🖥️ ServerConsole
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | 한국어 | [Español](./README.es.md) | [Français](./README.fr.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Português (Brasil)](./README.pt-BR.md)
 
-### One desktop to monitor your GPU fleet, browse files, and move data **between servers at full speed** — all over SSH, fully local.
+### GPU 플릿을 하나의 데스크톱에서 모니터링, 파일 탐색, 서버 간 **전속력 데이터 전송** — 모두 SSH, 완전 로컬.
 
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
@@ -18,10 +18,10 @@ English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) 
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
 ![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 
-**ServerConsole** is a local-first desktop app that centralizes multiple Linux/GPU servers:
-live GPU & process monitoring, a dual-pane SFTP file manager, uploads/downloads, and
-**high-speed server-to-server direct transfer** — built with Electron, React and [`ssh2`](https://github.com/mscdex/ssh2).
-No cloud, no relay of your data: every connection runs straight from your machine.
+**ServerConsole** 는 여러 Linux/GPU 서버를 중앙 집중화하는 로컬 우선 데스크톱 앱입니다:
+실시간 GPU & 프로세스 모니터링, 듀얼 페인 SFTP 파일 관리자, 업/다운로드,
+**고속 서버 간 직접 전송** — Electron, React, [`ssh2`](https://github.com/mscdex/ssh2) 로 구축.
+클라우드 없음, 데이터 릴레이 없음: 모든 연결은 로컬 머신에서 직접 실행됩니다.
 
   <p align="center">
     <img src="assets/screenshots/overview.png" alt="Fleet overview" width="880" />
@@ -34,37 +34,37 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 ---
 
-## 📑 Table of Contents
-- [✨ Highlights](#-highlights)
-- [🧱 Tech Stack](#-tech-stack)
-- [🚀 Getting Started](#-getting-started)
-- [🏗️ Build & Package](#️-build--package)
-- [🧭 Usage](#-usage)
-- [🏛️ How it works](#️-how-it-works)
-- [🔐 Security & Privacy](#-security--privacy)
-- [📁 Data storage](#-data-storage)
-- [🧪 Development](#-development)
-- [⚠️ Limitations](#️-limitations)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+## 📑 목차
+- [✨ ✨ 하이라이트](#-highlights)(#-highlights)
+- [🧱 🧱 기술 스택](#-tech-stack)(#-tech-stack)
+- [🚀 🚀 시작하기](#-getting-started)(#-getting-started)
+- [🏗️ 🏗️ 빌드 & 패키징](#️-build--package)(#️-build--package)
+- [🧭 🧭 사용법](#-usage)(#-usage)
+- [🏛️ 🏛️ 작동 방식](#️-how-it-works)(#️-how-it-works)
+- [🔐 🔐 보안 및 개인정보](#-security--privacy)(#-security--privacy)
+- [📁 📁 데이터 저장](#-data-storage)(#-data-storage)
+- [🧪 🧪 개발 및 테스트](#-development)(#-development)
+- [⚠️ ⚠️ 알려진 제한사항](#️-limitations)(#️-limitations)
+- [🤝 🤝 기여하기](#-contributing)(#-contributing)
+- [📄 📄 라이선스](#-license)(#-license)
 
 ---
 
-## ✨ Highlights
+## ✨ ✨ 하이라이트
 
-### 🧩 Multi-server management
+### 🧩 멀티 서버 관리
 - **Password & private-key** auth (passphrase supported), with per-server connection tests.
 - Credentials are encrypted at rest with the OS keychain (Windows DPAPI / libsecret) and **never leave your machine**.
 - Sidebar with live reachability, **groups**, configurable auto-refresh (1 / 2 / 5 / 10 s) and Ctrl+K command palette.
 - **Resizable sidebar** (180px–480px, double-click to reset to 224px, auto-persisted).
 - **Differential polling scheduler**: Keeps high-frequency monitoring on the active server while downthrottling background nodes to $\ge 8$s, saving over 70% network and CPU overhead on large clusters.
 
-### 🔑 One-click `~/.ssh/config` import
+### 🔑 `~/.ssh/config` 원클릭 가져오기
 - A **real React dialog** (no script injection) parses OpenSSH config: hosts, users, ports and `IdentityFile`s.
 - Browse any config file, assign one shared key or a key per host; existing hosts are auto-skipped.
 - **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
 
-### 🧰 Ops toolkit
+### 🧰 운영 도구 키트
 - **Embedded SSH terminal** per server (xterm.js): multiple sessions per server, Windows-style copy/paste (right-click, Ctrl+C/V, multi-line paste), scrollback preserved across tab switches.
 - **Parallel commands**: run one command on N selected servers at once, per-server live output.
 - **Local port forwarding** (ssh -L equivalent) with rule management and auto-restore.
@@ -74,7 +74,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - ProxyJump bastions, keyboard-interactive (2FA/MFA) and ssh-agent auth; SSH compression; system tray.
 - Encrypted config export/import; update check via GitHub Releases.
 
-### 📊 Real GPU & process monitoring
+### 📊 실시간 GPU / 프로세스 모니터링
 - Dashboard KPIs: average GPU utilization, VRAM, CPU, memory, load average and zombie-process count.
 - Per-GPU **utilization, VRAM, temperature, power and fan speed**, plus processes on each card.
 - **4 / 8 / 16-GPU Compact Matrix View**: Toggle high-density matrix mode for HGX/DGX clusters to monitor all accelerators in a single view.
@@ -82,7 +82,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Right-click a process for `SIGTERM` / `SIGKILL`, copy PID/command or restart a service — with confirmation and a **local audit log**.
 - > Temperature, fan and power come **straight from `nvidia-smi`**. Fields the driver doesn't report show `N/A` — values are never estimated or fabricated.
 
-### 🗂️ Dual-pane SFTP file manager
+### 🗂️ 듀얼 페인 SFTP 파일 관리자
 - **Local ⇄ remote** side-by-side panes: **resizable splitter** (drag to adjust ratio, double-click to reset to 50:50).
 - **Professional keyboard shortcuts**: `Delete` for removal, `F2` to rename, `F5` to reload, `Ctrl+A` to select all, `Esc` to clear selection.
 - **Remote permissions (`chmod`)**: Visual dialog to inspect and update octal permissions (e.g. 755/644).
@@ -90,7 +90,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Right-click menu: download, view as text, rename, delete, **compress to `.tar.gz`**, extract (tar/zip), send to another server.
 - Remote filename search in the current directory; double-click to descend; Ctrl-click to multi-select, **Shift-click for range selection**.
 
-### ⚡ Server-to-server direct transfer
+### ⚡ 서버 간 직접 전송
 - A **visual dual-pane picker** for source and destination — no manual path typing.
 - Prefers a **direct server-to-server path that never bounces through your machine**. It probes both ends for `rsync / tar / scp` and picks the best, falling back automatically; only when neither supports it does it relay locally.
 - Uses an **ephemeral one-time key pair** (generated at runtime, injected into `authorized_keys`, **shredded immediately after**). Your main private key is never used or uploaded.
@@ -98,7 +98,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Large trees are streamed while being walked — no blocking pre-scan, no stuck "adding…".
 - > A transfer is **always a copy**. Files on the source server are never deleted.
 
-### 🚦 Transfer Center drawer
+### 🚦 전송 센터 드로어
 - A pinned **right-side drawer** (up to fullscreen) opened from a persistent top-bar button with a running-count badge; it stays open while tasks run.
 - Header shows **live aggregate instant speed** (↑ upload / ↓ download / ⇄ relay), active count and overall progress.
 - Filter by **type** (all/upload/download/relay) and **status** (all/active/done/failed).
@@ -110,7 +110,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
   - **file x/y count** and a **recent-files stream** (rsync reports each finished file; locally filterable).
 - Queue controls: pause/resume all, multi-select cancel, retry all failed, clear finished, **reorder queued tasks ↑/↓**, global **concurrency 1–15 (default 15)**, system notifications and an optional failure beep.
 
-### 🎛️ Modern, calm UI
+### 🎛️ 모던하고 차분한 UI
 - Dashboard styling with a **clean light theme by default** (follow-system / light / dark) and a cyan accent.
 - **Windows title bar overlay theme synchronization**: Dynamic matching of native caption buttons with dark/light themes.
 - **Full 10-language internationalization (i18n)**: English, Simplified/Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian, Portuguese.
@@ -119,7 +119,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 ---
 
-## 🧱 Tech Stack
+## 🧱 🧱 기술 스택
 
 | Layer | Technology |
 | --- | --- |
@@ -152,7 +152,7 @@ The main process owns all SSH/SFTP/local-file work and transfer scheduling; the 
 
 ---
 
-## 🚀 Getting Started
+## 🚀 🚀 시작하기
 
 **Requirements:** Node.js ≥ 18 (developed on Node 22) and npm.
 
@@ -171,7 +171,7 @@ npm run electron:dev
 
 ---
 
-## 🏗️ Build & Package
+## 🏗️ 🏗️ 빌드 & 패키징
 
 ```bash
 npm run build          # tsc strict type-check + Vite production build
@@ -186,21 +186,21 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 🧭 Usage
-1. **Add a server** — enter host/port/user, choose password or key auth, optionally *Test connection*, then save. Or click **Import from `~/.ssh/config`**.
-2. Pick a node in the sidebar to open its **Overview / GPU / Processes / Files** tabs.
-3. In **Files**, upload/download between the two panes, or select remote items → **Server relay ⇄** and choose the destination server & folder in the dual-pane dialog.
-4. Open the top-bar **Transfers** button any time for live speed, file progress and queue management.
+## 🧭 🧭 사용법
+1. **서버 추가** — 호스트/포트/사용자를 입력하고 비밀번호 또는 키 인증을 선택, *연결 테스트* 후 저장. 또는 **`~/.ssh/config`에서 가져오기** 클릭.
+2. 사이드바에서 노드를 선택하여 **개요 / GPU / 프로세스 / 파일** 탭을 엽니다.
+3. **파일** 탭에서 두 패인 간 업/다운로드, 또는 원격 항목 선택 → **서버 릴레이 ⇄** 로 대상 서버 및 폴더 선택.
+4. 상단 바의 **전송** 버튼으로 실시간 속도, 파일 진행률, 큐 관리를 확인.
 
 ---
 
-## 🏛️ How it works
+## 🏛️ 🏛️ 작동 방식
 
 ```
-┌────────────────────────────┐         IPC (window.api)          ┌──────────────────────────┐
+┌────────────────────────────┐         IPC (window.api)        ┌──────────────────────────┐
 │  Renderer (React + TS)     │  ◀──────────────────────────▶   │  Main process (Node)     │
-│  dashboard / file manager  │                                   │  ssh2 · SFTP · scheduler │
-└────────────────────────────┘                                   └───────────┬──────────────┘
+│  dashboard / file manager  │                                 │  ssh2 · SFTP · scheduler │
+└────────────────────────────┘                                 └───────────┬──────────────┘
                                                                              │ SSH
                                               ┌──────────────────────────────┼──────────────────────────────┐
                                               ▼                              ▼                              ▼
@@ -216,7 +216,7 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 🔐 Security & Privacy
+## 🔐 🔐 보안 및 개인정보
 - **Host key verification (TOFU)**: the first connection records the server's host-key fingerprint; every later connection is verified against it and a mismatch is rejected with a clear warning. Direct server-to-server transfers carry the destination fingerprint into a temporary `known_hosts` on the source (`StrictHostKeyChecking=yes`). The trust store is manageable in *Settings → Security*.
 - Direct-transfer keys are **ephemeral and shredded after use**; the main private key is never copied or uploaded.
 - Relay is **copy-only** — source data is never deleted; **retry resumes from the breakpoint** instead of deleting the destination.
@@ -226,14 +226,14 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 📁 Data storage
+## 📁 📁 데이터 저장
 All local data lives in the OS user-data directory (`%AppData%/server-console/` on Windows):
 `servers.json` (connections), `transfers.json` (trimmed history), `hostkeys.json` (TOFU trust store), `security.json` (security options), `audit.log` (operations) and `error.log`.
 Delete that folder to wipe all local state.
 
 ---
 
-## 🧪 Development
+## 🧪 🧪 개발 및 테스트
 ```bash
 npm run typecheck   # tsc strict (src) + checkJs (electron main process)
 npm test            # vitest unit tests
@@ -246,7 +246,7 @@ Without a real GPU box, spin up the built-in **mock SSH server** — it returns 
 npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
 ```
 
-## ⚠️ Limitations
+## ⚠️ ⚠️ 알려진 제한사항
 - Direct transfer requires the two servers to be mutually reachable; otherwise it relays through your machine (bounded by your up/down bandwidth).
 - Precise per-file progress requires `rsync` (or local relay); an `scp`-only fallback reports byte-level progress.
 - GPU monitoring requires `nvidia-smi` to be installed and executable on the target host.
@@ -254,10 +254,10 @@ npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
 
 ---
 
-## 🤝 Contributing
+## 🤝 🤝 기여하기
 Issues and PRs are welcome. Please run `npm run build` (strict type-check) before opening a PR, and never commit real hosts, credentials or keys.
 
-## 📄 License
+## 📄 📄 라이선스
 Distributed under the **[MIT License](./LICENSE)**.
 
-<div align="center"><sub>Built for engineers who manage many GPU servers and just want transfers to be fast, honest and safe.</sub></div>
+<div align="center"><sub>많은 GPU 서버를 관리하는 엔지니어를 위해 — 전송은 빠르게, 데이터는 정직하게, 작업은 안전하게.</sub></div>

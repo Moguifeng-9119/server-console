@@ -6,9 +6,9 @@ English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) 
 
 # 🖥️ ServerConsole
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | Español | [Français](./README.fr.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Português (Brasil)](./README.pt-BR.md)
 
-### One desktop to monitor your GPU fleet, browse files, and move data **between servers at full speed** — all over SSH, fully local.
+### Un escritorio para monitorear tu flota de GPUs, navegar archivos y mover datos **entre servidores a máxima velocidad** — todo por SSH, completamente local.
 
 ![license](https://img.shields.io/badge/license-MIT-22c55e)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
@@ -18,10 +18,10 @@ English | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) 
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
 ![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 
-**ServerConsole** is a local-first desktop app that centralizes multiple Linux/GPU servers:
-live GPU & process monitoring, a dual-pane SFTP file manager, uploads/downloads, and
-**high-speed server-to-server direct transfer** — built with Electron, React and [`ssh2`](https://github.com/mscdex/ssh2).
-No cloud, no relay of your data: every connection runs straight from your machine.
+**ServerConsole** es una app de escritorio local-first que centraliza múltiples servidores Linux/GPU:
+monitoreo en vivo de GPU y procesos, un administrador de archivos SFTP de doble panel, subidas/descargas, y
+**transferencia directa de alta velocidad entre servidores** — construido con Electron, React y [`ssh2`](https://github.com/mscdex/ssh2).
+Sin nube, sin relé de datos: cada conexión corre directamente desde tu máquina.
 
   <p align="center">
     <img src="assets/screenshots/overview.png" alt="Fleet overview" width="880" />
@@ -34,37 +34,37 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 ---
 
-## 📑 Table of Contents
-- [✨ Highlights](#-highlights)
-- [🧱 Tech Stack](#-tech-stack)
-- [🚀 Getting Started](#-getting-started)
-- [🏗️ Build & Package](#️-build--package)
-- [🧭 Usage](#-usage)
-- [🏛️ How it works](#️-how-it-works)
-- [🔐 Security & Privacy](#-security--privacy)
-- [📁 Data storage](#-data-storage)
-- [🧪 Development](#-development)
-- [⚠️ Limitations](#️-limitations)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+## 📑 Índice
+- [✨ ✨ Destacados](#-highlights)(#-highlights)
+- [🧱 🧱 Stack tecnológico](#-tech-stack)(#-tech-stack)
+- [🚀 🚀 Primeros pasos](#-getting-started)(#-getting-started)
+- [🏗️ 🏗️ Compilar y empaquetar](#️-build--package)(#️-build--package)
+- [🧭 🧭 Uso](#-usage)(#-usage)
+- [🏛️ 🏛️ Cómo funciona](#️-how-it-works)(#️-how-it-works)
+- [🔐 🔐 Seguridad y privacidad](#-security--privacy)(#-security--privacy)
+- [📁 📁 Almacenamiento de datos](#-data-storage)(#-data-storage)
+- [🧪 🧪 Desarrollo](#-development)(#-development)
+- [⚠️ ⚠️ Limitaciones](#️-limitations)(#️-limitations)
+- [🤝 🤝 Contribuir](#-contributing)(#-contributing)
+- [📄 📄 Licencia](#-license)(#-license)
 
 ---
 
-## ✨ Highlights
+## ✨ ✨ Destacados
 
-### 🧩 Multi-server management
+### 🧩 Gestión multi-servidor
 - **Password & private-key** auth (passphrase supported), with per-server connection tests.
 - Credentials are encrypted at rest with the OS keychain (Windows DPAPI / libsecret) and **never leave your machine**.
 - Sidebar with live reachability, **groups**, configurable auto-refresh (1 / 2 / 5 / 10 s) and Ctrl+K command palette.
 - **Resizable sidebar** (180px–480px, double-click to reset to 224px, auto-persisted).
 - **Differential polling scheduler**: Keeps high-frequency monitoring on the active server while downthrottling background nodes to $\ge 8$s, saving over 70% network and CPU overhead on large clusters.
 
-### 🔑 One-click `~/.ssh/config` import
+### 🔑 Importación con un clic de `~/.ssh/config`
 - A **real React dialog** (no script injection) parses OpenSSH config: hosts, users, ports and `IdentityFile`s.
 - Browse any config file, assign one shared key or a key per host; existing hosts are auto-skipped.
 - **Watches the config file for changes** and shows a banner when hosts are added / changed / removed — import or update in one click; removed hosts are never deleted silently.
 
-### 🧰 Ops toolkit
+### 🧰 Caja de herramientas de operaciones
 - **Embedded SSH terminal** per server (xterm.js): multiple sessions per server, Windows-style copy/paste (right-click, Ctrl+C/V, multi-line paste), scrollback preserved across tab switches.
 - **Parallel commands**: run one command on N selected servers at once, per-server live output.
 - **Local port forwarding** (ssh -L equivalent) with rule management and auto-restore.
@@ -74,7 +74,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - ProxyJump bastions, keyboard-interactive (2FA/MFA) and ssh-agent auth; SSH compression; system tray.
 - Encrypted config export/import; update check via GitHub Releases.
 
-### 📊 Real GPU & process monitoring
+### 📊 Monitoreo real de GPU y procesos
 - Dashboard KPIs: average GPU utilization, VRAM, CPU, memory, load average and zombie-process count.
 - Per-GPU **utilization, VRAM, temperature, power and fan speed**, plus processes on each card.
 - **4 / 8 / 16-GPU Compact Matrix View**: Toggle high-density matrix mode for HGX/DGX clusters to monitor all accelerators in a single view.
@@ -82,7 +82,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Right-click a process for `SIGTERM` / `SIGKILL`, copy PID/command or restart a service — with confirmation and a **local audit log**.
 - > Temperature, fan and power come **straight from `nvidia-smi`**. Fields the driver doesn't report show `N/A` — values are never estimated or fabricated.
 
-### 🗂️ Dual-pane SFTP file manager
+### 🗂️ Administrador de archivos SFTP de doble panel
 - **Local ⇄ remote** side-by-side panes: **resizable splitter** (drag to adjust ratio, double-click to reset to 50:50).
 - **Professional keyboard shortcuts**: `Delete` for removal, `F2` to rename, `F5` to reload, `Ctrl+A` to select all, `Esc` to clear selection.
 - **Remote permissions (`chmod`)**: Visual dialog to inspect and update octal permissions (e.g. 755/644).
@@ -90,7 +90,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Right-click menu: download, view as text, rename, delete, **compress to `.tar.gz`**, extract (tar/zip), send to another server.
 - Remote filename search in the current directory; double-click to descend; Ctrl-click to multi-select, **Shift-click for range selection**.
 
-### ⚡ Server-to-server direct transfer
+### ⚡ Transferencia directa entre servidores
 - A **visual dual-pane picker** for source and destination — no manual path typing.
 - Prefers a **direct server-to-server path that never bounces through your machine**. It probes both ends for `rsync / tar / scp` and picks the best, falling back automatically; only when neither supports it does it relay locally.
 - Uses an **ephemeral one-time key pair** (generated at runtime, injected into `authorized_keys`, **shredded immediately after**). Your main private key is never used or uploaded.
@@ -98,7 +98,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 - Large trees are streamed while being walked — no blocking pre-scan, no stuck "adding…".
 - > A transfer is **always a copy**. Files on the source server are never deleted.
 
-### 🚦 Transfer Center drawer
+### 🚦 Panel de centro de transferencias
 - A pinned **right-side drawer** (up to fullscreen) opened from a persistent top-bar button with a running-count badge; it stays open while tasks run.
 - Header shows **live aggregate instant speed** (↑ upload / ↓ download / ⇄ relay), active count and overall progress.
 - Filter by **type** (all/upload/download/relay) and **status** (all/active/done/failed).
@@ -110,7 +110,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
   - **file x/y count** and a **recent-files stream** (rsync reports each finished file; locally filterable).
 - Queue controls: pause/resume all, multi-select cancel, retry all failed, clear finished, **reorder queued tasks ↑/↓**, global **concurrency 1–15 (default 15)**, system notifications and an optional failure beep.
 
-### 🎛️ Modern, calm UI
+### 🎛️ Interfaz moderna y serena
 - Dashboard styling with a **clean light theme by default** (follow-system / light / dark) and a cyan accent.
 - **Windows title bar overlay theme synchronization**: Dynamic matching of native caption buttons with dark/light themes.
 - **Full 10-language internationalization (i18n)**: English, Simplified/Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian, Portuguese.
@@ -119,7 +119,7 @@ No cloud, no relay of your data: every connection runs straight from your machin
 
 ---
 
-## 🧱 Tech Stack
+## 🧱 🧱 Stack tecnológico
 
 | Layer | Technology |
 | --- | --- |
@@ -152,7 +152,7 @@ The main process owns all SSH/SFTP/local-file work and transfer scheduling; the 
 
 ---
 
-## 🚀 Getting Started
+## 🚀 🚀 Primeros pasos
 
 **Requirements:** Node.js ≥ 18 (developed on Node 22) and npm.
 
@@ -171,7 +171,7 @@ npm run electron:dev
 
 ---
 
-## 🏗️ Build & Package
+## 🏗️ 🏗️ Compilar y empaquetar
 
 ```bash
 npm run build          # tsc strict type-check + Vite production build
@@ -186,21 +186,21 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 🧭 Usage
-1. **Add a server** — enter host/port/user, choose password or key auth, optionally *Test connection*, then save. Or click **Import from `~/.ssh/config`**.
-2. Pick a node in the sidebar to open its **Overview / GPU / Processes / Files** tabs.
-3. In **Files**, upload/download between the two panes, or select remote items → **Server relay ⇄** and choose the destination server & folder in the dual-pane dialog.
-4. Open the top-bar **Transfers** button any time for live speed, file progress and queue management.
+## 🧭 🧭 Uso
+1. **Agregar un servidor** — ingresa host/puerto/usuario, elige autenticación por contraseña o clave, opcionalmente *Probar conexión*, luego guarda. O haz clic en **Importar de `~/.ssh/config`**.
+2. Selecciona un nodo en la barra lateral para abrir sus pestañas **Resumen / GPU / Procesos / Archivos**.
+3. En **Archivos**, sube/descarga entre los dos paneles, o selecciona elementos remotos → **Relé entre servidores ⇄** y elige el servidor y carpeta de destino en el diálogo de doble panel.
+4. Abre el botón **Transferencias** de la barra superior en cualquier momento para velocidad en vivo, progreso de archivos y gestión de cola.
 
 ---
 
-## 🏛️ How it works
+## 🏛️ 🏛️ Cómo funciona
 
 ```
-┌────────────────────────────┐         IPC (window.api)          ┌──────────────────────────┐
+┌────────────────────────────┐         IPC (window.api)        ┌──────────────────────────┐
 │  Renderer (React + TS)     │  ◀──────────────────────────▶   │  Main process (Node)     │
-│  dashboard / file manager  │                                   │  ssh2 · SFTP · scheduler │
-└────────────────────────────┘                                   └───────────┬──────────────┘
+│  dashboard / file manager  │                                 │  ssh2 · SFTP · scheduler │
+└────────────────────────────┘                                 └───────────┬──────────────┘
                                                                              │ SSH
                                               ┌──────────────────────────────┼──────────────────────────────┐
                                               ▼                              ▼                              ▼
@@ -216,7 +216,7 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 🔐 Security & Privacy
+## 🔐 🔐 Seguridad y privacidad
 - **Host key verification (TOFU)**: the first connection records the server's host-key fingerprint; every later connection is verified against it and a mismatch is rejected with a clear warning. Direct server-to-server transfers carry the destination fingerprint into a temporary `known_hosts` on the source (`StrictHostKeyChecking=yes`). The trust store is manageable in *Settings → Security*.
 - Direct-transfer keys are **ephemeral and shredded after use**; the main private key is never copied or uploaded.
 - Relay is **copy-only** — source data is never deleted; **retry resumes from the breakpoint** instead of deleting the destination.
@@ -226,14 +226,14 @@ npm run dist:linux     # Linux AppImage
 
 ---
 
-## 📁 Data storage
+## 📁 📁 Almacenamiento de datos
 All local data lives in the OS user-data directory (`%AppData%/server-console/` on Windows):
 `servers.json` (connections), `transfers.json` (trimmed history), `hostkeys.json` (TOFU trust store), `security.json` (security options), `audit.log` (operations) and `error.log`.
 Delete that folder to wipe all local state.
 
 ---
 
-## 🧪 Development
+## 🧪 🧪 Desarrollo
 ```bash
 npm run typecheck   # tsc strict (src) + checkJs (electron main process)
 npm test            # vitest unit tests
@@ -246,7 +246,7 @@ Without a real GPU box, spin up the built-in **mock SSH server** — it returns 
 npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
 ```
 
-## ⚠️ Limitations
+## ⚠️ ⚠️ Limitaciones
 - Direct transfer requires the two servers to be mutually reachable; otherwise it relays through your machine (bounded by your up/down bandwidth).
 - Precise per-file progress requires `rsync` (or local relay); an `scp`-only fallback reports byte-level progress.
 - GPU monitoring requires `nvidia-smi` to be installed and executable on the target host.
@@ -254,10 +254,10 @@ npm run mock:ssh       # default port 2222 (set FAKE_SSH_PORT to override)
 
 ---
 
-## 🤝 Contributing
+## 🤝 🤝 Contribuir
 Issues and PRs are welcome. Please run `npm run build` (strict type-check) before opening a PR, and never commit real hosts, credentials or keys.
 
-## 📄 License
+## 📄 📄 Licencia
 Distributed under the **[MIT License](./LICENSE)**.
 
-<div align="center"><sub>Built for engineers who manage many GPU servers and just want transfers to be fast, honest and safe.</sub></div>
+<div align="center"><sub>Construido para ingenieros que administran muchos servidores GPU y quieren que las transferencias sean rápidas, honestas y seguras.</sub></div>

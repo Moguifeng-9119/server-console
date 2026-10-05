@@ -12,6 +12,20 @@
 ![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
 ![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 
+[English](./README.md) | 简体中文 | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Português (Brasil)](./README.pt-BR.md)
+
+# 🖥️ ServerConsole
+
+### 一台桌面管理整个 GPU 机房：监控、文件、服务器互传——全程 SSH，数据不经过任何第三方。
+
+![license](https://img.shields.io/badge/license-MIT-22c55e)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748b)
+![electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)
+![react](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![typescript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![ssh](https://img.shields.io/badge/SSH-ssh2-4EA94B)
+![ci](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+
 [English](./README.md) | 简体中文
 
 **ServerConsole** 是一款本地优先的桌面应用，把多台 Linux/GPU 服务器集中到一起：
