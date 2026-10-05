@@ -1,5 +1,7 @@
 # Validation ledger — 0.11.0 source change
 
+This is the historical 0.11.0 local ledger. See [0.11.1 validation](VALIDATION-0.11.1.md) for the subsequent forwarding fixes, expanded native checks and cross-platform packaging.
+
 Checked locally on Windows x64 with Node.js 22, Chrome and a locally packaged Electron 44.5.1 app. This ledger distinguishes source checks, Windows native checks and remote/platform validation. This local ledger was completed before publication. The v0.11.0 release uses the validated Windows portable package; see the [release](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0). GitHub CI and other platform builds are subsequent checks, not results established by the local receipts.
 
 | Layer | Command / evidence | Scope |

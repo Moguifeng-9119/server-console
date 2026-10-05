@@ -1,0 +1,25 @@
+{
+  "at": "2026-10-05T13:43:49.032Z",
+  "version": "0.11.1",
+  "testedSourceCommit": "0a07b4ab9c85c87f9e60404c748e724441fb1be1",
+  "windowsOrigin": "local native-tested portable build",
+  "linuxMacOrigin": "GitHub native-tested package workflow 37318075596",
+  "signing": "unsigned; macOS not notarized",
+  "assets": [
+    {
+      "name": "ServerConsole-0.11.1-linux-x86_64.AppImage",
+      "bytes": 130889513,
+      "sha256": "62635e476ee1eb7b509009659c74cbdd703c47d2281560f6484bedd9ccde9963"
+    },
+    {
+      "name": "ServerConsole-0.11.1-macos-universal.dmg",
+      "bytes": 233023310,
+      "sha256": "d620e812d0a98084cdd7948f08bb2dbf26b7402cc430fd577b025d326ab3ec02"
+    },
+    {
+      "name": "ServerConsole-0.11.1-windows-x64-portable.exe",
+      "bytes": 106227538,
+      "sha256": "d226d1f3ca1ea673a1a376f78ea5d6841f9667bd6e169134a1776bca3d9158d2"
+    }
+  ]
+}

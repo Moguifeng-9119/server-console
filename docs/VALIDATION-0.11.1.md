@@ -33,7 +33,15 @@ Regression tests cover these cases. Per-rule intent tokens cancel outdated work;
 
 v0.11.0 public unauthenticated download returned HTTP 200 and exactly matched the uploaded Windows portable SHA-256; see [download receipt](evidence/release-download-0.11.0.json). Its three-platform source CI passed: [run 37314732405](https://github.com/Moguifeng-9119/server-console/actions/runs/37314732405).
 
-The 0.11.1 Windows portable build and GitHub three-platform package/native checks are being completed. Their final results will be added with the release; this source ledger does not claim pending checks have passed.
+For 0.11.1, both the [source CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37318056302) and [desktop package/native workflow](https://github.com/Moguifeng-9119/server-console/actions/runs/37318075596) completed successfully on all three platforms. The tested application source commit is `0a07b4ab9c85c87f9e60404c748e724441fb1be1`; subsequent release documentation/evidence changes do not alter application code or assets. Compact GitHub receipts are stored for [source CI](evidence/source-ci-0.11.1.json) and [packages](evidence/packages-ci-0.11.1.json).
+
+| GitHub runner | Source CI | Package and native checks | Credential evidence |
+| --- | --- | --- | --- |
+| Windows x64 | Types, 84 tests, smoke, build, 22 UI checks passed | Portable built; 16 native checks passed | Actual Windows DPAPI; [receipt](evidence/native-terminal-0.11.1-windows-ci.json) |
+| Linux x64 | Same source checks passed | AppImage built; 16 native checks passed under Xvfb | `basic_text` backend rejected for persistence; session-only; [receipt](evidence/native-terminal-0.11.1-linux.json) |
+| macOS arm64 | Same source checks passed | Universal DMG built; 16 native checks passed on arm64 | Playwright MockKeychain; real Keychain and Intel execution unverified; [receipt](evidence/native-terminal-0.11.1-macos.json) |
+
+[v0.11.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) provides the locally tested Windows x64 portable file and the CI-built Linux x86_64 AppImage/macOS universal DMG, plus `SHA256SUMS.txt`. Binary sizes and SHA-256 values are in the [asset receipt](evidence/release-assets-0.11.1.json). All packages are unsigned; the macOS package is not notarized. The final Windows portable wrapper also passed a separate actual startup/CDP check; see [receipt](evidence/portable-launch-0.11.1.json). Full native checks use the matching unpacked application rather than instrumenting the portable/DMG/AppImage wrapper.
 
 ## Remaining boundaries
 

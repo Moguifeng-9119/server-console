@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-05T13:37:21.855Z",
+  "version": "0.11.1",
+  "scope": "Actual Windows portable wrapper startup via loopback CDP; narrower than full unpacked native E2E",
+  "bytes": 106227538,
+  "sha256": "d226d1f3ca1ea673a1a376f78ea5d6841f9667bd6e169134a1776bca3d9158d2",
+  "result": {
+    "bridge": "function",
+    "title": "ServerConsole",
+    "version": "ServerConsole\nv0.11.1"
+  }
+}
