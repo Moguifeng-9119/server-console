@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
@@ -32,6 +32,36 @@ export function FileManager({ serverId }: { serverId: string }) {
   const [localSort, setLocalSort] = useState<{ k: SortKey; asc: boolean }>({ k: 'name', asc: true });
   const [remoteSort, setRemoteSort] = useState<{ k: SortKey; asc: boolean }>({ k: 'name', asc: true });
   const [dragOver, setDragOver] = useState(false);
+
+  // 双面板拖拽分割（范围 20% - 80%，默认 50%）
+  const panesRef = useRef<HTMLDivElement | null>(null);
+  const [paneSplit, setPaneSplit] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem('sc.fm.split'));
+      return Number.isFinite(saved) && saved >= 20 && saved <= 80 ? saved : 50;
+    } catch {
+      return 50;
+    }
+  });
+
+  const onPaneSplitResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = panesRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const pct = Math.max(20, Math.min(80, ((ev.clientX - rect.left) / rect.width) * 100));
+      setPaneSplit(pct);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const finalPct = Math.max(20, Math.min(80, ((ev.clientX - rect.left) / rect.width) * 100));
+      localStorage.setItem('sc.fm.split', String(Math.round(finalPct)));
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const [ask, setAsk] = useState<{ title: string; label: string; value: string; onOk: (v: string) => void } | null>(null);
   const [askValue, setAskValue] = useState('');
@@ -144,23 +174,6 @@ export function FileManager({ serverId }: { serverId: string }) {
   const clearSelection = (side: 'local' | 'remote') => {
     (side === 'local' ? setLocal : setRemote)((p) => ({ ...p, selected: {} }));
   };
-
-  // Ctrl+A 全选 / Esc 清空（输入框聚焦或弹窗打开时不劫持）
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (results || ask || confirm || viewer || relay || menu) return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        selectAll(lastPane);
-      } else if (e.key === 'Escape') {
-        clearSelection(lastPane);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   const remoteFull = (e: FileEntry) => joinPosix(remote.cwd, e.name);
   // 注意：远程选中态的 key 与 FilePane 的 keyOf 保持一致，都用文件名 e.name
@@ -290,6 +303,61 @@ export function FileManager({ serverId }: { serverId: string }) {
     else pushToast({ level: 'error', title: '搜索失败', detail: r.error });
   };
 
+  const remoteChmod = (e: FileEntry) => {
+    const curOctal = e.mode ? (e.mode & 0o777).toString(8) : isDirLike(e) ? '755' : '644';
+    openAsk({
+      title: `修改权限 · ${e.name}`,
+      label: '八进制权限代码（如 755、644、777）',
+      value: curOctal,
+      onOk: async (v) => {
+        const mode = parseInt(v.trim(), 8);
+        if (Number.isNaN(mode)) {
+          pushToast({ level: 'error', title: '格式错误', detail: '权限代码必须为八进制数字（如 755 或 644）' });
+          return;
+        }
+        const r = await api?.sftpChmod(serverId, remoteFull(e), mode);
+        finishAction(r, () => loadRemote());
+      },
+    });
+  };
+
+  // 全局文件面板快捷键：Ctrl+A 全选、Esc 清空、Delete 删除、F2 重命名、F5 刷新
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (results || ask || confirm || viewer || relay || menu) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        selectAll(lastPane);
+      } else if (e.key === 'Escape') {
+        clearSelection(lastPane);
+      } else if (e.key === 'F5') {
+        e.preventDefault();
+        if (lastPane === 'remote') loadRemote();
+        else loadLocal();
+      } else if (e.key === 'Delete') {
+        e.preventDefault();
+        if (lastPane === 'remote') {
+          const sel = selectedRemote();
+          if (sel.length) remoteDelete(sel);
+        } else {
+          const sel = selectedLocal();
+          if (sel.length) localDelete(sel);
+        }
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        if (lastPane === 'remote') {
+          const sel = selectedRemote();
+          if (sel.length === 1) remoteRename(sel[0]);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   // 拖拽上传（Electron 32+ 经 webUtils.getPathForFile 取本地路径）
   const onDrop = (ev: React.DragEvent<HTMLDivElement>) => {
     ev.preventDefault();
@@ -380,7 +448,11 @@ export function FileManager({ serverId }: { serverId: string }) {
           ))}
         </div>
       ) : (
-        <div className="fm-panes">
+        <div
+          ref={panesRef}
+          className="fm-panes"
+          style={{ gridTemplateColumns: `${paneSplit}fr 96px ${100 - paneSplit}fr` }}
+        >
           <FilePane
             title="本机"
             state={local}
@@ -398,6 +470,15 @@ export function FileManager({ serverId }: { serverId: string }) {
           />
 
           <div className="fm-arrows">
+            <div
+              className="fm-split-handle"
+              title="按住拖拽调节左右面板比例 · 双击恢复 1:1"
+              onMouseDown={onPaneSplitResize}
+              onDoubleClick={() => {
+                setPaneSplit(50);
+                localStorage.setItem('sc.fm.split', '50');
+              }}
+            />
             <button className="btn primary" title="把左侧选中的本地文件上传到远程当前目录" onClick={() => doUpload(selectedLocal().map((e) => e.path || ''))}>
               上传 <ArrowRight size={13} />
             </button>
@@ -455,6 +536,7 @@ export function FileManager({ serverId }: { serverId: string }) {
                 </button>
               )}
               <button onClick={() => { remoteRename(menu.entry); setMenu(null); }}>重命名</button>
+              <button onClick={() => { remoteChmod(menu.entry); setMenu(null); }}>修改权限 (chmod)</button>
               <button onClick={() => { remoteArchive([menu.entry]); setMenu(null); }}>压缩为 tar.gz</button>
               {/\.(tar|tgz|zip)/i.test(menu.entry.name) && (
                 <button onClick={() => { remoteExtract(menu.entry); setMenu(null); }}>解压到当前目录</button>

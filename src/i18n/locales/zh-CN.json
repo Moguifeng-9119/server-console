@@ -40,7 +40,14 @@
     "timeout": "超时",
     "offline": "离线",
     "ngpu": "{{n}} GPU",
-    "cardTitle": "单击进入 · 右键查看 GPU 历史曲线"
+    "cardTitle": "单击进入 · 右键查看 GPU 历史曲线",
+    "emptyPrompt": "还没有连接任何服务器。",
+    "serverNotFound": "未找到该服务器"
+  },
+  "ki": {
+    "hint": "服务器要求交互式认证（如二次验证码）。",
+    "cancelFallback": "取消（回退密码）",
+    "submit": "提交"
   },
   "history": {
     "title": "GPU 利用率历史 · {{name}}",

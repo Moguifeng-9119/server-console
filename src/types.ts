@@ -104,6 +104,7 @@ export interface FileEntry {
   size: number;
   mtime: number;
   rights?: string;
+  mode?: number;
   path?: string; // 本地条目：绝对路径
   linkToDir?: boolean; // 远程符号链接且指向目录
   longname?: string;

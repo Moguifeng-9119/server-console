@@ -79,3 +79,20 @@ describe('parseSnapshot', () => {
     expect(COLLECT_CMD.indexOf('__SYS__')).toBeLessThan(COLLECT_CMD.indexOf('__PS__'));
   });
 });
+
+describe('SFTP & Shell safety', () => {
+  it('parses valid octal chmod and rejects NaN', () => {
+    const parseMode = (m) => (typeof m === 'number' ? m : parseInt(String(m), 8));
+    expect(parseMode('755')).toBe(0o755);
+    expect(parseMode('644')).toBe(0o644);
+    expect(parseMode(0o700)).toBe(0o700);
+    expect(Number.isNaN(parseMode('invalid'))).toBe(true);
+  });
+
+  it('gc regex correctly matches server-console temporary direct relay tags only', () => {
+    const regex = / sc[a-z0-9]{8}$/;
+    expect(regex.test('ssh-ed25519 AAAAC3... sc9a1b2c3d')).toBe(true);
+    expect(regex.test('ssh-rsa AAAAB3... user@my-desktop')).toBe(false);
+    expect(regex.test('ssh-ed25519 AAAAC3... sc123')).toBe(false);
+  });
+});

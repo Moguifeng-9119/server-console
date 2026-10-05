@@ -52,6 +52,7 @@ export default function App() {
   // 页面/标签持久化
   useEffect(() => {
     localStorage.setItem(LS_VIEW, JSON.stringify(view));
+    void api?.setFocusedServer(view.kind === 'server' ? view.id : null);
   }, [view]);
 
   // 上次页面对应的服务器已被删除 → 回总览
@@ -116,7 +117,33 @@ export default function App() {
 
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;
 
+  // 侧栏可拖拽宽度调节（范围 180px - 480px，默认 224px）
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem('sc.sidebar.w'));
+      return Number.isFinite(saved) && saved >= 180 && saved <= 480 ? saved : 224;
+    } catch {
+      return 224;
+    }
+  });
 
+  const onSidebarResizerMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(180, Math.min(480, startW + (ev.clientX - startX)));
+      setSidebarWidth(next);
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const finalW = Math.max(180, Math.min(480, startW + (ev.clientX - startX)));
+      localStorage.setItem('sc.sidebar.w', String(finalW));
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   // 侧栏分组：只要有服务器带分组信息就启用分区；折叠状态持久化
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -175,7 +202,7 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className="app" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark" title="ServerConsole">
@@ -217,6 +244,15 @@ export default function App() {
             {t('nav.settings')}
           </button>
         </div>
+        <div
+          className="sidebar-resizer"
+          title="按住拖拽调节宽度 · 双击恢复默认 224px"
+          onMouseDown={onSidebarResizerMouseDown}
+          onDoubleClick={() => {
+            setSidebarWidth(224);
+            localStorage.setItem('sc.sidebar.w', '224');
+          }}
+        />
       </aside>
 
       <main className="main">
@@ -251,10 +287,10 @@ export default function App() {
           ) : view.kind === 'overview' ? (
             configs.length === 0 && !demo ? (
               <div className="empty">
-                还没有连接任何服务器。
+                {t('overview.emptyPrompt', '还没有连接任何服务器。')}
                 <div style={{ marginTop: 12 }}>
                   <button className="btn primary" onClick={() => setManagerOpen(true)}>
-                    添加服务器
+                    {t('nav.servers', '添加服务器')}
                   </button>
                 </div>
               </div>
@@ -270,7 +306,7 @@ export default function App() {
               onBack={() => setView({ kind: 'overview' })}
             />
           ) : (
-            <div className="empty">未找到该服务器</div>
+            <div className="empty">{t('overview.serverNotFound', '未找到该服务器')}</div>
           )}
         </div>
       </main>
@@ -331,7 +367,7 @@ export default function App() {
           <div className="dialog" style={{ width: 440 }} onClick={(e) => e.stopPropagation()}>
             <h3>{kiAsk.title}</h3>
             <div className="body" style={{ color: 'var(--text-dim)' }}>
-              服务器要求交互式认证（如二次验证码）。
+              {t('ki.hint', '服务器要求交互式认证（如二次验证码）。')}
             </div>
             {kiAsk.prompts.map((p, i) => (
               <div className="field" key={i}>
@@ -362,10 +398,10 @@ export default function App() {
                   setKiAsk(null);
                 }}
               >
-                取消（回退密码）
+                {t('ki.cancelFallback', '取消（回退密码）')}
               </button>
               <button className="btn primary" onClick={submitKi}>
-                提交
+                {t('ki.submit', '提交')}
               </button>
             </div>
           </div>

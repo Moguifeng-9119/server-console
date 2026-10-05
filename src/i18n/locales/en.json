@@ -40,7 +40,14 @@
     "timeout": "Timeout",
     "offline": "Offline",
     "ngpu": "{{n}} GPU",
-    "cardTitle": "Click to open · right-click for GPU history"
+    "cardTitle": "Click to open · right-click for GPU history",
+    "emptyPrompt": "No servers connected yet.",
+    "serverNotFound": "Server not found"
+  },
+  "ki": {
+    "hint": "Server requires interactive authentication (e.g. 2FA/MFA token).",
+    "cancelFallback": "Cancel (fallback to password)",
+    "submit": "Submit"
   },
   "history": {
     "title": "GPU utilization history · {{name}}",

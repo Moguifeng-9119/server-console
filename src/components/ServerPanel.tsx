@@ -43,8 +43,32 @@ function KpiStrip({ s }: { s: Server }) {
 function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y: number) => void }) {
   const { colorOf } = useStore();
   const { t } = useTranslation();
+  const [matrix, setMatrix] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sc.gpu.matrix') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleMatrix = () => {
+    setMatrix((prev) => {
+      const next = !prev;
+      localStorage.setItem('sc.gpu.matrix', String(next));
+      return next;
+    });
+  };
+
   return (
-    <div className="gpu-list">
+    <>
+      {s.gpus.length >= 4 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <button className="btn mini" onClick={toggleMatrix} title="切换标准详细卡片与紧凑网格矩阵">
+            {matrix ? '视图：详细卡片' : '视图：紧凑矩阵'}
+          </button>
+        </div>
+      )}
+      <div className={`gpu-list ${matrix ? 'matrix' : ''}`}>
       {s.gpus.map((g) => {
         const memPct = (g.memUsed / g.memTotal) * 100;
         return (
@@ -110,7 +134,8 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
           </div>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 }
 

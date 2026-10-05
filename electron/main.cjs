@@ -158,6 +158,22 @@ ipcMain.handle('app:set-settings', (_e, o) => {
   return true;
 });
 
+// Windows 标题栏覆盖层深浅色动态同步
+ipcMain.handle('app:set-theme-overlay', (_e, payload) => {
+  if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return false;
+  try {
+    const isDark = (typeof payload === 'string' ? payload : payload?.theme) === 'dark';
+    mainWindow.setTitleBarOverlay({
+      color: isDark ? '#0c1420' : '#f4f7fb',
+      symbolColor: isDark ? '#e9f1fb' : '#0f1b2d',
+      height: 34,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 function createTray() {
   const iconPath = path.join(__dirname, '../build/icon_512.png');
   const img = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 }) : undefined;

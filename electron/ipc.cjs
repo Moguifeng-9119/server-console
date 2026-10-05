@@ -43,17 +43,29 @@ function logError(tag, e) {
 }
 
 const lastSnapJson = new Map(); // serverId -> 上次快照 JSON（增量广播：内容无变化不重发）
+const lastCollectTime = new Map(); // serverId -> 上次采集时间戳（用于后台节点降频调度）
+let activeServerId = null; // 当前前端聚焦的服务器 ID（null=在总览或其它页面，全量采集）
 
 async function tick() {
   if (ticking) return;
   ticking = true;
   // 采集错峰：把各服务器的采集起点按索引摊开，避免同刻打满本机与对端
   const stagger = Math.min(250, Math.floor((intervalMs * 0.8) / Math.max(1, servers.length)));
+  const now = Date.now();
+  const bgInterval = Math.max(intervalMs * 4, 8000);
   await Promise.all(
     servers.map(async (cfg, i) => {
       await new Promise((r) => setTimeout(r, i * stagger));
       const conn = pool.get(cfg);
       if (conn.isBackedOff()) return; // 退避窗口内不重试也不重复广播
+
+      // 差异化调度：当前聚焦节点每轮必采；未聚焦的后台节点降频至 bgInterval（≥8s）探活，大幅降低机群网络与主进程负载
+      const isFocused = !activeServerId || cfg.id === activeServerId;
+      if (!isFocused && now - (lastCollectTime.get(cfg.id) || 0) < bgInterval) {
+        return;
+      }
+      lastCollectTime.set(cfg.id, now);
+
       try {
         const snap = await conn.collect();
         const json = JSON.stringify(snap);
@@ -251,6 +263,11 @@ function registerIpc() {
     return intervalMs;
   });
 
+  ipcMain.handle('ssh:set-focused', (_e, id) => {
+    activeServerId = typeof id === 'string' && id ? id : null;
+    return true;
+  });
+
   ipcMain.handle('ssh:kill', async (_e, { id, pid, signal }) => {
     try {
       const res = await pool.get(getCfg(id)).kill(pid, signal);
@@ -391,7 +408,7 @@ function registerIpc() {
     wrap(async ({ id, cwd, names, archiveName }) => {
       const conn = await getConn(id);
       const target = archiveName.endsWith('.tar.gz') || archiveName.endsWith('.tgz') ? archiveName : archiveName + '.tar.gz';
-      const cmd = `cd ${shq(cwd)} && tar -czf ${shq(target)} ${names.map(shq).join(' ')}`;
+      const cmd = `cd ${shq(cwd)} && tar -czf ${shq(target)} -- ${names.map(shq).join(' ')}`;
       const { stdout, stderr } = await conn.exec(cmd, 120000);
       if (stderr && /permission denied/i.test(stderr)) throw new Error(stderr);
       return { name: target, stdout };
@@ -405,12 +422,29 @@ function registerIpc() {
       const conn = await getConn(id);
       let cmd;
       if (/\.tar\.(gz|tgz|bz2|xz)$/i.test(p) || /\.tgz$/i.test(p)) cmd = `cd ${shq(cwd)} && tar -xf ${shq(p)}`;
-      else if (/\.zip$/i.test(p)) cmd = `cd ${shq(cwd)} && (unzip -o ${shq(p)} || (echo 'NO_UNZIP' && exit 1))`;
+      else if (/\.zip$/i.test(p)) cmd = `cd ${shq(cwd)} && (unzip -o -- ${shq(p)} || (echo 'NO_UNZIP' && exit 1))`;
       else cmd = `cd ${shq(cwd)} && tar -xf ${shq(p)}`;
       const { stderr, stdout } = await conn.exec(cmd, 120000);
       if (/NO_UNZIP/i.test(stderr + stdout)) throw new Error('远程未安装 unzip，无法解压 zip（tar.gz 可用）');
       if (stderr && /permission denied/i.test(stderr)) throw new Error(stderr);
       return { ok: true };
+    }),
+  );
+
+  // 修改远程文件权限：chmod
+  ipcMain.handle(
+    'sftp:chmod',
+    wrap(async ({ id, path: p, mode }) => {
+      const conn = await getConn(id);
+      const sftp = await conn.sftp();
+      const numMode = typeof mode === 'number' ? mode : parseInt(String(mode), 8);
+      if (Number.isNaN(numMode)) throw new Error('无效的八进制权限格式（如 755 或 644）');
+      return new Promise((resolve, reject) => {
+        sftp.chmod(p, numMode, (err) => {
+          if (err) reject(err);
+          else resolve(true);
+        });
+      });
     }),
   );
 

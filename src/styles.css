@@ -134,6 +134,21 @@ select {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
+}
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  transition: background-color 0.15s ease;
+}
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: var(--accent);
 }
 .brand {
   padding: var(--pad-card);
@@ -454,6 +469,30 @@ input.mini {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--gap);
+}
+.gpu-list.matrix {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.gpu-list.matrix .gpu-card {
+  padding: 10px;
+}
+.gpu-list.matrix .gpu-card .metric-line {
+  margin-top: 4px;
+}
+.gpu-list.matrix .gpu-card .metric-line .num {
+  font-size: 16px !important;
+}
+.gpu-list.matrix .gpu-card .metrics {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  font-size: 10px;
+  margin-top: 6px;
+}
+.gpu-list.matrix .gpu-card .gpu-procs {
+  margin-top: 6px;
+  max-height: 80px;
+  overflow-y: auto;
 }
 .gpu-card {
   background: var(--bg-elev);
@@ -819,13 +858,30 @@ table.proc tbody tr.sel {
   gap: 8px;
 }
 .fm-arrows {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
 }
+.fm-split-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  cursor: col-resize;
+  z-index: 1;
+  transition: background-color 0.15s ease;
+}
+.fm-split-handle:hover {
+  background: var(--accent-soft);
+  border-radius: var(--r-sm);
+}
 .fm-arrows .btn {
+  position: relative;
+  z-index: 2;
   width: 100%;
 }
 .fm-pane-wrap {

@@ -123,6 +123,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const apply = () => {
       const resolved = theme === 'system' ? (mq.matches ? 'dark' : 'light') : theme;
       document.documentElement.dataset.theme = resolved;
+      void api?.setTitleBarTheme(resolved);
     };
     apply();
     if (theme !== 'system') return;

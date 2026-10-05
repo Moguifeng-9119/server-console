@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   backgroundContinue: () => ipcRenderer.send('app:background-continue'),
   forceQuit: () => ipcRenderer.send('app:force-quit'),
+  setTitleBarTheme: (theme) => ipcRenderer.invoke('app:set-theme-overlay', theme),
   notify: (title, body) => ipcRenderer.invoke('app:notify', { title, body }),
   storeInfo: () => ipcRenderer.invoke('store:info'),
   auditList: () => ipcRenderer.invoke('audit:list'),
@@ -33,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 采集与进程操作
   setInterval: (ms) => ipcRenderer.invoke('ssh:setInterval', ms),
+  setFocusedServer: (id) => ipcRenderer.invoke('ssh:set-focused', id),
   kill: (id, pid, signal) => ipcRenderer.invoke('ssh:kill', { id, pid, signal }),
   restartService: (id, service) => ipcRenderer.invoke('ssh:restartService', { id, service }),
   exec: (id, cmd) => ipcRenderer.invoke('ssh:exec', { id, cmd }),
@@ -164,6 +166,7 @@ contextBridge.exposeInMainWorld('api', {
   sftpArchive: (id, cwd, names, archiveName) =>
     ipcRenderer.invoke('sftp:archive', { id, cwd, names, archiveName }),
   sftpExtract: (id, cwd, p) => ipcRenderer.invoke('sftp:extract', { id, cwd, path: p }),
+  sftpChmod: (id, p, mode) => ipcRenderer.invoke('sftp:chmod', { id, path: p, mode }),
 
   // 传输队列
   transferList: () => ipcRenderer.invoke('transfer:list'),

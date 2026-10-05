@@ -20,6 +20,7 @@ interface Api {
   onConfirmQuit: (cb: () => void) => () => void;
   backgroundContinue: () => void;
   forceQuit: () => void;
+  setTitleBarTheme: (theme: 'light' | 'dark') => Promise<boolean>;
   notify: (title: string, body: string) => Promise<void>;
   storeInfo: () => Promise<{ encryptionAvailable: boolean }>;
   auditList: () => Promise<AuditEntry[]>;
@@ -34,6 +35,7 @@ interface Api {
   removeServer: (id: string) => Promise<boolean>;
   testServer: (cfg: Partial<ServerConfig> & { password?: string; passphrase?: string }) => Promise<{ ok: boolean; error?: string; gpus?: number; processes?: number }>;
   setInterval: (ms: number) => Promise<number>;
+  setFocusedServer: (id: string | null) => Promise<boolean>;
   kill: (id: string, pid: number, signal: 'TERM' | 'KILL') => Promise<{ ok: boolean; error?: string }>;
   restartService: (id: string, service: string) => Promise<{ ok: boolean; error?: string }>;
   exec: (id: string, cmd: string) => Promise<IpcResult<{ stdout: string; stderr: string }>>;
@@ -116,6 +118,7 @@ interface Api {
   sftpSearch: (id: string, base: string, keyword: string) => Promise<IpcResult<{ base: string; paths: string[] }>>;
   sftpArchive: (id: string, cwd: string, names: string[], archiveName: string) => Promise<IpcResult<{ name: string }>>;
   sftpExtract: (id: string, cwd: string, p: string) => Promise<IpcResult<{ ok: boolean }>>;
+  sftpChmod: (id: string, p: string, mode: string | number) => Promise<IpcResult<boolean>>;
 
   // 传输队列
   transferList: () => Promise<TransferItem[]>;

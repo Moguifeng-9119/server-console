@@ -823,14 +823,14 @@ class TransferManager {
         // 同步模式（ignoreExisting）仅 rsync 支持
         const flags = '-aW --partial --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '');
         modeLines +=
-          `if rsync ${flags} --out-format='@@%n' -e ${q(sshVar)} ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
+          `if rsync ${flags} --out-format='@@%n' -e ${q(sshVar)} -- ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
           `else echo "rsync:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       }
       if (useTar) {
         // tar over ssh：不依赖 rsync，远端只需 tar+ssh；目录打包内容解到目标，单文件按原名解到目标父目录
         const tarCmd = isDir
           ? `tar c -C ${q(t.srcRemote)} . | ${sshVar} ${q(dst)} ${q(`mkdir -p ${t.dstRemote} && tar x -C ${t.dstRemote}`)}`
-          : `SB=$(basename ${q(t.srcRemote)}); tar c -C $(dirname ${q(t.srcRemote)}) "$SB" | ${sshVar} ${q(dst)} ${q(
+          : `SB=$(basename ${q(t.srcRemote)}); tar c -C $(dirname ${q(t.srcRemote)}) -- "$SB" | ${sshVar} ${q(dst)} ${q(
               `DP=$(dirname ${t.dstRemote}); mkdir -p "$DP" && tar x -C "$DP"`,
             )}`;
         modeLines +=
@@ -839,7 +839,7 @@ class TransferManager {
       }
       const scpOpt = `-i ${key} -P ${port} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${khfile} -o BatchMode=yes`;
       modeLines +=
-        `if scp -r ${scpOpt} ${rsyncSrc} ${rsyncDst} >>${logf} 2>&1; then echo scp >${modefile}; echo 0 >${rcfile}; exit 0; ` +
+        `if scp -r ${scpOpt} -- ${rsyncSrc} ${rsyncDst} >>${logf} 2>&1; then echo scp >${modefile}; echo 0 >${rcfile}; exit 0; ` +
         `else echo "scp:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
       modeLines += `echo 1 >${rcfile}\n`;
       const body = '#!/bin/bash\nset +e\nrm -f ' + logf + ' ' + notefile + ' ' + modefile + '\n' + modeLines;

@@ -157,6 +157,7 @@ class Connection {
     this._hostKeyError = '';
     this._fails = 0; // 连续失败次数（指数退避）
     this._nextRetryAt = 0;
+    this._gcDone = false;
   }
 
   // 退避窗口内跳过重连尝试，避免对宕机服务器每个采集周期都发起 10s 超时的连接
@@ -228,6 +229,7 @@ class Connection {
               this._nextRetryAt = 0;
               this.pending = null;
               resolve();
+              this._scheduleGc();
             })
             .on('error', (err) => {
               // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
@@ -291,6 +293,20 @@ class Connection {
       }
       this.client = null;
     }
+    this._gcDone = false;
+  }
+
+  // 异步机会性 GC：清理由于客户端非正常退出（掉电/杀进程）残留的历史一次性临时直传密钥与临时目录
+  _scheduleGc() {
+    if (this._gcDone) return;
+    this._gcDone = true;
+    setTimeout(() => {
+      if (this.status !== 'online') return;
+      this.exec(
+        'if [ -f ~/.ssh/authorized_keys ]; then sed -i -E "/ sc[a-z0-9]{8}$/d" ~/.ssh/authorized_keys; fi; rm -rf /tmp/.sc[a-z0-9]* 2>/dev/null',
+        8000,
+      ).catch(() => {});
+    }, 5000);
   }
 
   close() {
