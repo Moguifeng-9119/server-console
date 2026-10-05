@@ -353,15 +353,13 @@ export function ServerPanel({
               {tab === 'files' ? '双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传' : '右键任意进程行可执行操作'}
             </span>
           </div>
-          {tab === 'gpu' ? (
-            <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />
-          ) : tab === 'proc' ? (
-            <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />
-          ) : tab === 'term' ? (
-            <TerminalSessions serverId={s.id} />
-          ) : (
-            <FileManager serverId={s.id} />
-          )}
+          {/* 终端会话常驻挂载（切 tab 只隐藏不卸载，xterm 与输出保留） */}
+          <div style={{ display: tab === 'term' ? 'block' : 'none' }}>
+            <TerminalSessions serverId={s.id} visible={tab === 'term'} />
+          </div>
+          {tab === 'gpu' && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'proc' && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'files' && <FileManager serverId={s.id} />}
         </>
       )}
 

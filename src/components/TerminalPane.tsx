@@ -5,19 +5,23 @@ import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
 import type { TerminalSessionInfo } from '../types';
 
-// 单个终端会话：xterm 绑定主进程会话（termId）。切走 tab 时脱离（会话保留），回来时回放缓冲。
+// 单个终端会话：xterm 绑定主进程会话（termId）。
+// 生命周期设计：effect 只跑一次（deps 仅 termId），onClosed 用 ref 避免
+// 父组件重渲染导致 effect 重跑（那会销毁 xterm → 闪屏 + 内容丢失）。
+// 切 tab 由父组件控制可见性而非卸载，xterm DOM 常驻不销毁。
 export function TerminalPane({
-  serverId,
   termId,
   onClosed,
+  active,
 }: {
-  serverId: string;
   termId: string;
   onClosed: (termId: string) => void;
+  active: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [status, setStatus] = useState<'attaching' | 'live' | 'closed'>('attaching');
-  const { t } = useTranslation();
+  // 用 ref 存 onClosed，避免它作为 effect 依赖导致反复重建
+  const onClosedRef = useRef(onClosed);
+  onClosedRef.current = onClosed;
 
   useEffect(() => {
     const a = api;
@@ -52,7 +56,7 @@ export function TerminalPane({
       try {
         fit.fit();
       } catch {
-        /* 容器尚未布局时忽略 */
+        /* 容器可能处于 display:none（首次在别的 tab 创建），等切回时 ResizeObserver 触发 */
       }
 
       // 输出监听（先注册再挂接，避免早期输出丢失）
@@ -65,8 +69,7 @@ export function TerminalPane({
       offList.push(
         a.onTerminalClosed(({ termId: tid }) => {
           if (tid !== termId || disposed) return;
-          setStatus('closed');
-          onClosed(tid);
+          onClosedRef.current(tid);
         }),
       );
 
@@ -74,7 +77,6 @@ export function TerminalPane({
       const replay = await a.terminalAttach(termId);
       if (disposed) return;
       if (replay) term.write(replay);
-      setStatus('live');
 
       term.onData((data) => void a.terminalWrite(termId, data));
 
@@ -119,6 +121,8 @@ export function TerminalPane({
 
       const onResize = () => {
         if (!term || !fit) return;
+        // display:none 时 offsetWidth/Height 为 0，跳过避免 xterm 崩溃
+        if (host.offsetWidth === 0 || host.offsetHeight === 0) return;
         try {
           fit.fit();
           void a.terminalResize(termId, term.cols, term.rows);
@@ -131,7 +135,7 @@ export function TerminalPane({
       onResize();
 
       // 关键：xterm 只有聚焦才会产生 onData
-      term.focus();
+      if (active) term.focus();
       host.addEventListener('mousedown', () => setTimeout(() => term?.focus(), 0));
 
       // e2e 测试钩子：canvas 渲染下 DOM 读不到文本，暴露缓冲区读取器
@@ -153,24 +157,37 @@ export function TerminalPane({
     return () => {
       disposed = true;
       offList.forEach((off) => off());
-      // 脱离（不关闭）：会话与缓冲留在主进程，切回时回放
+      // 脱离（不关闭）：会话与缓冲留在主进程
       void a.terminalDetach(termId);
       term?.dispose();
     };
-  }, [termId, serverId, onClosed]);
+    // effect 仅依赖 termId：onClosed 用 ref，serverId 不变，active 由父组件控制 display
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termId]);
+
+  // 切回活跃时聚焦
+  useEffect(() => {
+    if (active) {
+      // 等 display 恢复后再聚焦
+      const timer = setTimeout(() => {
+        // 通过 ResizeObserver 触发 fit + 聚焦
+        hostRef.current?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [active]);
 
   return (
-    <div className="term-host-wrap">
-      {status !== 'live' && (
-        <div className="term-status">{status === 'attaching' ? t('terminal.attaching') : t('terminal.sessionEnded')}</div>
-      )}
-      <div ref={hostRef} className="term-host" />
-    </div>
+    <div
+      ref={hostRef}
+      className="term-host"
+      style={{ display: active ? 'block' : 'none' }}
+    />
   );
 }
 
-// 会话条 + 多开管理：自动创建首个会话；会话在主进程持有，切 tab / 多开互不影响
-export function TerminalSessions({ serverId }: { serverId: string }) {
+// 会话条 + 多开管理：所有 TerminalPane 常驻挂载（仅 CSS 隐藏非活跃的），切 tab 不卸载
+export function TerminalSessions({ serverId, visible }: { serverId: string; visible: boolean }) {
   const { pushToast } = useStore();
   const { t } = useTranslation();
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([]);
@@ -207,25 +224,25 @@ export function TerminalSessions({ serverId }: { serverId: string }) {
           setActive(r.data);
           refresh();
         } else {
-          pushToast({ level: 'error', title: '终端打开失败', detail: r.error });
+          pushToast({ level: 'error', title: t('terminal.openFail'), detail: r.error });
           autoCreated.current = false;
         }
       })
       .catch((e) => {
-        pushToast({ level: 'error', title: '终端打开失败', detail: e instanceof Error ? e.message : String(e) });
+        pushToast({ level: 'error', title: t('terminal.openFail'), detail: e instanceof Error ? e.message : String(e) });
         autoCreated.current = false;
       });
   };
 
   // 首次进入自动创建一个会话；失败（如服务器离线）允许重试
   useEffect(() => {
-    if (!loaded || autoCreated.current) return;
+    if (!loaded || autoCreated.current || !visible) return;
     if (sessions.length === 0) {
       autoCreated.current = true;
       create();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, sessions.length]);
+  }, [loaded, sessions.length, visible]);
 
   const closeSession = (termId: string) => {
     void api?.terminalClose(termId);
@@ -233,14 +250,14 @@ export function TerminalSessions({ serverId }: { serverId: string }) {
   };
 
   return (
-    <div className="term">
+    <div className="term" style={{ display: visible ? 'flex' : 'none' }}>
       <div className="term-chips">
         {sessions.map((s, i) => (
           <span
             key={s.termId}
             className={`term-chip ${s.termId === active ? 'on' : ''}`}
             onClick={() => setActive(s.termId)}
-            title="点击切换会话"
+            title={t('terminal.switchHint')}
           >
             {t('terminal.termN', { n: i + 1 })}
             <button
@@ -261,17 +278,21 @@ export function TerminalSessions({ serverId }: { serverId: string }) {
         <span style={{ flex: 1 }} />
       </div>
       {active ? (
-        <TerminalPane
-          key={active}
-          serverId={serverId}
-          termId={active}
-          onClosed={(tid) => {
-            refresh();
-            setActive((a) => (a === tid ? '' : a));
-          }}
-        />
+        sessions
+          .filter((s) => s.termId === active)
+          .map((s) => (
+            <TerminalPane
+              key={s.termId}
+              termId={s.termId}
+              active
+              onClosed={(tid) => {
+                refresh();
+                setActive((a) => (a === tid ? '' : a));
+              }}
+            />
+          ))
       ) : (
-        <div className="term-empty">{loaded ? '点击 ＋ 新建终端会话' : '加载会话…'}</div>
+        <div className="term-empty">{loaded ? t('terminal.clickPlus') : t('terminal.loadingSessions')}</div>
       )}
     </div>
   );
