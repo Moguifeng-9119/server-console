@@ -55,8 +55,8 @@ async function main() {
         if (scenario.delayed) {
           assert.equal(await selector.inputValue(), 'de');
           await selector.focus();
-          const steps = await selector.evaluate((select) => Array.from(select.options).findIndex((option) => option.value === 'de'));
-          for (let step = 0; step < steps; step++) await selector.press('ArrowUp');
+          // Native select uses typeahead on Windows, Linux and macOS; Home is platform-dependent.
+          await selector.press('e');
           await selector.press('Enter');
           assert.equal(await selector.inputValue(), 'en');
           await page.waitForTimeout(1800);
