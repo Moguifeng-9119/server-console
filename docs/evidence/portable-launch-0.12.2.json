@@ -1,0 +1,11 @@
+{
+  "version": "0.12.2",
+  "result": "passed",
+  "scope": "Public Windows portable wrapper launched through loopback CDP in fresh isolated userData; native preload IPC; no remote connections. Portable wrapper does not expose inspector stderr for Playwright Electron launch.",
+  "checks": [
+    "public portable launches",
+    "visible v0.12.2",
+    "native preload bridge",
+    "settings IPC works"
+  ]
+}

@@ -38,7 +38,11 @@ All three platforms passed [source CI](https://github.com/Moguifeng-9119/server-
 | Linux x64 | Same source checks passed | 16 terminal/IPC + 12 native layout under Xvfb; [receipt](evidence/native-0.12.2-linux-ci.json) | Session-only when secure storage is unavailable; real secret-service unverified |
 | macOS arm64 | Same source checks passed, including native keyboard typeahead cancellation | Universal DMG built; 16 terminal/IPC + 12 native layout on arm64; [receipt](evidence/native-0.12.2-macos-ci.json) | Playwright MockKeychain, not real Keychain |
 
-These native packages compare backend sources, production assets and all ten catalogs with the runner's current source hashes. A later documentation-only release commit may contain these receipts; it does not change the tested application. Public asset and download verification is recorded after publication.
+These native packages compare backend sources, production assets and all ten catalogs with the runner's current source hashes. Release commit `f61b1bf427892d1106c94bd55ee89c838995f5a2` adds documentation and receipts without changing the tested application.
+
+[v0.12.2 is published](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) as the latest stable release. The [draft publisher](https://github.com/Moguifeng-9119/server-console/actions/runs/37466237731) passed source/package/head guards and uploaded Windows x64 portable, Linux x64 AppImage, macOS universal DMG and SHA256SUMS.txt. All three binary GitHub digests match the checksum manifest. The public manifest and full 106,187,156-byte Windows binary were downloaded without authentication and their SHA-256 values matched; the Windows file used 24 validated HTTP ranges after a slow single-connection download timed out. macOS/Linux public payloads were not downloaded locally in this check. [Download receipt](evidence/release-downloads-0.12.2.json).
+
+The downloaded Windows portable wrapper also passed actual startup: visible v0.12.2, renderer navigation, native preload and settings IPC with isolated fresh data. This uses loopback CDP because the portable wrapper does not relay inspector stderr to Playwright's Electron launcher. It is a startup check, separate from the 16 unpacked native checks and the real two-server forced-main-crash test. [Portable receipt](evidence/portable-launch-0.12.2.json).
 
 ## Remaining limits
 

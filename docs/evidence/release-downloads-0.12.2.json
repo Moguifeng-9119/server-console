@@ -1,0 +1,49 @@
+{
+  "version": "0.12.2",
+  "release": "https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2",
+  "releaseCommit": "f61b1bf427892d1106c94bd55ee89c838995f5a2",
+  "appCommit": "de46e81cd7e908bbcb5cf27da5b5716a3fdbee7a",
+  "publisher": "https://github.com/Moguifeng-9119/server-console/actions/runs/37466237731",
+  "published": true,
+  "publicManifestVerifiedWithoutAuthentication": true,
+  "assets": [
+    {
+      "name": "ServerConsole-0.12.2-universal.dmg",
+      "bytes": 233244119,
+      "sha256": "4cd33ea55c3b4d1744c85d175bcb42db41a03249eb49d55f9648594f77d36606",
+      "githubDigestMatched": true,
+      "downloadedInFullWithoutAuthentication": false,
+      "localSHA256Matched": false
+    },
+    {
+      "name": "ServerConsole-0.12.2.AppImage",
+      "bytes": 131077943,
+      "sha256": "39bf2c12b271fb25903c73b372a8f49208f3a22e110a908037b0714e3d1b6351",
+      "githubDigestMatched": true,
+      "downloadedInFullWithoutAuthentication": false,
+      "localSHA256Matched": false
+    },
+    {
+      "name": "ServerConsole-0.12.2.exe",
+      "bytes": 106187156,
+      "sha256": "87b2d762ced0821757f6f35df052a481bbf1b6653c57ae936ce8afa23fc524db",
+      "githubDigestMatched": true,
+      "downloadedInFullWithoutAuthentication": true,
+      "localSHA256Matched": true
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 288,
+      "sha256": "396ec756a5205e1f1eb30deb7179672c7fce138c539d142af29160bec9d95f17",
+      "githubDigestMatched": true,
+      "downloadedInFullWithoutAuthentication": true,
+      "localSHA256Matched": true
+    }
+  ],
+  "windowsDownload": {
+    "rangeRequests": 24,
+    "totalBytes": 106187156,
+    "completeSHA256Matched": true
+  },
+  "scope": "All binary server digests checked against the authenticated draft and unauthenticated published checksum manifest; public Windows binary downloaded in full using validated HTTP ranges and hashed; macOS/Linux payloads not downloaded locally in this check"
+}
