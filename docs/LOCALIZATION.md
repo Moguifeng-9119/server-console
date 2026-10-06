@@ -1,16 +1,11 @@
 # Localization status
 
-The selector retains ten languages and i18next falls back to English for missing strings.
+The README has ten substantive language pages with the same navigation on each page. Detailed recovery and development guides are available in [English](USER-GUIDE.md) and [Simplified Chinese](USER-GUIDE.zh-CN.md).
 
-| Area | Maintained in this change | Remaining boundary |
-| --- | --- | --- |
-| Resource workbench, history, alert center, credential mode | English and Simplified Chinese | Other languages fall back to English for new strings |
-| Main navigation, server manager, GPU/process panel, settings, transfer center | Main business labels use existing/new English and Chinese keys | Remote command output/error messages are not translated by the app |
-| SSH config importer, file manager, terminal, parallel commands | Existing behavior retained; importer gains modal keyboard behavior | Older hardcoded Chinese labels still need migration |
-| README guides | Ten substantive usage guides with the same ten-language navigation on every page | Linked technical documents remain primarily English; screenshots show English/Chinese UI |
+The application retains English, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, German, Russian and Brazilian Portuguese. All ten resource files now have the same 635 leaf keys and matching interpolation parameters. Previously, eight locales had only 153 keys relative to 604 English keys. Importer, files, relay, parallel commands, config notices and text editing now use the locale resources instead of hardcoded Chinese business labels.
 
-Each README covers the product scope, download, source demo versus desktop usage, transfers/credentials, verification boundaries, development and contributions. This is distinct from application localization.
+Nine locales are loaded on demand; English is the bundled fallback. Ten contract tests reject missing keys, empty strings, broken interpolation and translation artifacts. Browser workflow checks load, switch and reload every locale, including the file manager. Delayed competing language requests were also tested with unsaved text and incoming monitoring/transfer events.
 
-As checked on 2026-10-06, English and Simplified Chinese each have 604 leaf translation keys. Each other locale has 153, missing 451 relative to English. FileManager, ImportSshConfig, ServerRelay, ParallelCommand, ConfigWatchBanner and TextViewer still contain hardcoded Chinese business labels. See the [original assessment follow-up](ASSESSMENT-STATUS.zh-CN.md).
+English/Simplified Chinese are maintained directly. The other languages include existing translations and machine-assisted drafts, with manual corrections for the workbench, resource/credential observations, destructive file actions, prefix recovery, cleanup, checksum and unsaved-draft prompts. Native-speaker review of all remaining wording is still pending. Key completeness and a successful render should not be described as professional translation certification.
 
-Do not describe the application as fully translated into ten languages. New locale keys should preserve units and interpolation names. Validate English/Chinese in both themes, then test each supported translation when extending it. Repository screenshots show the source version with simulated data.
+Remote command output and backend error details remain in the language supplied by the remote tool or backend. Technical names, paths, units and template parameters are intentionally preserved. Linked technical documents are mainly English/Chinese; README language coverage does not imply every linked document is translated.

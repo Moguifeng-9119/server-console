@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
@@ -23,6 +25,7 @@ const isDirLike = (e: FileEntry) => e.type === 'dir' || e.linkToDir;
 type SortKey = 'name' | 'size' | 'mtime';
 
 export function FileManager({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
   const { configs, pushToast } = useStore();
   const tf = useTransfers();
   const cfg = configs.find((c) => c.id === serverId);
@@ -78,6 +81,10 @@ export function FileManager({ serverId }: { serverId: string }) {
     setAskValue('');
   };
   const [confirm, setConfirm] = useState<{ title: string; body: string; onOk: () => void } | null>(null);
+  const askRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(!!ask, askRef, () => setAsk(null));
+  useDialogFocus(!!confirm, confirmRef, () => setConfirm(null));
 
   const [searchKw, setSearchKw] = useState('');
   const [results, setResults] = useState<string[] | null>(null);
@@ -96,7 +103,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       await loadLocal(home);
       const hr = await api.sftpHome(serverId);
       if (hr.ok && hr.data) await loadRemote(hr.data);
-      else setRemote((p) => ({ ...p, err: hr.error || '无法连接 SFTP' }));
+      else setRemote((p) => ({ ...p, err: hr.error || t('files.sftpUnavailable') }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverId]);
@@ -110,7 +117,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     setLocal((p) =>
       r.ok && r.data
         ? { cwd: r.data.path, entries: r.data.entries, loading: false, err: '', selected: {} }
-        : { ...p, loading: false, err: r.error || '读取失败' },
+        : { ...p, loading: false, err: r.error || t('files.readFail') },
     );
   };
 
@@ -123,7 +130,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     setRemote((p) =>
       r.ok && r.data
         ? { cwd: r.data.path, entries: r.data.entries, loading: false, err: '', selected: {} }
-        : { ...p, loading: false, err: r.error || '读取失败' },
+        : { ...p, loading: false, err: r.error || t('files.readFail') },
     );
   };
 
@@ -187,37 +194,37 @@ export function FileManager({ serverId }: { serverId: string }) {
   // ---------- 传输 ----------
   const doUpload = async (localPaths: string[]) => {
     if (!localPaths.length) {
-      pushToast({ level: 'warn', title: '请先在左侧本地列表勾选要上传的文件/文件夹' });
+      pushToast({ level: 'warn', title: t('files.selectUploadWarn') });
       return;
     }
     try {
       const n = await tf.upload(serverId, localPaths, remote.cwd, cfg?.name);
-      pushToast({ level: 'info', title: `已加入 ${n} 个上传任务`, detail: remote.cwd });
+      pushToast({ level: 'info', title: t('files.uploadQueued', { n }), detail: remote.cwd });
       showTransfers();
       setLocal((p) => ({ ...p, selected: {} }));
     } catch (e) {
-      pushToast({ level: 'error', title: '上传失败', detail: msg(e) });
+      pushToast({ level: 'error', title: t('files.uploadFail'), detail: msg(e) });
     }
   };
   const doDownload = async (sel: FileEntry[]) => {
     if (!sel.length) {
-      pushToast({ level: 'warn', title: '请先在右侧远程列表勾选要下载的文件/文件夹' });
+      pushToast({ level: 'warn', title: t('files.selectDownloadWarn') });
       return;
     }
     try {
       const n = await tf.download(serverId, sel, local.cwd, cfg?.name);
-      pushToast({ level: 'info', title: `已加入 ${n} 个下载任务`, detail: local.cwd });
+      pushToast({ level: 'info', title: t('files.downloadQueued', { n }), detail: local.cwd });
       showTransfers();
       setRemote((p) => ({ ...p, selected: {} }));
     } catch (e) {
-      pushToast({ level: 'error', title: '下载失败', detail: msg(e) });
+      pushToast({ level: 'error', title: t('files.downloadFail'), detail: msg(e) });
     }
   };
 
   // ---------- 远程整理 ----------
   const remoteMkdir = () =>
     openAsk({
-      title: '新建远程文件夹', label: '名称', value: '',
+      title: t('files.newRemoteDir'), label: t('files.name'), value: '',
       onOk: async (v) => {
         const r = await api?.sftpMkdir(serverId, joinPosix(remote.cwd, v));
         finishAction(r, () => loadRemote());
@@ -225,7 +232,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     });
   const remoteRename = (e: FileEntry) =>
     openAsk({
-      title: '重命名', label: '新名称', value: e.name,
+      title: t('files.rename'), label: t('files.newName'), value: e.name,
       onOk: async (v) => {
         const r = await api?.sftpRename(serverId, remoteFull(e), joinPosix(remote.cwd, v));
         finishAction(r, () => loadRemote());
@@ -233,8 +240,8 @@ export function FileManager({ serverId }: { serverId: string }) {
     });
   const remoteDelete = (sel: FileEntry[]) =>
     setConfirm({
-      title: `确认删除 ${sel.length} 项？`,
-      body: sel.map((s) => s.name).join('、') + '\n服务器上删除不可恢复。',
+      title: t('files.confirmDeleteTitle', { n: sel.length }),
+      body: t('files.confirmDeleteBody', { names: sel.map((s) => s.name).join(', ') }),
       onOk: async () => {
         const fails: string[] = [];
         for (const s of sel) {
@@ -243,12 +250,12 @@ export function FileManager({ serverId }: { serverId: string }) {
         }
         loadRemote();
         if (fails.length)
-          pushToast({ level: 'error', title: `删除失败 ${fails.length} 项`, detail: fails.slice(0, 3).join('\n') });
+          pushToast({ level: 'error', title: t('files.deleteFail', { n: fails.length }), detail: fails.slice(0, 3).join('\n') });
       },
     });
   const remoteArchive = (sel: FileEntry[]) =>
     openAsk({
-      title: '压缩为 tar.gz', label: '压缩包名', value: 'archive.tar.gz',
+      title: t('files.compressTitle'), label: t('files.archiveName'), value: 'archive.tar.gz',
       onOk: async (v) => {
         const name = v.endsWith('.tar.gz') ? v : v + '.tar.gz';
         const r = await api?.sftpArchive(serverId, remote.cwd, sel.map((s) => s.name), name);
@@ -257,7 +264,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     });
   const remoteExtract = (e: FileEntry) =>
     setConfirm({
-      title: `解压 ${e.name}？`, body: '将在当前目录展开（tar/zip）。',
+      title: t('files.extractTitle', { name: e.name }), body: t('files.extractBody'),
       onOk: async () => {
         const r = await api?.sftpExtract(serverId, remote.cwd, remoteFull(e));
         finishAction(r, () => loadRemote());
@@ -267,7 +274,7 @@ export function FileManager({ serverId }: { serverId: string }) {
   // ---------- 本地整理 ----------
   const localMkdir = () =>
     openAsk({
-      title: '新建本地文件夹', label: '名称', value: '',
+      title: t('files.newLocalDir'), label: t('files.name'), value: '',
       onOk: async (v) => {
         const r = await api?.localMkdir(joinLocal(local.cwd, v));
         finishAction(r, () => loadLocal());
@@ -275,7 +282,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     });
   const localDelete = (sel: FileEntry[]) =>
     setConfirm({
-      title: `本地删除 ${sel.length} 项？`, body: sel.map((s) => s.name).join('、'),
+      title: t('files.localDeleteTitle', { n: sel.length }), body: sel.map((s) => s.name).join('、'),
       onOk: async () => {
         const fails: string[] = [];
         for (const s of sel) {
@@ -285,12 +292,12 @@ export function FileManager({ serverId }: { serverId: string }) {
         }
         loadLocal();
         if (fails.length)
-          pushToast({ level: 'error', title: `删除失败 ${fails.length} 项`, detail: fails.slice(0, 3).join('\n') });
+          pushToast({ level: 'error', title: t('files.deleteFail', { n: fails.length }), detail: fails.slice(0, 3).join('\n') });
       },
     });
 
   const finishAction = (r: { ok: boolean; error?: string } | undefined, reload: () => void) => {
-    if (r && !r.ok) pushToast({ level: 'error', title: '操作失败', detail: r.error });
+    if (r && !r.ok) pushToast({ level: 'error', title: t('files.opFail'), detail: r.error });
     else reload();
   };
 
@@ -300,19 +307,19 @@ export function FileManager({ serverId }: { serverId: string }) {
     const r = await api.sftpSearch(serverId, remote.cwd, searchKw.trim());
     setSearching(false);
     if (r.ok && r.data) setResults(r.data.paths);
-    else pushToast({ level: 'error', title: '搜索失败', detail: r.error });
+    else pushToast({ level: 'error', title: t('files.searchFail'), detail: r.error });
   };
 
   const remoteChmod = (e: FileEntry) => {
     const curOctal = e.mode ? (e.mode & 0o777).toString(8) : isDirLike(e) ? '755' : '644';
     openAsk({
-      title: `修改权限 · ${e.name}`,
-      label: '八进制权限代码（如 755、644、777）',
+      title: t('files.chmodTitle', { name: e.name }),
+      label: t('files.chmodLabel'),
       value: curOctal,
       onOk: async (v) => {
         const mode = parseInt(v.trim(), 8);
         if (Number.isNaN(mode)) {
-          pushToast({ level: 'error', title: '格式错误', detail: '权限代码必须为八进制数字（如 755 或 644）' });
+          pushToast({ level: 'error', title: t('files.invalidMode'), detail: t('files.invalidModeDetail') });
           return;
         }
         const r = await api?.sftpChmod(serverId, remoteFull(e), mode);
@@ -325,6 +332,7 @@ export function FileManager({ serverId }: { serverId: string }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (results || ask || confirm || viewer || relay || menu) return;
+      if (!(e.target instanceof HTMLElement) || !e.target.closest('.fm') || e.target.closest('[role="dialog"], [aria-modal="true"]')) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
@@ -378,7 +386,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       // 双击文件：文本尝试在线查看
       api?.sftpReadText(serverId, remoteFull(e), false).then((r) => {
         if (r.ok) setViewer({ path: remoteFull(e), name: e.name, size: e.size });
-        else pushToast({ level: 'warn', title: '无法作为文本查看，可下载后打开', detail: r.error });
+        else pushToast({ level: 'warn', title: t('files.textUnavailable'), detail: r.error });
       });
     }
   };
@@ -391,13 +399,13 @@ export function FileManager({ serverId }: { serverId: string }) {
       <div className="fm-toolbar">
         <input
           className="mini"
-          placeholder="在当前远程目录搜索文件名，回车…"
+          placeholder={t('files.searchPh')}
           value={searchKw}
           onChange={(e) => setSearchKw(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && runSearch()}
         />
         <button className="btn" disabled={searching} onClick={runSearch}>
-          搜索
+          {t('files.searchBtn')}
         </button>
         {results && (
           <button
@@ -407,32 +415,32 @@ export function FileManager({ serverId }: { serverId: string }) {
               loadRemote();
             }}
           >
-            返回列表
+            {t('files.backToList')}
           </button>
         )}
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={remoteMkdir}>
-          新建远程文件夹
+          {t('files.newRemoteDir')}
         </button>
         <button
           className="btn"
           onClick={() => {
             const sel = selectedRemote();
             if (!sel.length) {
-              pushToast({ level: 'warn', title: '请先在右侧远程列表勾选要互传的文件/文件夹' });
+              pushToast({ level: 'warn', title: t('files.selectRelayWarn') });
               return;
             }
             setRelay({ sel });
           }}
         >
-          服务器互传 <ArrowLeftRight size={13} style={{ verticalAlign: '-2px' }} />
+          {t('files.relayBtn')} <ArrowLeftRight size={13} style={{ verticalAlign: '-2px' }} />
         </button>
       </div>
 
       {results ? (
         <div className="fm-search">
           <div className="body" style={{ padding: 6 }}>
-            找到 {results.length} 条（最多 200）
+            {t('files.found', { n: results.length })}
           </div>
           {results.map((p) => (
             <div
@@ -454,7 +462,7 @@ export function FileManager({ serverId }: { serverId: string }) {
           style={{ gridTemplateColumns: `${paneSplit}fr 96px ${100 - paneSplit}fr` }}
         >
           <FilePane
-            title="本机"
+            title={t('files.local')}
             state={local}
             sorted={sortedLocal}
             sort={localSort}
@@ -472,18 +480,26 @@ export function FileManager({ serverId }: { serverId: string }) {
           <div className="fm-arrows">
             <div
               className="fm-split-handle"
-              title="按住拖拽调节左右面板比例 · 双击恢复 1:1"
+              role="separator" tabIndex={0} aria-orientation="vertical"
+              aria-label={t('files.splitHint')} aria-valuemin={20} aria-valuemax={80} aria-valuenow={Math.round(paneSplit)}
+              onKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? 50 : Math.max(20, Math.min(80, paneSplit + (event.key === 'ArrowRight' ? 5 : -5)));
+                setPaneSplit(next); localStorage.setItem('sc.fm.split', String(next));
+              }}
+              title={t('files.splitHint')}
               onMouseDown={onPaneSplitResize}
               onDoubleClick={() => {
                 setPaneSplit(50);
                 localStorage.setItem('sc.fm.split', '50');
               }}
             />
-            <button className="btn primary" title="把左侧选中的本地文件上传到远程当前目录" onClick={() => doUpload(selectedLocal().map((e) => e.path || ''))}>
-              上传 <ArrowRight size={13} />
+            <button className="btn primary" title={t('files.uploadTitle')} onClick={() => doUpload(selectedLocal().map((e) => e.path || ''))}>
+              {t('files.upload')} <ArrowRight size={13} />
             </button>
-            <button className="btn primary" title="把右侧选中的远程文件下载到本地当前目录" onClick={() => doDownload(selectedRemote())}>
-              <ArrowLeft size={13} /> 下载
+            <button className="btn primary" title={t('files.downloadTitle')} onClick={() => doDownload(selectedRemote())}>
+              <ArrowLeft size={13} /> {t('files.download')}
             </button>
           </div>
 
@@ -497,7 +513,7 @@ export function FileManager({ serverId }: { serverId: string }) {
             onDrop={onDrop}
           >
             <FilePane
-              title={`远程 · ${cfg?.name ?? ''}`}
+              title={t('files.remote', { name: cfg?.name ?? '' })}
               state={remote}
               sorted={sortedRemote}
               sort={remoteSort}
@@ -516,7 +532,7 @@ export function FileManager({ serverId }: { serverId: string }) {
               onMkdir={remoteMkdir}
               remote
             />
-            {dragOver && <div className="fm-drop-hint">松开以上传到 {remote.cwd}</div>}
+            {dragOver && <div className="fm-drop-hint">{t('files.dragHint', { dir: remote.cwd })}</div>}
           </div>
         </div>
       )}
@@ -528,37 +544,33 @@ export function FileManager({ serverId }: { serverId: string }) {
             <>
               <div className="hdr">{menu.entry.name}</div>
               <button onClick={() => { doDownload([{ ...menu.entry, path: remoteFull(menu.entry) }]); setMenu(null); }}>
-                {isDirLike(menu.entry) ? '下载整个文件夹到本地' : '下载到本地当前目录'}
+                {isDirLike(menu.entry) ? t('files.downloadFolder') : t('files.downloadHere')}
               </button>
               {!isDirLike(menu.entry) && (
                 <button onClick={() => { setViewer({ path: remoteFull(menu.entry), name: menu.entry.name, size: menu.entry.size }); setMenu(null); }}>
-                  查看文本
+                  {t('files.viewText')}
                 </button>
               )}
-              <button onClick={() => { remoteRename(menu.entry); setMenu(null); }}>重命名</button>
-              <button onClick={() => { remoteChmod(menu.entry); setMenu(null); }}>修改权限 (chmod)</button>
-              <button onClick={() => { remoteArchive([menu.entry]); setMenu(null); }}>压缩为 tar.gz</button>
+              <button onClick={() => { remoteRename(menu.entry); setMenu(null); }}>{t('files.rename')}</button>
+              <button onClick={() => { remoteChmod(menu.entry); setMenu(null); }}>{t('files.chmod')}</button>
+              <button onClick={() => { remoteArchive([menu.entry]); setMenu(null); }}>{t('files.compressTitle')}</button>
               {/\.(tar|tgz|zip)/i.test(menu.entry.name) && (
-                <button onClick={() => { remoteExtract(menu.entry); setMenu(null); }}>解压到当前目录</button>
+                <button onClick={() => { remoteExtract(menu.entry); setMenu(null); }}>{t('files.extract')}</button>
               )}
               <button onClick={() => { setRelay({ sel: [{ ...menu.entry, path: remoteFull(menu.entry) }] }); setMenu(null); }}>
-                传到另一台服务器
+                {t('files.sendToServer')}
               </button>
               <div className="sep" />
-              <button className="danger" onClick={() => { remoteDelete([{ ...menu.entry, path: remoteFull(menu.entry) }]); setMenu(null); }}>
-                删除
-              </button>
+              <button className="danger" onClick={() => { remoteDelete([{ ...menu.entry, path: remoteFull(menu.entry) }]); setMenu(null); }}>{t('files.delete')}</button>
             </>
           ) : (
             <>
               <div className="hdr">{menu.entry.name}</div>
               <button onClick={() => { doUpload([menu.entry.path || '']); setMenu(null); }}>
-                {isDirLike(menu.entry) ? '上传整个文件夹到远程' : '上传到远程当前目录'}
+                {isDirLike(menu.entry) ? t('files.uploadFolder') : t('files.uploadHere')}
               </button>
               <div className="sep" />
-              <button className="danger" onClick={() => { localDelete([menu.entry]); setMenu(null); }}>
-                删除
-              </button>
+              <button className="danger" onClick={() => { localDelete([menu.entry]); setMenu(null); }}>{t('files.delete')}</button>
             </>
           )}
         </ContextMenu>
@@ -567,12 +579,13 @@ export function FileManager({ serverId }: { serverId: string }) {
       {/* 输入对话框 */}
       {ask && (
         <div className="mask" onClick={() => setAsk(null)}>
-          <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
-            <h3>{ask.title}</h3>
+          <div className="dialog" ref={askRef} role="dialog" aria-modal="true" aria-labelledby="fm-ask-title" tabIndex={-1} style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="fm-ask-title">{ask.title}</h3>
             <div className="field">
-              <label>{ask.label}</label>
+              <label htmlFor="fm-ask-input">{ask.label}</label>
               <input
                 className="mini"
+                id="fm-ask-input"
                 style={{ width: '100%' }}
                 autoFocus
                 value={askValue}
@@ -582,10 +595,10 @@ export function FileManager({ serverId }: { serverId: string }) {
             </div>
             <div className="foot">
               <button className="btn primary" onClick={submitAsk}>
-                确定
+                {t('files.ok')}
               </button>
               <button className="btn" onClick={() => setAsk(null)}>
-                取消
+                {t('files.cancel')}
               </button>
             </div>
           </div>
@@ -595,14 +608,14 @@ export function FileManager({ serverId }: { serverId: string }) {
       {/* 确认对话框 */}
       {confirm && (
         <div className="mask" onClick={() => setConfirm(null)}>
-          <div className="dialog" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ color: 'var(--warn)' }}>{confirm.title}</h3>
+          <div className="dialog" ref={confirmRef} role="dialog" aria-modal="true" aria-labelledby="fm-confirm-title" tabIndex={-1} style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="fm-confirm-title" style={{ color: 'var(--warn)' }}>{confirm.title}</h3>
             <div className="body" style={{ whiteSpace: 'pre-wrap' }}>
               {confirm.body}
             </div>
             <div className="foot">
               <button className="btn" onClick={() => setConfirm(null)}>
-                取消
+                {t('files.cancel')}
               </button>
               <button
                 className="btn danger"
@@ -610,9 +623,7 @@ export function FileManager({ serverId }: { serverId: string }) {
                   confirm.onOk();
                   setConfirm(null);
                 }}
-              >
-                确认
-              </button>
+              >{t('files.confirm')}</button>
             </div>
           </div>
         </div>
@@ -644,6 +655,7 @@ function FilePane({
   onMkdir: () => void;
   remote?: boolean;
 }) {
+  const { t } = useTranslation();
   const [addr, setAddr] = useState(state.cwd);
   useEffect(() => setAddr(state.cwd), [state.cwd]);
   const keyOf = (e: FileEntry) => (isRemote ? e.name : e.path || e.name);
@@ -654,9 +666,8 @@ function FilePane({
   const shown = sorted.slice(0, renderLimit);
 
   const th = (k: SortKey, label: string) => (
-    <th onClick={() => setSort({ k, asc: sort.k === k ? !sort.asc : true })}>
-      {label}
-      {sort.k === k ? (sort.asc ? ' ▲' : ' ▼') : ''}
+    <th aria-sort={sort.k === k ? (sort.asc ? 'ascending' : 'descending') : 'none'}>
+      <button className="fm-inline" onClick={() => setSort({ k, asc: sort.k === k ? !sort.asc : true })}>{label}{sort.k === k ? (sort.asc ? ' ▲' : ' ▼') : ''}</button>
     </th>
   );
 
@@ -664,38 +675,39 @@ function FilePane({
     <div className="fm-pane">
       <div className="fm-pane-head">
         <span className="fm-pane-title">{title}</span>
-        <button className="btn mini" onClick={onHome} title="家目录">
+        <button className="btn mini" onClick={onHome} title={t('files.home')}>
           <Home size={13} />
         </button>
-        <button className="btn mini" onClick={onUp} title="上一级">
+        <button className="btn mini" onClick={onUp} title={t('files.up')}>
           <ArrowUp size={13} />
         </button>
-        <button className="btn mini" onClick={onReload} title="刷新">
+        <button className="btn mini" onClick={onReload} title={t('files.reload')}>
           <RefreshCw size={13} />
         </button>
-        <button className="btn mini" onClick={onMkdir} title="新建文件夹">
+        <button className="btn mini" onClick={onMkdir} title={t('files.mkdir')}>
           <FolderPlus size={13} />
         </button>
       </div>
       <div className="fm-address">
         <input
           className="mini mono"
+          aria-label={title}
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onAddress((e.target as HTMLInputElement).value)}
         />
       </div>
       <div className="fm-table-wrap">
-        {state.loading && <div className="empty">加载中…</div>}
+        {state.loading && <div className="empty">{t('files.loading')}</div>}
         {state.err && <div className="empty" style={{ color: 'var(--crit)' }}>{state.err}</div>}
         {!state.loading && !state.err && (
           <table className="fm-table">
             <thead>
               <tr>
-                {th('name', '名称')}
-                {th('size', '大小')}
-                <th>权限</th>
-                {th('mtime', '修改时间')}
+                {th('name', t('files.name'))}
+                {th('size', t('files.size'))}
+                <th>{t('files.perm')}</th>
+                {th('mtime', t('files.mtime'))}
               </tr>
             </thead>
             <tbody>
@@ -706,6 +718,11 @@ function FilePane({
                   <tr
                     key={key}
                     className={sel ? 'sel' : ''}
+                    onKeyDown={(event) => {
+                      if (event.shiftKey && event.key === 'F10') {
+                        event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); onMenu(rect.left + 24, rect.top + 24, e);
+                      }
+                    }}
                     onClick={(ev) => onToggle(key, ev)}
                     onDoubleClick={() => onOpen(e)}
                     onContextMenu={(ev) => {
@@ -715,26 +732,27 @@ function FilePane({
                     }}
                   >
                     <td>
+                      <input type="checkbox" checked={sel} aria-label={`${t('transfer.pickTip')} · ${e.name}`} onClick={(event) => event.stopPropagation()} onChange={() => onToggle(key, { ctrlKey: true, metaKey: false, shiftKey: false })} />
                       <span className={`fm-ic ${isDirLike(e) ? 'dir' : 'file'}`}>
                         {isDirLike(e) ? <Folder size={14} strokeWidth={1.8} /> : <FileIcon size={14} strokeWidth={1.8} />}
                       </span>
-                      <span title={e.name}>{e.name}</span>
+                      <button className="fm-inline" title={e.name} onClick={(event) => { event.stopPropagation(); onOpen(e); }}>{e.name}</button>
                     </td>
                     <td className="num">{isDirLike(e) ? '—' : formatBytes(e.size)}</td>
                     <td className="mono">{e.rights || ''}</td>
-                    <td className="num">{fmtDate(e.mtime)}</td>
+                    <td className="num">{fmtDate(e.mtime)} <button className="fm-inline" aria-label={`${t('workbench.actions')} · ${e.name}`} onClick={(event) => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); if (!sel) onToggle(key, { ctrlKey: false, metaKey: false, shiftKey: false }); onMenu(rect.left, rect.bottom, e); }}>⋯</button></td>
                   </tr>
                 );
               })}
               {sorted.length > renderLimit && (
-                <tr className="fm-more" onClick={() => setRenderLimit((v) => v + 2000)}>
-                  <td colSpan={4}>还有 {sorted.length - renderLimit} 项未显示 · 点击继续加载</td>
+                <tr className="fm-more">
+                  <td colSpan={4}><button className="fm-inline" onClick={() => setRenderLimit((v) => v + 2000)}>{t('files.more', { n: sorted.length - renderLimit })}</button></td>
                 </tr>
               )}
               {sorted.length === 0 && (
                 <tr>
                   <td colSpan={4} className="empty">
-                    空目录
+                    {t('files.emptyDir')}
                   </td>
                 </tr>
               )}

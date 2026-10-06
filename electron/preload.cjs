@@ -175,6 +175,7 @@ contextBridge.exposeInMainWorld('api', {
   transferResume: (id) => ipcRenderer.invoke('transfer:resume', id),
   transferRetry: (id) => ipcRenderer.invoke('transfer:retry', id),
   transferRemove: (id) => ipcRenderer.invoke('transfer:remove', id),
+  transferForgetLegacy: (id) => ipcRenderer.invoke('transfer:forget-legacy', id),
   transferClear: () => ipcRenderer.invoke('transfer:clear'),
   transferPauseAll: () => ipcRenderer.invoke('transfer:pause-all'),
   transferResumeAll: () => ipcRenderer.invoke('transfer:resume-all'),

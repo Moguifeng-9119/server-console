@@ -155,7 +155,7 @@
     "backToList": "返回列表",
     "found": "找到 {{n}} 条（最多 200）",
     "newRemoteDir": "新建远程文件夹",
-    "relayBtn": "服务器互传 ⇄",
+    "relayBtn": "服务器互传",
     "selectUploadWarn": "请先在左侧本地列表勾选要上传的文件/文件夹",
     "selectDownloadWarn": "请先在右侧远程列表勾选要下载的文件/文件夹",
     "selectRelayWarn": "请先在右侧远程列表勾选要互传的文件/文件夹",
@@ -194,7 +194,22 @@
     "cancel": "取消",
     "dragHint": "松开以上传到 {{dir}}",
     "termHint": "双击进入目录 · 右键更多操作 · 可拖拽文件到右侧上传",
-    "procHint": "右键任意进程行可执行操作"
+    "procHint": "右键任意进程行可执行操作",
+    "sftpUnavailable": "无法连接 SFTP",
+    "readFail": "读取失败",
+    "uploadQueued": "已加入 {{n}} 个上传任务",
+    "downloadQueued": "已加入 {{n}} 个下载任务",
+    "searchFail": "搜索失败",
+    "chmod": "修改权限 (chmod)",
+    "chmodTitle": "修改权限 · {{name}}",
+    "chmodLabel": "八进制权限代码（如 755 或 644）",
+    "invalidMode": "格式错误",
+    "invalidModeDetail": "权限代码必须为八进制数字（如 755 或 644）",
+    "textUnavailable": "无法作为文本查看，可下载后打开",
+    "splitHint": "用方向键或拖拽调节面板，Home 恢复等宽",
+    "confirm": "确认",
+    "delete": "删除",
+    "nameLabel": "名称"
   },
   "transfer": {
     "center": "传输中心",
@@ -239,7 +254,7 @@
     "copied": "已复制",
     "recentFiles": "最近传输文件（{{done}}{{sep}}{{total}}）",
     "recentFilesFilter": "过滤本任务最近文件…",
-    "noPerFile": "暂无逐文件记录（rsync 直传与本机中继会实时回传，scp 兜底模式仅显示字节进度）",
+    "noPerFile": "此任务未记录逐文件明细，请查看上方字节进度。",
     "empty": "暂无传输任务",
     "foldFinished": "{{n}} 条已完成/已取消",
     "loadMore": "继续加载（还有 {{n}} 条）",
@@ -263,7 +278,15 @@
     "moveDown": "置后",
     "pickTip": "选择任务",
     "expand": "展开任务详情",
-    "collapse": "收起任务详情"
+    "collapse": "收起任务详情",
+    "checkingPrefix": "正在校验已传前缀…",
+    "prefixProgress": "已校验 {{checked}} / {{total}} · {{n}} 个文件，可暂停或取消。",
+    "legacyRecovery": "此任务由旧版本保存，缺少安全恢复所需的执行信息。请在文件管理器重新创建传输。",
+    "stagingRetained": "保留了 {{n}} 个暂存文件用于续传；移除任务会清理它们。",
+    "cleanupPending": "{{n}} 个暂存文件等待清理，原服务器重新连接后会重试。",
+    "removeStaged": "移除此任务并清理其暂存文件",
+    "forgetLegacy": "仅移除旧记录",
+    "forgetLegacyConfirm": "仅移除此旧任务记录？原服务器上的未知暂存文件将保留；如不再需要，请核查后手动清理。"
   },
   "state": {
     "tempAlert": "GPU 温度过高（{{name}}）",
@@ -350,7 +373,8 @@
     "importing": "导入中…",
     "importDone": "导入完成：新增 {{ok}} 台{{fail}}",
     "importFailSuffix": "，失败 {{n}} 台",
-    "chooseKey": "选择密钥…"
+    "chooseKey": "选择密钥…",
+    "ownIdentityFile": "各主机使用自己的 IdentityFile"
   },
   "cfgBanner": {
     "added": "~/.ssh/config 新增 {{n}} 台主机",
@@ -454,7 +478,7 @@
   },
   "relay": {
     "title": "服务器互传（左侧勾选内容，右侧选择落到哪个目录）",
-    "body": "数据经本机内存中继、不在本机落盘；两台服务器都需在线。单击勾选/选择，双击目录进入。",
+    "body": "优先尝试服务器直传，失败时回退到本机内存中继。实际方式会显示在传输任务中。",
     "src": "源",
     "dst": "目标",
     "selected": "已选 {{n}} 项",
@@ -482,11 +506,15 @@
     "adding": "加入中…",
     "cancel": "取消",
     "syncMode": "跳过目标已有文件（同步模式）",
-    "syncModeTitle": "仅 rsync 直传支持；经本机中继或 tar/scp 时忽略此项",
+    "syncModeTitle": "仅适用于 rsync 直传；SFTP 中继会忽略此选项",
     "queuedToast": "已加入互传队列：→ {{dst}}",
     "queuedDetail": "{{n}} 项 → {{dir}}",
     "relayFail": "互传失败",
-    "addFail": "加入互传队列失败"
+    "addFail": "加入互传队列失败",
+    "readFail": "读取目录失败",
+    "enterAddress": "回车跳转",
+    "newFolderName": "新建文件夹",
+    "selectSourceWarn": "请先在左侧勾选要传输的文件/文件夹"
   },
   "parallel": {
     "targets": "目标（{{a}}/{{b}} 在线）：",
@@ -497,12 +525,13 @@
     "needServers": "请先勾选至少一台在线服务器",
     "needCmd": "请输入要执行的命令",
     "cmdPh": "在所有选中服务器上执行的命令，如：nvidia-smi --query-gpu=index,utilization.gpu --format=csv",
-    "emptyHint": "输入命令并运行，输出会按服务器分栏实时显示。右键可结束远端进程——请谨慎执行破坏性命令。",
+    "emptyHint": "输入命令并运行，输出会按服务器分栏实时显示。",
     "running": "运行中",
     "done": "已结束",
     "copyOut": "复制输出",
     "noOut": "（无输出）",
-    "ended": "并行命令已结束"
+    "ended": "并行命令已结束",
+    "startFail": "启动失败"
   },
   "terminal": {
     "termN": "终端 {{n}}",
@@ -553,7 +582,9 @@
     "savedToast": "已保存到服务器",
     "saveFail": "保存失败",
     "copyAll": "复制全部",
-    "close": "关闭"
+    "close": "关闭",
+    "unsavedNote": "内容已修改，请先保存或刷新放弃。",
+    "discardConfirm": "放弃未保存的修改并重新读取？"
   },
   "main": {
     "transferDone": "传输完成：{{name}}",

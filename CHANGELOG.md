@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0 — 2026-10-06
+
+- Commit staging ownership before writes and cleanup intent before deletion; restore crash-orphaned tasks and retry exact owned cleanup on server reconnect. Preserve unknown legacy stages, corrupt journals and failed writes.
+- Show complete SHA-256 prefix-check progress separately from transferred bytes, with cancellation and reader-failure handling.
+- Explain old recovery limitations as paused records and provide metadata-only removal for unowned legacy stages. Preserve overview polling behavior.
+- Localize previously hardcoded file/import/relay/parallel/editor flows; complete ten locale key contracts and load non-English resources on demand. Machine-assisted wording still needs full native-speaker review.
+- Add keyboard file selection/open/actions/resizing, terminal buttons, relay focus and unsaved/saving text navigation protection. Wrap sidebar footer actions for longer translations.
+- Add 12 staging/recovery regressions, 10 locale contracts, production workflow/language checks, ESLint/Hooks CI, English/Chinese detailed guides, simulated demonstration and transfer screenshots.
+- Verify real 16 MiB SSH/SFTP upload/download hashes, forced transfer-subprocess recovery, prefix progress and remote staging cleanup on one six-H100 Linux host. Second host unavailable; real cross-server rsync remains pending.
+
+Current source and platform evidence: [0.12.0 validation ledger](docs/VALIDATION-0.12.0.md).
+
 ## 0.11.1 — 2026-10-05
 
 - Stop and replace active port forwards promptly by closing their local sockets and SSH channels.

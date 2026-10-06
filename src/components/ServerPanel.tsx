@@ -216,14 +216,14 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
         <table className="proc">
           <thead>
             <tr>
-              {th('pid', 'PID', 80)}
-              {th('user', 'USER', 90)}
-              {th('cpu', 'CPU%', 80)}
-              {th('mem', 'MEM%', 80)}
-              {th('rssMb', 'RSS', 90)}
-              {th('state', 'STAT', 60)}
+              {th('pid', t('proc.pid'), 80)}
+              {th('user', t('proc.user'), 90)}
+              {th('cpu', t('proc.cpu'), 80)}
+              {th('mem', t('proc.mem'), 80)}
+              {th('rssMb', t('proc.rss'), 90)}
+              {th('state', t('proc.stat'), 60)}
               <th style={{ width: 60 }}>GPU</th>
-              <th>COMMAND</th><th aria-label={t('workbench.actions')} />
+              <th>{t('proc.command')}</th><th aria-label={t('workbench.actions')} />
             </tr>
           </thead>
           <tbody>

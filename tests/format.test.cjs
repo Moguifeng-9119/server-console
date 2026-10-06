@@ -36,16 +36,18 @@ describe('formatSpeed', () => {
 
 describe('formatDuration', () => {
   it('seconds/minutes/hours', () => {
-    expect(formatDuration(45)).toBe('45秒');
-    expect(formatDuration(60)).toBe('1分00秒');
-    expect(formatDuration(83)).toBe('1分23秒');
-    expect(formatDuration(3600)).toBe('1时00分');
-    expect(formatDuration(3725)).toBe('1时02分');
+    expect(formatDuration(45)).toBe('45s');
+    expect(formatDuration(45, 'zh-CN')).toBe('45秒');
+    expect(formatDuration(83, 'ja')).not.toMatch(/秒|分/);
+    expect(formatDuration(60)).toBe('1m 0s');
+    expect(formatDuration(83)).toBe('1m 23s');
+    expect(formatDuration(3600)).toBe('1h 0m');
+    expect(formatDuration(3725)).toBe('1h 2m');
   });
   it('bad input', () => {
-    expect(formatDuration(0)).toBe('0秒');
-    expect(formatDuration(undefined)).toBe('0秒');
-    expect(formatDuration(-10)).toBe('0秒');
+    expect(formatDuration(0)).toBe('0s');
+    expect(formatDuration(undefined)).toBe('0s');
+    expect(formatDuration(-10)).toBe('0s');
   });
 });
 

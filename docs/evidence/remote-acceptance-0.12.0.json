@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-06T06:39:01.481Z",
+  "scope": "opt-in real Linux SSH/SFTP and NVIDIA sampling",
+  "checks": [
+    "real NVIDIA GPU snapshot",
+    "upload final SHA-256",
+    "download final SHA-256",
+    "child-process termination, recovered prefix progress, final SHA-256",
+    "durable cleanup intent survives manager restart and removes actual remote stage",
+    "dedicated test directory has no staging leftovers"
+  ],
+  "unavailable": [
+    "cross-server rsync needs a reachable destination alias"
+  ],
+  "payloadBytes": 16777216,
+  "payloadSha256": "09acb45a3edf3593d552d26181bd7d88d2b7f0fbd27b7e7caca291d09c2c491c",
+  "gpuCards": 6,
+  "cpuPercent": 1,
+  "crashPrefixBytes": 2097152,
+  "result": "passed"
+}

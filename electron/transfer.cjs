@@ -6,7 +6,8 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { serializeTask, canResume } = require('./task-store.cjs');
+const { TransferStaging } = require('./transfer-staging.cjs');
+const { serializeTask, canResume, migrateTask } = require('./task-store.cjs');
 const { verifiedOffset, verifiedRemoteOffset, remoteStat, uploadPart, commitUpload, assertActive } = require('./safe-files.cjs');
 
 const DEFAULT_CONCURRENCY = 15; // 同时传输的顶层任务数（默认，可在设置中 1-15 调整）
@@ -140,7 +141,7 @@ function pump(rs, ws, onBytes, gate, limitTake) {
 class TransferManager {
   // getConn(serverId) -> Promise<Connection>（由 ipc 注入，复用连接池）
   // knownHostsLine(host, port) -> 目标机 known_hosts 行（由 ipc 注入 hostkeys 信任库；直传防中间人）
-  constructor({ getConn, storeFile, notify, knownHostsLine }) {
+  constructor({ getConn, storeFile, notify, knownHostsLine, endpointIdentity }) {
     this.getConn = getConn;
     this.storeFile = storeFile || null;
     this.notify = typeof notify === 'function' ? notify : null; // 任务完成/失败系统通知回调
@@ -154,6 +155,9 @@ class TransferManager {
     this.persistenceError = '';
     this._saveTimer = null;
     this._load();
+    this.staging = new TransferStaging(this, endpointIdentity);
+    this.staging.restore();
+    setImmediate(() => this.collectStaging({ localOnly: true }));
   }
 
   setConcurrency(n) {
@@ -226,7 +230,11 @@ class TransferManager {
       finishedAt: t.finishedAt,
       verification: t.verification || 'not-requested',
       resumable: canResume(t),
-      persistenceError: this.persistenceError,
+      persistenceError: this.persistenceError || this.staging?.journal.error,
+      recoveryReason: t.recoveryReason,
+      resumeCheck: t.resumeCheck,
+      stagedCount: (t.stagedUploads?.length || 0) + (t.stagedDownloads?.length || 0),
+      legacyStaging: !!t.stagedUploads?.some((p) => this.staging && !this.staging.journal.list().some((e) => e.taskId === t.id && e.path === p)),
     };
   }
 
@@ -319,14 +327,10 @@ class TransferManager {
     try {
       const arr = JSON.parse(fs.readFileSync(this.storeFile, 'utf8'));
       const kinds = ['upload', 'download', 'relay'];
-      for (const t of arr) {
+      for (const record of arr) {
+        const t = migrateTask(record);
         // 版本兼容/坏数据防护：缺关键字段的条目直接丢弃
         if (!t || !kinds.includes(t.kind) || typeof t.id !== 'string') continue;
-        if (t.status === 'running' || t.status === 'queued') t.status = 'paused';
-        if (!canResume(t) && !['done', 'canceled'].includes(t.status)) {
-          t.status = 'error';
-          t.error = 'This older task has no recovery inputs. Start a new transfer from the file manager.';
-        }
         t.speed = 0;
         this.tasks.set(t.id, t);
       }
@@ -579,30 +583,28 @@ class TransferManager {
     return true;
   }
 
-  async _cleanup(t) {
-    const errors = [];
-    for (const local of t.stagedDownloads || []) {
-      try { await fsp.unlink(local); }
-      catch (error) { if (error.code !== 'ENOENT') errors.push(error.message); }
-    }
-    for (const remote of t.stagedUploads || []) {
-      try {
-        const sftp = await (await this._conn(t.kind === 'relay' ? t.peerId : t.serverId)).sftp();
-        await withTimeout(new Promise((resolve, reject) => sftp.unlink(remote, (error) => error ? reject(error) : resolve())), 10000, 'Staging cleanup');
-      } catch (error) { if (error.code !== 2 && error.code !== 'ENOENT') errors.push(error.message); }
-    }
-    if (errors.length) t.error = 'Could not remove all temporary transfer files: ' + errors[0];
-    else { t.stagedUploads = []; t.stagedDownloads = []; }
-    return errors.length === 0;
-  }
+  _cleanup(t) { return this.staging.cleanup(t); }
+  _stage(t, key, staged, target, connection) { return this.staging.stage(t, key, staged, target, connection); }
+  _unstage(t, key, staged) { return this.staging.unstage(t, key, staged); }
+  collectStaging(options) { return this.staging.collect(options); }
 
-  _stage(t, key, target) {
-    if (!t[key]) t[key] = [];
-    if (!t[key].includes(target)) t[key].push(target);
-    this.saveSoon();
+  async _verified(t, key, run) {
+    const checks = t._resumeChecks || (t._resumeChecks = new Map());
+    let last = 0;
+    const publish = (force = false) => {
+      const now = Date.now();
+      if (!force && now - last < EMIT_MS) return;
+      last = now;
+      t.resumeCheck = checks.size ? {
+        bytes: [...checks.values()].reduce((sum, v) => sum + v.bytes, 0),
+        total: [...checks.values()].reduce((sum, v) => sum + v.total, 0),
+        files: checks.size,
+      } : undefined;
+      this.emit(t);
+    };
+    try { return await run((value) => { checks.set(key, value); publish(); }); }
+    finally { checks.delete(key); publish(true); }
   }
-
-  _unstage(t, key, target) { t[key] = (t[key] || []).filter((item) => item !== target); }
 
   async _conn(id) {
     const c = await this.getConn(id);
@@ -622,8 +624,8 @@ class TransferManager {
     if (t.sourceVersion && t.sourceVersion !== version) throw new Error('Source file changed since this transfer started. Start a new transfer.');
     t.sourceVersion = version;
     const staged = uploadPart(t.dstRemote, t.id);
-    this._stage(t, 'stagedUploads', staged);
-    const offset = t._restart ? 0 : await verifiedOffset(sftp, t.srcLocal, staged, t.size, true, gate);
+    await this._stage(t, 'stagedUploads', staged, t.dstRemote, conn);
+    const offset = t._restart ? 0 : await this._verified(t, staged, (progress) => verifiedOffset(sftp, t.srcLocal, staged, t.size, true, gate, progress));
     t._baseOffset = offset;
     t.transferred = offset;
     this.emit(t);
@@ -636,7 +638,7 @@ class TransferManager {
     await this._checkStaged(t, gate, staged);
     assertActive(gate);
     await commitUpload(sftp, staged, t.dstRemote);
-    this._unstage(t, 'stagedUploads', staged);
+    await this._unstage(t, 'stagedUploads', staged);
   }
 
   // 上传单个文件：0 字节直接建空文件（避免空流触发 SFTP Failure）；offset 由调用方算好传入
@@ -700,15 +702,15 @@ class TransferManager {
         const before = await fsp.stat(j.abs);
         if (before.size !== j.size) throw new Error('Source file changed since directory listing');
         const staged = uploadPart(j.remote, t.id);
-        this._stage(t, 'stagedUploads', staged);
-        const offset = t._restart ? 0 : await verifiedOffset(sftp, j.abs, staged, j.size, true, gate);
+        await this._stage(t, 'stagedUploads', staged, j.remote, conn);
+        const offset = t._restart ? 0 : await this._verified(t, staged, (progress) => verifiedOffset(sftp, j.abs, staged, j.size, true, gate, progress));
         await this._uploadOneFile(gate, sftp, j.abs, staged, j.size, offset, report);
         const after = await fsp.stat(j.abs);
         if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new Error('Source file changed during directory upload');
         if ((await remoteStat(sftp, staged)).size !== j.size) throw new Error('Staged upload size mismatch');
         assertActive(gate);
         await commitUpload(sftp, staged, j.remote);
-        this._unstage(t, 'stagedUploads', staged);
+        await this._unstage(t, 'stagedUploads', staged);
       },
       (j) => j.abs.slice(srcRoot.length).split(path.sep).join('/').replace(/^\/+/, ''),
     );
@@ -726,16 +728,16 @@ class TransferManager {
     t.sourceVersion = version;
     await fsp.mkdir(path.dirname(t.dstLocal), { recursive: true });
     const part = uploadPart(t.dstLocal, t.id);
-    this._stage(t, 'stagedDownloads', part);
+    await this._stage(t, 'stagedDownloads', part, t.dstLocal);
     const before = await remoteStat(sftp, t.srcRemote);
     if (`${before.size}:${before.mtime * 1000}` !== version) throw new Error('Source file changed before download');
-    const offset = t._restart ? 0 : await verifiedOffset(sftp, part, t.srcRemote, t.size, false, gate);
+    const offset = t._restart ? 0 : await this._verified(t, part, (progress) => verifiedOffset(sftp, part, t.srcRemote, t.size, false, gate, progress));
     t._baseOffset = offset;
     t.transferred = offset;
     this.emit(t);
     await this._downloadOneFile(gate, sftp, t.srcRemote, t.dstLocal, t.size, offset, (abs) =>
       onProgress(abs - offset, t.size), before, () => this._checkStaged(t, gate, undefined, part), part);
-    this._unstage(t, 'stagedDownloads', part);
+    await this._unstage(t, 'stagedDownloads', part);
   }
 
   // 下载单个文件：写 .scpart，完成后原子改名；offset 由调用方算好传入
@@ -789,10 +791,10 @@ class TransferManager {
         const before = await remoteStat(sftp, j.remote);
         if (before.size !== j.size) throw new Error('Source file changed since directory listing');
         const part = uploadPart(j.local, t.id);
-        this._stage(t, 'stagedDownloads', part);
-        const offset = t._restart ? 0 : await verifiedOffset(sftp, part, j.remote, j.size, false, gate);
+        await this._stage(t, 'stagedDownloads', part, j.local);
+        const offset = t._restart ? 0 : await this._verified(t, part, (progress) => verifiedOffset(sftp, part, j.remote, j.size, false, gate, progress));
         await this._downloadOneFile(gate, sftp, j.remote, j.local, j.size, offset, report, before, undefined, part);
-        this._unstage(t, 'stagedDownloads', part);
+        await this._unstage(t, 'stagedDownloads', part);
       },
       (j) => j.remote.slice(srcRoot.length).replace(/^\/+/, ''),
     );
@@ -825,9 +827,9 @@ class TransferManager {
     const port = cfgB.port || 22;
     const user = cfgB.username || 'root';
     if (!host) throw new Error('目标缺少主机地址');
-    // tag 格式：sckey- + 8 位随机 base36（GC 端用 / sckey-[a-z0-9]{8}$/ 精确匹配，
+    // tag 格式：sckey- + 8 位随机 hex（GC 端用 / sckey-[a-z0-9]{8}$/ 精确匹配，
     // 避免误删 authorized_keys 中碰巧以 sc 开头 8 位的用户自有密钥注释）
-    const tag = 'sckey-' + Math.random().toString(36).slice(2, 10);
+    const tag = 'sckey-' + crypto.randomBytes(4).toString('hex');
     const dir = '/tmp/.' + tag;
     const key = dir + '/k';
     const script = dir + '/run.sh';
@@ -844,13 +846,12 @@ class TransferManager {
     const khLine = this.knownHostsLine ? this.knownHostsLine(host, port) : null;
     if (!khLine) throw new Error('无法获取目标主机指纹（目标机尚未连接过）');
     const khfile = dir + '/known_hosts';
-    await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir}`); // 目录先建好，known_hosts 才有落点
-    await wf(sa, khfile, Buffer.from(khLine + '\n'));
-
-    // 1) 源端生成一次性临时密钥（不使用用户主私钥）
-    await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir} && ssh-keygen -t ed25519 -N '' -f ${key} -q`);
     let installed = false;
     try {
+      await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir}`);
+      await wf(sa, khfile, Buffer.from(khLine + '\n'));
+      // Setup failures also pass through the exact-directory cleanup below.
+      await connA.exec(`ssh-keygen -t ed25519 -N '' -f ${key} -q`);
       const pubRaw = (await connA.exec(`cat ${key}.pub`)).stdout.trim();
       const marked = pubRaw.split(' ').slice(0, 2).join(' ') + ' ' + tag; // 用随机 tag 作注释，便于精确删除
       // 2) 临时把公钥注入目标 authorized_keys
@@ -1031,20 +1032,20 @@ class TransferManager {
     await this._relayOneFile(t, gate, sa, sb, t.srcRemote, t.dstRemote, top.size, (d) => {
       t.transferred = d;
       this.emit(t);
-    });
+    }, b);
     t.transferred = t.size;
     t.filesDone = 1;
     this._pushRecent(t, t.name);
   }
 
   // 单个文件中继（断点续传；0 字节直接建空文件，避免空流触发 SFTP Failure）
-  async _relayOneFile(t, gate, sa, sb, srcAbs, dstAbs, size, onBytes) {
+  async _relayOneFile(t, gate, sa, sb, srcAbs, dstAbs, size, onBytes, destinationConnection) {
     assertActive(gate);
     const before = await remoteStat(sa, srcAbs);
     if (before.size !== size) throw new Error('Relay source changed before transfer');
     const staged = uploadPart(dstAbs, t.id);
-    this._stage(t, 'stagedUploads', staged);
-    const offset = t._restart ? 0 : await verifiedRemoteOffset(sa, sb, srcAbs, staged, size, gate);
+    await this._stage(t, 'stagedUploads', staged, dstAbs, destinationConnection);
+    const offset = t._restart ? 0 : await this._verified(t, staged, (progress) => verifiedRemoteOffset(sa, sb, srcAbs, staged, size, gate, progress));
     assertActive(gate);
     if (size === 0 && offset === 0) {
       await new Promise((res, rej) => sb.writeFile(staged, Buffer.alloc(0), (e) => (e ? rej(e) : res())));
@@ -1063,7 +1064,7 @@ class TransferManager {
     }
     assertActive(gate);
     await commitUpload(sb, staged, dstAbs);
-    this._unstage(t, 'stagedUploads', staged);
+    await this._unstage(t, 'stagedUploads', staged);
   }
 
   // 目录任务的通用骨架：BFS 边遍历边传 + 有界文件并发 + 节流进度/速度 + 单文件错误汇总。
@@ -1191,7 +1192,7 @@ class TransferManager {
         }));
       },
       async (j, report) => {
-        await this._relayOneFile(t, gate, sa, sb, j.src, j.dst, j.size, report);
+        await this._relayOneFile(t, gate, sa, sb, j.src, j.dst, j.size, report, connB);
       },
       (j) => (j.src.startsWith(srcRoot) ? j.src.slice(srcRoot.length).replace(/^\/+/, '') : j.src),
     );
@@ -1220,7 +1221,11 @@ class TransferManager {
     if (['queued', 'paused', 'error'].includes(t.status)) {
       this.queue = this.queue.filter((x) => x !== id);
       t.status = 'canceled';
-      t._cleanupPromise = this._cleanup(t).then(() => this.emit(t));
+      const pending = this._cleanup(t).finally(() => {
+        if (t._cleanupPromise === pending) t._cleanupPromise = null;
+        this.emit(t);
+      });
+      t._cleanupPromise = pending;
       this.emit(t);
       return true;
     }
@@ -1236,7 +1241,7 @@ class TransferManager {
     const t = this.tasks.get(id);
     if (!t) return false;
     if (!canResume(t)) return false;
-    if (t._cleaning) return false;
+    if (t._cleaning || t._cleanupPromise || this.staging.journal.list().some((e) => e.taskId === id && e.disposition === 'cleanup')) return false;
     if (t.status === 'running') return true;
     if (reset) {
       t.transferred = 0;
@@ -1275,6 +1280,16 @@ class TransferManager {
       if (['done', 'canceled'].includes(t.status) && !await this.remove(id)) success = false;
     }
     return success;
+  }
+
+  forgetLegacy(id) {
+    const t = this.tasks.get(id);
+    if (!t || ['running', 'queued'].includes(t.status) || t._cleaning || t._gate || t._cleanupPromise) return false;
+    if (!t.stagedUploads?.length || this.staging.journal.list().some((e) => e.taskId === id)) return false;
+    // This explicit action forgets old metadata only; no local or remote file is removed.
+    this.tasks.delete(id);
+    this.saveSoon();
+    return true;
   }
 }
 

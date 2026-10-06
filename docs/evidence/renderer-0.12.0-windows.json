@@ -1,0 +1,30 @@
+{
+  "at": "2026-10-06T06:43:32.036Z",
+  "scope": "production renderer browser demo",
+  "checks": [
+    "simulated fleet renders",
+    "demo sends no anomaly toasts",
+    "1440px viewport has no page overflow",
+    "40 GiB filter uses individual cards",
+    "empty filter result can reset",
+    "GPU owner search",
+    "terminal shortcut opens correct tab",
+    "files shortcut opens correct tab",
+    "multi-GPU detail defaults to compact matrix",
+    "monitor render does not reset process menu focus",
+    "settings traps keyboard focus",
+    "security explains actual credential mode",
+    "Escape closes dialog and restores focus",
+    "palette above transfer drawer is visible and focused",
+    "command palette has no duplicate server actions",
+    "nested import dialog keeps its own focus",
+    "Escape only closes top nested dialog",
+    "demo alert details render",
+    "timestamped history has a visible entry",
+    "English resource workbench has translated business labels",
+    "900px viewport has no page overflow",
+    "no uncaught renderer errors"
+  ],
+  "errors": [],
+  "version": "0.12.0"
+}

@@ -11,7 +11,15 @@
 
 ![按单卡空闲显存和占用用户找资源的工作台](assets/screenshots/workbench-light.png)
 
-*截图来自 v0.11.0，使用明确标注的模拟数据。[v0.11.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.11.1.md)。*
+*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.0](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.0.md)。*
+
+详细操作、传输决策流程、崩溃恢复和源码布局见[使用与恢复指南](docs/USER-GUIDE.zh-CN.md)。
+
+**0.12.0 新增：**暂存文件持久化恢复与清理、SHA-256 校验进度、旧任务说明、文件/互传键盘操作、草稿保护和十语言完整键资源。
+
+![约27秒完整操作演示，模拟数据](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated prefix verification progress" width="49%"></p>
 
 ## 适合解决什么问题？
 
@@ -53,6 +61,8 @@ npm run electron:dev
 
 ## 传输与凭据的实际保证
 
+暂存文件在写入前提交归属记录，崩溃后恢复可操作任务。清理意图在删除前持久化，断连后重连重试；未知旧 stage 保留供人工核查。完整 SHA-256 前缀校验有独立进度，但仍需读取两边前缀。
+
 - 任意已有目标文件不再被当成断点。上传、下载和本机中转使用独立任务临时文件，只有完整 SHA-256 前缀一致时才续传。
 - SFTP 检查预期字节数和源文件前后的大小/修改时间，通过后才替换目标。不同路径写法与目录/子文件目标冲突会进入队列。失败保留临时文件以便重试；取消/移除清理任务跟踪的临时文件，清理失败则保留记录并显示原因。
 - 可选 MD5 在单文件上传/下载**替换目标前**执行，界面明确区分已校验、失败、无法校验、未请求。目录和互传不会冒称已通过 MD5。
@@ -64,23 +74,25 @@ npm run electron:dev
 ## 开发、测试与构建
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium  # 无可用本地 Chrome 时
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-类型检查覆盖严格 TypeScript 前端与 Electron checkJs。smoke 使用假 SSH 服务但真实 SFTP 协议；UI 检查生产构建的浏览器演示并生成截图。v0.11.1 含 84 项回归测试、22 项浏览器检查、16 项打包程序原生检查，覆盖真实 IPC、本机 SSH shell、尺寸同步、端口转发和重启恢复；运行原生检查前需将 SC_ELECTRON_PATH 指向当前解包程序，然后执行 npm run e2e:terminal。Windows 验证 DPAPI 加密；macOS 自动化使用 MockKeychain，Linux CI 无密钥库时验证密码只存当前会话。基准仅测试本机 10/30 个模拟 SSH 会话，不承诺真实集群性能或节省百分比。
+类型检查覆盖严格 TypeScript 前端与 Electron checkJs。当前 106 项回归通过；两台本机假 SSH 服务的真实 SFTP 协议检查比对最终字节；生产浏览器检查覆盖工作台与文件/编辑/互传/十语言加载切换。ESLint/Hooks 已通过。真实 Linux 六张 H100 主机通过 16 MiB 上传/下载 SHA-256、强杀传输子进程恢复和暂存清理；第二台测试机不可达，跨机 rsync 待验。三平台原生和发布证据、密钥库边界见验证记录。基准仅为本机 10/30 模拟 SSH 会话。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [本轮改进](docs/IMPROVEMENTS.zh-CN.md)、[原评估问题逐项状态](docs/ASSESSMENT-STATUS.zh-CN.md)、[架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.11.1.md)、[基准说明](docs/BENCHMARKS.md)。未配置 ESLint/Hooks lint，不声称该项已通过。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [本轮改进](docs/IMPROVEMENTS.zh-CN.md)、[原评估问题逐项状态](docs/ASSESSMENT-STATUS.zh-CN.md)、[架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.0.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
 
-构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.11.1.md)。
+构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.0.md)。
 
 ## 语言、贡献与后续方向
 
-README 提供十种语言的使用说明，每页顶部均可切换。应用界面翻译是另一项尚未完成的工作，保留十种语言选项。新版工作台优先维护英文与简体中文，其他语言新增字符串回退英文；旧页面仍有待翻译部分，见 [国际化状态](docs/LOCALIZATION.md)。
+README 十页都有实质使用说明与相互导航。界面十语言各 635 个键，插值一致，旧硬编码中文已迁移，语言按需加载。非中英文包含机器辅助初稿，完整母语审校仍待完成；远端命令输出与后端详细错误保留原语言。详见 [国际化状态](docs/LOCALIZATION.md)。
 
 欢迎按 [贡献指南](CONTRIBUTING.md) 提交可复现问题或 PR。查看 [变更记录](CHANGELOG.md)、[路线图](docs/ROADMAP.md) 与 [MIT 许可证](LICENSE)。

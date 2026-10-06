@@ -121,8 +121,8 @@ function TaskRow({ t, tf, picked, togglePick }: {
         )}
         <span className="td-peer">{peer}</span>
         <span className="td-spacer" />
-        {t.status === 'running' && <span className="td-now num">{formatSpeed(t.speed)}</span>}
-        {t.status === 'running' && (eta != null ? <span className="td-eta num">{formatDuration(eta)}</span> : t.size === 0 ? <span className="td-eta">{tt('transfer.totalUnknown')}</span> : null)}
+        {t.status === 'running' && (t.resumeCheck ? <span className="td-now">{tt('transfer.checkingPrefix')}</span> : <span className="td-now num">{formatSpeed(t.speed)}</span>)}
+        {t.status === 'running' && !t.resumeCheck && (eta != null ? <span className="td-eta num">{formatDuration(eta)}</span> : t.size === 0 ? <span className="td-eta">{tt('transfer.totalUnknown')}</span> : null)}
         <span className={`td-status ${t.status}`}>{tt('transfer.' + t.status)}</span>
         <span className="td-row-actions">
           {t.status === 'queued' && (
@@ -134,14 +134,22 @@ function TaskRow({ t, tf, picked, togglePick }: {
           {t.status === 'running' && <button className="btn mini" onClick={() => tf.pause(t.id)}>{tt('transfer.pauseBtn')}</button>}
           {t.status === 'paused' && t.resumable !== false && <button className="btn mini primary" onClick={() => tf.resume(t.id)}>{tt('transfer.resumeBtn')}</button>}
           {t.status === 'error' && t.resumable !== false && <button className="btn mini primary" onClick={() => tf.retry(t.id)}>{tt('transfer.retryBtn')}</button>}
-          {['queued', 'running'].includes(t.status) && <button className="btn mini danger" onClick={() => tf.cancel(t.id)}>{tt('transfer.cancel')}</button>}
-          {['done', 'canceled', 'error', 'paused'].includes(t.status) && <button className="btn mini" onClick={() => tf.remove(t.id)}>{tt('transfer.removeBtn')}</button>}
+          {['queued', 'running', 'paused', 'error'].includes(t.status) && <button className="btn mini danger" onClick={() => tf.cancel(t.id)}>{tt('transfer.cancel')}</button>}
+          {['done', 'canceled', 'error', 'paused'].includes(t.status) && <button className="btn mini" title={t.stagedCount ? tt('transfer.removeStaged') : tt('transfer.removeBtn')} onClick={() => tf.remove(t.id)}>{tt('transfer.removeBtn')}</button>}
+          {t.legacyStaging && !['running', 'queued'].includes(t.status) && <button className="btn mini" onClick={async () => { if (window.confirm(tt('transfer.forgetLegacyConfirm'))) { await api?.transferForgetLegacy(t.id); tf.refresh(); } }}>{tt('transfer.forgetLegacy')}</button>}
         </span>
       </div>
 
       <div className="td-bar">
         <i style={{ width: `${pct}%` }} className={t.status === 'error' ? 'err' : t.status === 'paused' ? 'pause' : ''} />
       </div>
+
+      {t.resumeCheck && <div className="td-note" role="status">
+        {tt('transfer.prefixProgress', { checked: formatBytes(t.resumeCheck.bytes), total: formatBytes(t.resumeCheck.total), n: t.resumeCheck.files })}
+        <progress aria-label={tt('transfer.checkingPrefix')} value={t.resumeCheck.bytes} max={t.resumeCheck.total || 1} style={{ width: '100%' }} />
+      </div>}
+      {t.recoveryReason && <div className="td-note">{tt('transfer.legacyRecovery')}</div>}
+      {!!t.stagedCount && ['paused', 'error', 'canceled'].includes(t.status) && <div className="td-note">{tt(t.status === 'canceled' ? 'transfer.cleanupPending' : 'transfer.stagingRetained', { n: t.stagedCount })}</div>}
 
       {open && (
         <div className="td-detail">

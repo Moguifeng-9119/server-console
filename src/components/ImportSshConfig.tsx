@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
@@ -15,6 +16,7 @@ export function ImportSshConfig({
   onClose: () => void;
   preferAliases?: string[];
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   useDialogFocus(true, ref, onClose);
   const { configs, addServer, pushToast } = useStore();
@@ -45,7 +47,7 @@ export function ImportSshConfig({
     setReading(false);
     if (!r.ok || !r.data) {
       setEntries([]);
-      setReadErr(r.error || '读取失败');
+      setReadErr(r.error || t('import.readFail'));
       return;
     }
     setConfigPath(r.data.path);
@@ -114,7 +116,7 @@ export function ImportSshConfig({
     setImporting(false);
     pushToast({
       level: fail ? 'warn' : 'info',
-      title: `导入完成：新增 ${ok} 台${fail ? `，失败 ${fail} 台` : ''}`,
+      title: t('import.importDone', { ok, fail: fail ? t('import.importFailSuffix', { n: fail }) : '' }),
     });
     onClose();
   };
@@ -122,26 +124,26 @@ export function ImportSshConfig({
   return (
     <div className="mask" onClick={onClose}>
       <div className="dialog import-dlg" ref={ref} role="dialog" aria-modal="true" aria-label="SSH config" tabIndex={-1} style={{ width: 720 }} onClick={(e) => e.stopPropagation()}>
-        <h3>从 ~/.ssh/config 导入</h3>
+        <h3>{t('import.title')}</h3>
 
         <div className="field" style={{ marginBottom: 10 }}>
-          <label>config 文件路径</label>
+          <label>{t('import.pathLabel')}</label>
           <div className="row" style={{ gap: 6 }}>
             <input className="mini mono" style={{ flex: 1 }} value={configPath} onChange={(e) => setConfigPath(e.target.value)} />
             <button className="btn" onClick={browseConfig}>
-              浏览…
+              {t('import.browse')}
             </button>
             <button className="btn" disabled={reading} onClick={() => doRead(configPath)}>
-              {reading ? '读取中…' : '重新读取'}
+              {reading ? t('import.reading') : t('import.reread')}
             </button>
           </div>
         </div>
 
         <div className="field" style={{ marginBottom: 10 }}>
-          <label>统一私钥（可选；选择后覆盖下面每台主机的密钥）</label>
+          <label>{t('import.unifiedKey')}</label>
           <div className="row" style={{ gap: 6 }}>
             <select className="mini mono" style={{ flex: 1 }} value={unifiedKey} onChange={(e) => setUnifiedKey(e.target.value)}>
-              <option value="">（各主机使用自己的 IdentityFile）</option>
+              <option value="">{t('import.ownIdentityFile')}</option>
               {info?.keys.map((k) => (
                 <option key={k.path} value={k.path}>
                   {k.name}
@@ -149,11 +151,11 @@ export function ImportSshConfig({
               ))}
             </select>
             <button className="btn" onClick={browseUnified}>
-              选择密钥…
+              {t('import.pickKey')}
             </button>
             {unifiedKey && (
               <button className="btn" onClick={() => setUnifiedKey('')}>
-                清除
+                {t('import.clear')}
               </button>
             )}
           </div>
@@ -161,21 +163,21 @@ export function ImportSshConfig({
 
         <div className="import-bar">
           <span>
-            共 {rows.length} 台 · 已存在 {rows.filter((r) => r.exists).length} 台自动跳过 · 选中 {selectedCount} 台
+            {t('import.summary', { total: rows.length, exists: rows.filter((r) => r.exists).length, sel: selectedCount })}
           </span>
           <span className="spacer" style={{ flex: 1 }} />
           <button className="btn" onClick={() => toggleAll(true)}>
-            全选新增
+            {t('import.selectNew')}
           </button>
           <button className="btn" onClick={() => toggleAll(false)}>
-            全不选
+            {t('import.selectNone')}
           </button>
         </div>
 
         {readErr && <div className="body" style={{ color: 'var(--crit)', padding: '8px 0' }}>{readErr}</div>}
         {!readErr && rows.length === 0 && !reading && (
           <div className="empty" style={{ padding: 24 }}>
-            未解析到任何 Host。可点“浏览”选择其他 config。
+            {t('import.parseEmpty')}
           </div>
         )}
 
@@ -197,12 +199,12 @@ export function ImportSshConfig({
                   <span className="mono imp-host">
                     {e.user}@{e.host}:{e.port}
                   </span>
-                  {e.exists && <span className="tag">已存在</span>}
+                  {e.exists && <span className="tag">{t('import.existsTag')}</span>}
                 </label>
                 <div className="imp-key">
                   {unifiedKey ? (
                     <span className="mono" title={key}>
-                      统一密钥
+                      {t('import.unified')}
                     </span>
                   ) : (
                     <>
@@ -214,15 +216,15 @@ export function ImportSshConfig({
                           else setPerKey((m) => ({ ...m, [e.alias]: ev.target.value }));
                         }}
                       >
-                        {options.length === 0 && <option value="">未指定密钥</option>}
+                        {options.length === 0 && <option value="">{t('import.noKey')}</option>}
                         {options.map((o) => (
                           <option key={o} value={o}>
                             {o.split(/[\\/]/).pop()}
                           </option>
                         ))}
-                        <option value="__browse__">浏览…</option>
+                        <option value="__browse__">{t('import.browse')}</option>
                       </select>
-                      <span className={`key-state ${key ? 'ok' : 'miss'}`}>{key ? '密钥就绪' : '缺密钥'}</span>
+                      <span className={`key-state ${key ? 'ok' : 'miss'}`}>{key ? t('import.keyReady') : t('import.keyMissing')}</span>
                     </>
                   )}
                 </div>
@@ -233,11 +235,9 @@ export function ImportSshConfig({
 
         <div className="foot">
           <button className="btn primary" disabled={importing || selectedCount === 0} onClick={runImport}>
-            {importing ? '导入中…' : `导入选中的 ${selectedCount} 台`}
+            {importing ? t('import.importing') : t('import.importSel', { n: selectedCount })}
           </button>
-          <button className="btn" onClick={onClose}>
-            关闭
-          </button>
+          <button className="btn" onClick={onClose}>{t('settings.close')}</button>
         </div>
       </div>
     </div>

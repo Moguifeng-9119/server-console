@@ -1,17 +1,17 @@
 # Roadmap
 
-These are priorities, not release promises. The product focus is getting from a suitable Linux/NVIDIA GPU to SSH work with clear observations and dependable data movement.
+Priorities, not release promises. The 0.12.0 recovery journal, prefix progress, file/relay keyboard flows, locale contracts, detailed guides, demonstration and lint are implemented. See the [validation ledger](VALIDATION-0.12.0.md) for exact evidence.
 
-| Priority | Next problem | Evidence for completion |
+| Priority | Remaining problem | Completion evidence |
 | --- | --- | --- |
-| 1 | Complete release confidence beyond current CI | v0.11.1 three-platform packages and 16 native checks per platform passed, including resize, forwarding and restart. Remaining: Intel macOS execution, signing/notarization, installer/update, real macOS/Linux key stores and full remote PTY |
-| 1 | Real direct relay and failure recovery | Two owned test hosts: rsync, loss of source-to-target reachability, cancellation, mismatch/source changes, crash and temporary-key cleanup; destination-byte checks |
-| 1 | Physical GPU observations | CPU comparison against Linux counters; multi-GPU PID, unavailable NVIDIA fields, MIG/permissions behavior; timestamp freshness under slow polling |
-| 2 | Remaining translation and keyboard gaps | Migrate importer/files/terminal/parallel labels, add locale coverage, native screen-reader checks and controls with accessible names |
-| 2 | Product demonstration | Ten README guides exist; add a 20–30 second find-GPU → inspect → terminal → transfer demonstration and transfer screenshots, with simulated/real data labelled |
-| 2 | Large-fleet responsiveness | Real 10/30-host profiling and parser/UI timing; split broad React store only when measurements justify it; cap concurrent collection if needed |
-| 2 | Transfer source snapshots and remote coordination | Define semantics for changing files, filesystem symlink aliases and separate configurations pointing at one physical target |
-| 2 | Stronger engineering checks | ESLint/react-hooks rules, renderer/native regression jobs and dependency-update review |
-| 3 | Deep GPU diagnostics | Compare whether NVML/MIG/process detail improves a concrete lab task before adding dependencies |
+| 1 | Real cross-server direct relay | Reachable second authorized host; final rsync bytes, connectivity failure, cancellation and tagged-key cleanup after interrupted direct transfer |
+| 1 | Package confidence beyond automation | Intel macOS, real Keychain/Linux secret-service, signing/notarization, installer/update and remote PTY |
+| 1 | Physical GPU semantics | Independent CPU comparison, real multi-GPU PID, missing fields, MIG/permissions; six H100 cards detected on one host |
+| 2 | Wording and screen readers | Native-speaker review of machine-assisted drafts and native reader acceptance; locale contract and keyboard regressions already exist |
+| 2 | Actual user feedback | Lab users complete GPU → work → transfer tasks; simulated demonstration does not substitute for feedback |
+| 2 | Large-prefix/fleet performance | Real 100 GB prefix timing and 10/30-host parser/UI/network profiling; full prefix verification remains |
+| 2 | Source changes and remote coordination | Source snapshots, symlink aliases and cross-config physical target semantics |
+| 2 | Module boundaries | Use measured complexity/performance to guide further IPC/store decomposition; checkJs is not strict TypeScript |
+| 3 | Deep GPU diagnostics | Concrete lab need before implementing full NVML/MIG/process-tree capabilities |
 
-Team SSO, RBAC, web deployment and cluster reservations change the trust/data model. Treat them as separate product decisions after native reliability and resource discovery have evidence, rather than making the current README imply they exist.
+Team SSO, RBAC, web deployment and cluster reservations change the trust/data model and require separate product decisions. They are not existing capabilities.

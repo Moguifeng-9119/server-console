@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU-Arbeitsbereich: simulierte Daten](assets/screenshots/workbench-en.png)
 
-Die Bilder zeigen v0.11.0 mit simulierten Daten. v0.11.1 bietet Windows x64 Portable, Linux x86_64 AppImage und macOS Universal-DMG mit SHA-256-Prüfsummen. Pakete sind unsigniert; macOS ist nicht notarisiert.
+**Neu in 0.12.0**
+
+Dauerhafte Wiederherstellung und gezielte Bereinigung eigener temporärer Dateien; sichtbarer SHA-256-Prüffortschritt und verständliche Hinweise für alte Aufgaben. Datei-/Relay-Tastaturbedienung, Schutz ungespeicherter Texte und ESLint/Hooks-Prüfungen ergänzt. Alle zehn Sprachdateien haben 635 Schlüssel; maschinell unterstützte Texte benötigen noch vollständige muttersprachliche Prüfung.
+
+Aktuelle Nachweise: echte SSH/SFTP-Wiederherstellung auf einem Linux-Host mit sechs H100-GPUs. Der zweite Testhost ist nicht erreichbar; echtes serverübergreifendes rsync bleibt ungeprüft. Die folgenden 0.11.1-Zahlen sind historische Ergebnisse. [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+Die Bilder zeigen v0.12.0 mit simulierten Daten. v0.12.0 bietet Windows x64 Portable, Linux x86_64 AppImage und macOS Universal-DMG mit SHA-256-Prüfsummen. Pakete sind unsigniert; macOS ist nicht notarisiert.
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## Funktionen
 
@@ -61,19 +73,21 @@ Windows DPAPI wurde real getestet. macOS nutzt MockKeychain, keinen Nachweis fü
 React, TypeScript, Electron, Vite und ssh2; genaue Versionen in [package.json](package.json) und Lockdatei. Kommandos:
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-SC_ELECTRON_PATH auf die aktuelle entpackte Anwendung setzen, dann npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux und dist:mac deaktivieren automatische Veröffentlichung. Die [Paket-CI](.github/workflows/package.yml) testet vor dem Hochladen. ESLint/Hooks lint ist nicht eingerichtet.
+SC_ELECTRON_PATH auf die aktuelle entpackte Anwendung setzen, dann npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux und dist:mac deaktivieren automatische Veröffentlichung. Die [Paket-CI](.github/workflows/package.yml) testet vor dem Hochladen. ESLint und React-Hooks sind konfiguriert; npm run lint ist Teil der CI.
 
 ## Sprachen und Beiträge
 
-README-Anleitungen gibt es in zehn Sprachen. Die App ist noch nicht vollständig übersetzt: neuer Arbeitsbereich in Englisch/vereinfachtem Chinesisch, neue fehlende Texte fallen auf Englisch zurück, ältere Seiten enthalten festes Chinesisch. Siehe [Übersetzungsstand](docs/LOCALIZATION.md).
+README-Anleitungen in zehn Sprachen; die Oberfläche hat zehn vollständige Schlüsseldateien und lädt sie bei Bedarf. Nicht alle Formulierungen sind muttersprachlich geprüft. [LOCALIZATION](docs/LOCALIZATION.md).
 
 [Nachweise](docs/VALIDATION-0.11.1.md) · [Messmethode](docs/BENCHMARKS.md) · [Architektur](docs/ARCHITECTURE.md) · [Beitragen](CONTRIBUTING.md) · [Roadmap](docs/ROADMAP.md) · [Änderungen](CHANGELOG.md) · [MIT-Lizenz](LICENSE)

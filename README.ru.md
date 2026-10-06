@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
+[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![Рабочая панель GPU: имитационные данные](assets/screenshots/workbench-en.png)
 
-Снимки показывают v0.11.0 с имитационными данными. v0.11.1 содержит портативный Windows x64, Linux x86_64 AppImage, универсальный macOS DMG и суммы SHA-256. Пакеты не подписаны; macOS не нотарифицирован. См. [проверки](docs/VALIDATION-0.11.1.md).
+**Что нового в 0.12.0**
+
+Добавлены постоянный журнал временных файлов задачи, восстановление и очистка после переподключения, прогресс SHA-256 и пояснения старых задач. Улучшены управление файлами и ретрансляцией с клавиатуры, защита несохранённого текста и проверки ESLint/Hooks. Во всех десяти языках по 635 ключей; полная вычитка текстов с машинным переводом носителями языка ещё нужна.
+
+Текущие реальные проверки: восстановление SSH/SFTP на Linux-сервере с шестью H100. Второй сервер недоступен; реальный rsync между серверами не проверен. Числа для 0.11.1 ниже относятся к прошлой версии. [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+Снимки показывают v0.12.0 с имитационными данными. v0.12.0 содержит портативный Windows x64, Linux x86_64 AppImage, универсальный macOS DMG и суммы SHA-256. Пакеты не подписаны; macOS не нотарифицирован. См. [проверки](docs/VALIDATION-0.12.0.md).
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## Для каких задач
 
@@ -23,7 +35,7 @@ ServerConsole — персональный настольный инструме
 
 ## Начало работы
 
-Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
+Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -61,19 +73,21 @@ v0.11.1 прошла на Windows, Linux и macOS отдельно провер�
 React, TypeScript, Electron, Vite и ssh2; точные версии указаны в [package.json](package.json) и файле блокировки. Команды проверки:
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-Укажите SC_ELECTRON_PATH на актуальный распакованный исполняемый файл и запустите npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux и dist:mac отключают автоматическую публикацию. [CI пакетов](.github/workflows/package.yml) проверяет приложение до загрузки неподписанных файлов. ESLint/Hooks lint не настроен.
+Укажите SC_ELECTRON_PATH на актуальный распакованный исполняемый файл и запустите npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux и dist:mac отключают автоматическую публикацию. [CI пакетов](.github/workflows/package.yml) проверяет приложение до загрузки неподписанных файлов. ESLint и React-Hooks настроены; npm run lint выполняется в CI.
 
 ## Языки и участие
 
-Руководства README доступны на десяти языках. Перевод интерфейса — отдельная незавершённая задача: новая панель поддерживается на английском и упрощённом китайском; новые отсутствующие строки показываются по-английски, старые экраны содержат жёстко заданный китайский текст. См. [состояние локализации](docs/LOCALIZATION.md).
+README и файлы интерфейса доступны на десяти языках; языки загружаются по требованию. Полная вычитка всех текстов носителями языка ещё не завершена. [LOCALIZATION](docs/LOCALIZATION.md).
 
 [Архитектура](docs/ARCHITECTURE.md) · [Участие](CONTRIBUTING.md) · [Планы](docs/ROADMAP.md) · [Изменения](CHANGELOG.md) · [Лицензия MIT](LICENSE)

@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
+[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU 資源工作台：模擬資料](assets/screenshots/workbench-en.png)
 
-截圖來自 v0.11.0，使用模擬資料。v0.11.1 提供 Windows x64 便攜版、Linux x86_64 AppImage、macOS 通用 DMG 和 SHA-256 校驗檔。套件未簽署，macOS 未公證；各系統驗證範圍見[最新紀錄](docs/VALIDATION-0.11.1.md)。
+**0.12.0 更新**
+
+新增任務暫存檔持久記錄、崩潰恢復及重新連線清理；SHA-256 前綴驗證有獨立進度，舊任務提供明確說明。補齊檔案與互傳鍵盤操作、未儲存文字保護及 ESLint/Hooks。十語言各 635 個鍵，機器輔助初稿仍需完整母語審校。
+
+真機 SSH/SFTP 已在六張 H100 的 Linux 主機通過；第二台測試機無法連線，跨伺服器 rsync 仍待驗。以下 0.11.1 數字是歷史記錄。 [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+截圖來自 v0.12.0，使用模擬資料。v0.12.0 提供 Windows x64 便攜版、Linux x86_64 AppImage、macOS 通用 DMG 和 SHA-256 校驗檔。套件未簽署，macOS 未公證；各系統驗證範圍見[最新紀錄](docs/VALIDATION-0.12.0.md)。
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## 適合解決什麼問題？
 
@@ -23,7 +35,7 @@ ServerConsole 是面向共用 **Linux / NVIDIA GPU 伺服器**的個人桌面工
 
 ## 開始使用
 
-從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
+從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -61,19 +73,21 @@ v0.11.1 的 Windows、Linux、macOS CI 各通過 84 項回歸測試、SFTP 冒�
 技術棧為 React、TypeScript、Electron、Vite 和 ssh2，確切版本見 [package.json](package.json)與鎖定檔。常用檢查：
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-將 SC_ELECTRON_PATH 指向目前解包執行檔，再執行 npm run e2e:terminal。建置命令為 dist:win:lite、dist:win:nsis、dist:linux、dist:mac；均關閉自動發布。[打包 CI](.github/workflows/package.yml)先驗證原生應用，再上傳未簽署構建。尚未配置 ESLint/Hooks lint。
+將 SC_ELECTRON_PATH 指向目前解包執行檔，再執行 npm run e2e:terminal。建置命令為 dist:win:lite、dist:win:nsis、dist:linux、dist:mac；均關閉自動發布。[打包 CI](.github/workflows/package.yml)先驗證原生應用，再上傳未簽署構建。尚未配置 ESLint/Hooks 已設定，CI 執行 npm run lint。
 
 ## 語言與貢獻
 
-README 使用說明提供十種語言。應用介面尚未完整翻譯：新版工作台優先維護英文與簡體中文，其他新文字回退英文，部分舊頁面仍有硬編碼中文。詳見[國際化狀態](docs/LOCALIZATION.md)。
+README 和介面資源提供十語言，語言按需載入；全部非中英文文字的母語審校仍待完成。 [LOCALIZATION](docs/LOCALIZATION.md).
 
 [架構](docs/ARCHITECTURE.md) · [貢獻指南](CONTRIBUTING.md) · [路線圖](docs/ROADMAP.md) · [變更紀錄](CHANGELOG.md) · [MIT 授權](LICENSE)
