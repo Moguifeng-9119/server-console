@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU-Arbeitsbereich: simulierte Daten](assets/screenshots/workbench-en.png)
 

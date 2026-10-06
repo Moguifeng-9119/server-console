@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU リソース画面：模擬データ](assets/screenshots/workbench-en.png)
 
@@ -35,7 +35,7 @@ ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向け
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
+[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![Рабочая панель GPU: имитационные данные](assets/screenshots/workbench-en.png)
 
@@ -35,7 +35,7 @@ ServerConsole — персональный настольный инструме
 
 ## Начало работы
 
-Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
+Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

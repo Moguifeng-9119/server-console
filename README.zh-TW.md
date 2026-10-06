@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
+[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU 資源工作台：模擬資料](assets/screenshots/workbench-en.png)
 
@@ -35,7 +35,7 @@ ServerConsole 是面向共用 **Linux / NVIDIA GPU 伺服器**的個人桌面工
 
 ## 開始使用
 
-從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
+從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

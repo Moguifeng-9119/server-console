@@ -11,7 +11,7 @@
 
 ![按单卡空闲显存和占用用户找资源的工作台](assets/screenshots/workbench-light.png)
 
-*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.0](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.0.md)。*
+*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.0.md)。*
 
 详细操作、传输决策流程、崩溃恢复和源码布局见[使用与恢复指南](docs/USER-GUIDE.zh-CN.md)。
 

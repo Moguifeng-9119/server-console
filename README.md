@@ -11,7 +11,7 @@
 
 ![Resource workbench with per-card free memory and owners](assets/screenshots/workbench-en.png)
 
-*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.0](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.0.md) for platform coverage.*
+*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.0.md) for platform coverage.*
 
 [Detailed usage, transfer decisions, recovery and source map (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 

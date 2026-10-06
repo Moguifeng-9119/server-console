@@ -4,7 +4,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU 작업 공간: 모의 데이터](assets/screenshots/workbench-en.png)
 
@@ -35,7 +35,7 @@ ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
