@@ -108,7 +108,9 @@ server-console/
 └─ .github/workflows/          三系统 CI 与打包
 ```
 
-先运行 `npm ci`，再运行 `npm run lint
-npm run typecheck`、`npm test`、`npm run smoke`、`npm run build` 和 `npm run test:ui`。真实服务器验收需另行指定授权 SSH 别名，使用独立测试目录；不要把生产目录交给破坏性测试。
+先运行 `npm ci`，再运行 `npm run lint`, `npm run typecheck`、`npm test`、`npm run smoke`、`npm run build` 、`npm run test:ui` 和 `npm run test:workflow`。真实服务器验收需另行指定授权 SSH 别名，使用独立测试目录；不要把生产目录交给破坏性测试。
 
 参阅 [架构](ARCHITECTURE.md)、[原问题逐项状态](ASSESSMENT-STATUS.zh-CN.md)、[安全边界](../SECURITY.md) 与 [发布验证](VALIDATION-0.12.0.md)。
+
+
+发布：手动 publish-artifacts 工作流接收同一应用提交的成功源码与打包 run ID，确认应用内容未变，只允许后续发布文档/媒体/工作流修改。它取回已验证附件、计算 SHA-256 并创建草稿，不覆盖现有 Release，也不自动转正式发布。触发前为对应标签准备 docs/RELEASE-v版本.md。

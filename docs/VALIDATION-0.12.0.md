@@ -13,6 +13,7 @@ Checked on 2026-10-06. Evidence below distinguishes simulated renderer checks, a
 | Production build | Passed | Nine locale bundles load on demand; xterm is separately bundled |
 | Workbench browser checks | 22 passed | Simulated data, filters, theme, layout and stacked dialogs |
 | File/editor/relay/language checks | 23 passed | Simulated IPC; dirty drafts, save lock, keyboard files, focus, resize and collapsed prefix progress; ten languages load, switch and reload |
+| Local Windows native | 16 passed | Packaged source/assets SHA-256, sandboxed IPC, actual DPAPI, loopback SSH shell/forwarding and authenticated restart |
 | Language switching | Passed in browser review | All ten languages; delayed competing loads preserve drafts and incoming events |
 | Product demonstration | 27 seconds | Simulated GPU → process → terminal → files → relay → prefix progress; persistent simulation caption |
 
@@ -29,13 +30,25 @@ User-authorized existing SSH alias, existing OpenSSH known_hosts fingerprint, an
 
 This kills the transfer subprocess, not the entire packaged Electron process. It is a real small-file recovery check, not a 100 GB throughput measurement. Large-prefix cancellation and reader-error paths are covered by controlled stream regressions. Full SHA-256 prefix verification still requires reading both prefixes.
 
-The second authorized Docker alias closed both connection attempts. Cross-server real rsync, source-to-destination connectivity failure and remote temporary-key cleanup under an interrupted direct transfer remain unverified. The local SFTP relay fallback has byte-level protocol regressions.
+The second authorized Docker alias closed all three connection attempts. Cross-server real rsync, source-to-destination connectivity failure and remote temporary-key cleanup under an interrupted direct transfer remain unverified. The local SFTP relay fallback has byte-level protocol regressions.
 
 The user’s RTX 5070 Ti Laptop GPU was confirmed with local nvidia-smi. This read-only observation does not establish Windows local GPU collection by the app: the shipped collector targets Linux hosts over SSH. No GPU workload was started.
 
 ## Native packages and publication
 
-The new version's three-platform CI/package receipts will be recorded here after the workflows complete. [0.11.1 evidence](VALIDATION-0.11.1.md) remains a historical record, not a new 0.12.0 result.
+All three platforms passed [source CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37427109429) and [package/native CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37427110686). Both tested application commit `6ff6603e6e3db2f972ff83ec40f3eb1835d80d8b`; later release/evidence documentation does not change application sources or renderer assets. Compact receipts: [source CI](evidence/source-ci-0.12.0.json) and [packages](evidence/packages-ci-0.12.0.json).
+
+| Runner | Source checks | Native package evidence |
+| --- | --- | --- |
+| Windows x64 | Types, 106 tests, lint, SFTP smoke, build, 22 workbench and 23 workflow/language checks passed | Portable built, 16 native checks; actual DPAPI; [receipt](evidence/native-0.12.0-windows-ci.json) |
+| Linux x64 | Same checks passed | AppImage built, 16 native checks under Xvfb; basic_text rejected for persistence, session-only; [receipt](evidence/native-0.12.0-linux.json) |
+| macOS arm64 | Same checks passed | Universal DMG built, 16 native checks on arm64; MockKeychain; [receipt](evidence/native-0.12.0-macos.json) |
+
+The local Windows unpacked build also passed [16 native checks](evidence/native-0.12.0-windows-local.json). Native tests compare the current package's Electron sources and built assets with the current source SHA-256, use generated fixture identities and isolated data, and exercise sandboxed IPC, computed shell output, sessions, resize, exact-byte forwarding, stopping an active tunnel and authenticated restart. The fixture shell is local and the native GPU metrics are simulated.
+
+The downloaded Windows CI portable executable also passed an [actual wrapper startup check](evidence/portable-launch-0.12.0.json): isolated data, loopback CDP, working IPC bridge and visible v0.12.0. This is narrower than the 16 unpacked native checks.
+
+Published files and download verification are added after asset publication. [0.11.1 evidence](VALIDATION-0.11.1.md) remains historical.
 
 All packages remain unsigned. Playwright macOS automation uses MockKeychain; a passing result does not validate real Keychain. Universal packaging does not validate Intel macOS execution. Signing/notarization, installer/update, real Linux secret-service, remote PTY/MIG/NCCL and production fleet/network performance remain separate checks.
 

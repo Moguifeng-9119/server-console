@@ -1,0 +1,87 @@
+name: Publish validated desktop artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      package_run:
+        description: Successful three-platform package run ID
+        required: true
+        type: string
+      source_run:
+        description: Successful three-platform source CI run ID for the same app commit
+        required: true
+        type: string
+      tag:
+        description: Release tag, matching package.json (for example v0.12.0)
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: desktop-release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  publish-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PACKAGE_RUN: ${{ inputs.package_run }}
+      SOURCE_RUN: ${{ inputs.source_run }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify successful workflows and unchanged application
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PACKAGE_RUN" =~ ^[0-9]+$ && "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$RELEASE_TAG" = "v$(node -p 'require("./package.json").version')"
+          gh api "repos/$GH_REPO/actions/runs/$PACKAGE_RUN" > package-run.json
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > source-run.json
+          test "$(jq -r '.status + ":" + .conclusion' package-run.json)" = completed:success
+          test "$(jq -r '.status + ":" + .conclusion' source-run.json)" = completed:success
+          test "$(jq -r .path package-run.json)" = .github/workflows/package.yml
+          test "$(jq -r .path source-run.json)" = .github/workflows/ci.yml
+          APP_COMMIT=$(jq -r .head_sha package-run.json)
+          test "$APP_COMMIT" = "$(jq -r .head_sha source-run.json)"
+          for RUN in "$PACKAGE_RUN" "$SOURCE_RUN"; do
+            gh api "repos/$GH_REPO/actions/runs/$RUN/jobs" > jobs.json
+            jq -e '(.jobs | length) == 3 and all(.jobs[]; .conclusion == "success")' jobs.json
+          done
+          # Release-only documentation/media/workflow commits may follow the tested app.
+          git diff --name-only "$APP_COMMIT" "$RELEASE_COMMIT" > changed.txt
+          if grep -Ev '^(docs/|assets/(demo|screenshots)/|README[^/]*\.md$|CHANGELOG\.md$|CONTRIBUTING\.md$|\.github/workflows/)' changed.txt; then
+            echo 'Application files changed after the tested package commit'; exit 1
+          fi
+      - name: Download tested package artifacts and compute SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir packages upload
+          gh run download "$PACKAGE_RUN" --pattern 'unsigned-desktop-*' --dir packages
+          mapfile -t FILES < <(find packages -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) | sort)
+          test "${#FILES[@]}" -eq 3
+          for FILE in "${FILES[@]}"; do cp "$FILE" upload/; done
+          cd upload
+          test "$(find . -type f | wc -l)" -eq 3
+          sha256sum *.exe *.dmg *.AppImage > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create reviewable draft release without replacing an existing release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
+          else
+            git tag "$RELEASE_TAG" "$RELEASE_COMMIT"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          gh release create "$RELEASE_TAG" upload/* --target "$RELEASE_COMMIT" --verify-tag --draft \
+            --title "ServerConsole $RELEASE_TAG" --notes-file "docs/RELEASE-$RELEASE_TAG.md"
