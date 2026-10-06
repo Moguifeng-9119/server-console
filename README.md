@@ -93,6 +93,6 @@ Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual pa
 
 ## Languages and contributing
 
-README usage guides have ten substantive language pages with shared navigation. The app’s ten locale files each contain 635 keys with matching interpolation, and older hardcoded business labels have been migrated. Non-English locales load on demand. Other languages include machine-assisted drafts; full native-speaker review remains pending. Remote command output and backend details retain their original language. See [localization status](docs/LOCALIZATION.md) and the [assessment follow-up](docs/ASSESSMENT-STATUS.zh-CN.md).
+README usage guides have ten substantive language pages with shared navigation. The app’s ten locale files each contain 635 keys with matching interpolation, and older hardcoded business labels have been migrated. Non-English locales load on demand. Other languages include machine-assisted drafts; full native-speaker review remains pending. Remote command output and backend details retain their original language. See [localization status](docs/LOCALIZATION.md).
 
 [Contribution guide](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md) · [MIT License](LICENSE)

@@ -87,7 +87,7 @@ npm run benchmark
 
 类型检查覆盖严格 TypeScript 前端与 Electron checkJs。当前 106 项回归通过；两台本机假 SSH 服务的真实 SFTP 协议检查比对最终字节；生产浏览器检查覆盖工作台与文件/编辑/互传/十语言加载切换。ESLint/Hooks 已通过。真实 Linux 六张 H100 主机通过 16 MiB 上传/下载 SHA-256、强杀传输子进程恢复和暂存清理；第二台测试机不可达，跨机 rsync 待验。三平台原生和发布证据、密钥库边界见验证记录。基准仅为本机 10/30 模拟 SSH 会话。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [本轮改进](docs/IMPROVEMENTS.zh-CN.md)、[原评估问题逐项状态](docs/ASSESSMENT-STATUS.zh-CN.md)、[架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.0.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.0.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
 
 构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.0.md)。
 

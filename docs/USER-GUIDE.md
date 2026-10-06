@@ -99,7 +99,7 @@ docs/                          Guides, architecture and evidence
 .github/workflows/             Cross-platform checks and packaging
 ```
 
-After `npm ci`, run `npm run lint`, `npm run typecheck`, `npm test`, `npm run smoke`, `npm run build`, `npm run test:ui` and `npm run test:workflow`. Live acceptance requires explicitly authorized SSH aliases and a new dedicated test directory. See [architecture](ARCHITECTURE.md), [security](../SECURITY.md), [assessment status](ASSESSMENT-STATUS.zh-CN.md) and [release validation](VALIDATION-0.12.0.md).
+After `npm ci`, run `npm run lint`, `npm run typecheck`, `npm test`, `npm run smoke`, `npm run build`, `npm run test:ui` and `npm run test:workflow`. Live acceptance requires explicitly authorized SSH aliases and a new dedicated test directory. See [architecture](ARCHITECTURE.md), [security](../SECURITY.md) and [release validation](VALIDATION-0.12.0.md).
 
 
 Publishing: the manual `publish-artifacts` workflow accepts successful package/source run IDs for the same application commit, checks that only release documentation/media/workflows changed, retrieves the tested binaries, normalizes asset names, computes SHA-256 and creates a draft. It does not replace an existing release or automatically make the draft public. Add `docs/RELEASE-vVERSION.md` for the validated tag before dispatch.
