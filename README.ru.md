@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
+[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.2:** корректные ошибки удалённых команд, сохранение языка, проверка обновлений и надёжная очистка временных ключей. На двух реальных серверах проверены rsync, восстановление после принудительного завершения главного процесса и SHA-256.
+**0.12.3:** установщик Windows, отзывчивое переключение серверов и сохранение сеансов, истории и фонового вывода при переходе между терминалами, серверами и обзором. Установите `ServerConsole-Setup-0.12.3.exe` один раз и запускайте из меню «Пуск» или с рабочего стола. [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Файлы Windows не подписаны. SmartScreen может показать предупреждение. Сверьте SHA-256 с файлом контрольных сумм релиза.**
 
@@ -39,7 +39,7 @@ ServerConsole — персональный настольный инструме
 
 ## Начало работы
 
-Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
+Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

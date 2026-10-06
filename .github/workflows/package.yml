@@ -10,7 +10,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            command: dist:win:lite
+            command: dist:win:nsis
           - os: ubuntu-latest
             command: dist:linux
           - os: macos-latest

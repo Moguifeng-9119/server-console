@@ -2,21 +2,27 @@
 function installFixture(language = 'en') {
   if (!localStorage.getItem('sc.lang')) localStorage.setItem('sc.lang', language);
   localStorage.setItem('sc.theme.user', 'light');
-  const callbacks = {}, config = { id: 'fake1', name: 'Demo training', host: 'demo.invalid', port: 22, username: 'demo', authType: 'key' };
+  const callbacks = {}, listeners = {}, config = { id: 'fake1', name: 'Demo training', host: 'demo.invalid', port: 22, username: 'demo', authType: 'key' };
   const entry = { name: 'test.txt', type: 'file', size: 10, mtime: Date.now(), path: '/home/demo/test.txt' };
   const sessions = [];
+  let nextSession = 0;
   const tasks = [{ id: 'demo-transfer', kind: 'upload', name: 'checkpoint.pt', size: 10 * 1024 ** 3, transferred: 4 * 1024 ** 3, status: 'running', speed: 0, serverName: config.name, resumeCheck: { bytes: 2 * 1024 ** 3, total: 4 * 1024 ** 3, files: 1 }, srcPath: '/demo/checkpoint.pt', dstPath: 'demo:/data/checkpoint.pt', resumable: true }];
   window.__fixture = { callbacks, tasks, finishWrite: null, lastWrite: null };
   window.api = new Proxy({}, { get: (_, key) => {
     if (key === 'platform') return 'win32';
-    if (String(key).startsWith('on')) return (fn) => { callbacks[key] = fn; return () => { if (callbacks[key] === fn) delete callbacks[key]; }; };
+    if (String(key).startsWith('on')) return (fn) => {
+      (listeners[key] ||= new Set()).add(fn);
+      callbacks[key] = (...args) => { for (const listener of listeners[key]) listener(...args); };
+      return () => { listeners[key].delete(fn); if (!listeners[key].size) delete callbacks[key]; };
+    };
     return (...args) => {
       if (key === 'sftpWriteText') {
         window.__fixture.lastWrite = args;
         return new Promise((resolve) => { window.__fixture.finishWrite = () => resolve({ ok: true }); });
       }
-      if (key === 'terminalOpen') { const id = 'demo-term-' + (sessions.length + 1); sessions.push({ termId: id, serverId: args[0] }); callbacks.onTerminalSessions?.(); return Promise.resolve({ ok: true, data: id }); }
-      if (key === 'terminalAttach') return Promise.resolve('\u001b[32mdemo@training\u001b[0m:~$ nvidia-smi\r\nSIMULATED DEMO · NVIDIA H100 · 80 GiB\r\n');
+      if (key === 'terminalOpen') { const id = 'demo-term-' + (++nextSession); sessions.push({ termId: id, serverId: args[0] }); callbacks.onTerminalSessions?.([...sessions]); return Promise.resolve({ ok: true, data: id }); }
+      if (key === 'terminalClose') { const i = sessions.findIndex((s) => s.termId === args[0]); if (i >= 0) sessions.splice(i, 1); callbacks.onTerminalSessions?.([...sessions]); return Promise.resolve(true); }
+      if (key === 'terminalAttach') return Promise.resolve({data: '\u001b[32mdemo@training\u001b[0m:~$ nvidia-smi\r\nSIMULATED DEMO · NVIDIA H100 · 80 GiB\r\n', sequence: 0});
       return Promise.resolve(key === 'listServers' ? [config, { ...config, id: 'fake2', name: 'Demo inference' }]
         : key === 'terminalList' ? sessions
         : key === 'transferList' ? tasks

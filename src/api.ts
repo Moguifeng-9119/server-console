@@ -73,12 +73,12 @@ interface Api {
 
   terminalOpen: (id: string, cols: number, rows: number) => Promise<IpcResult<string>>;
   terminalList: () => Promise<TerminalSessionInfo[]>;
-  terminalAttach: (termId: string) => Promise<string>;
+  terminalAttach: (termId: string) => Promise<{ data: string; sequence: number } | null>;
   terminalDetach: (termId: string) => Promise<boolean>;
   terminalWrite: (termId: string, data: string) => Promise<unknown>;
   terminalResize: (termId: string, cols: number, rows: number) => Promise<unknown>;
   terminalClose: (termId: string) => Promise<unknown>;
-  onTerminalData: (cb: (d: { termId: string; data: string }) => void) => () => void;
+  onTerminalData: (cb: (d: { termId: string; data: string; sequence: number }) => void) => () => void;
   onTerminalClosed: (cb: (d: { termId: string }) => void) => () => void;
   onTerminalSessions: (cb: (list: TerminalSessionInfo[]) => void) => () => void;
 

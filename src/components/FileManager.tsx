@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../hooks/useDialogFocus';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
@@ -23,6 +23,7 @@ const emptyPane = (cwd = ''): PaneState => ({ cwd, entries: [], loading: false, 
 const isDirLike = (e: FileEntry) => e.type === 'dir' || e.linkToDir;
 
 type SortKey = 'name' | 'size' | 'mtime';
+const fileNames = new Intl.Collator('zh-Hans-CN', { numeric: true });
 
 export function FileManager({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
@@ -98,13 +99,16 @@ export function FileManager({ serverId }: { serverId: string }) {
   // 初次进入：定位到本地家目录与远程家目录
   useEffect(() => {
     if (!api) return;
-    (async () => {
-      const home = await api.localHome();
-      await loadLocal(home);
-      const hr = await api.sftpHome(serverId);
-      if (hr.ok && hr.data) await loadRemote(hr.data);
-      else setRemote((p) => ({ ...p, err: hr.error || t('files.sftpUnavailable') }));
-    })();
+    let disposed = false;
+    // The remote connection must not delay showing the local directory.
+    void api.localHome().then((home) => { if (!disposed) return loadLocal(home); })
+      .catch((e) => { if (!disposed) setLocal((p) => ({ ...p, loading: false, err: msg(e) })); });
+    void api.sftpHome(serverId).then((hr) => {
+      if (disposed) return;
+      if (hr.ok && hr.data) return loadRemote(hr.data);
+      setRemote((p) => ({ ...p, loading: false, err: hr.error || t('files.sftpUnavailable') }));
+    }).catch((e) => { if (!disposed) setRemote((p) => ({ ...p, loading: false, err: msg(e) })); });
+    return () => { disposed = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverId]);
 
@@ -391,8 +395,8 @@ export function FileManager({ serverId }: { serverId: string }) {
     }
   };
 
-  const sortedLocal = sortEntries(local.entries, localSort);
-  const sortedRemote = sortEntries(remote.entries, remoteSort);
+  const sortedLocal = useMemo(() => sortEntries(local.entries, localSort), [local.entries, localSort]);
+  const sortedRemote = useMemo(() => sortEntries(remote.entries, remoteSort), [remote.entries, remoteSort]);
 
   return (
     <div className="fm">
@@ -772,7 +776,7 @@ function sortEntries(entries: FileEntry[], s: { k: SortKey; asc: boolean }): Fil
     const bd = isDirLike(b);
     if (ad !== bd) return ad ? -1 : 1;
     let r = 0;
-    if (s.k === 'name') r = a.name.localeCompare(b.name, 'zh-Hans-CN', { numeric: true });
+    if (s.k === 'name') r = fileNames.compare(a.name, b.name);
     else if (s.k === 'size') r = a.size - b.size;
     else r = a.mtime - b.mtime;
     return s.asc ? r : -r;

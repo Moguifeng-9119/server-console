@@ -6,7 +6,7 @@
 
 [Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
-**0.12.2:** accurate remote command failures, persisted native/app language, validated update checks, durable direct-key cleanup and working bandwidth limits. Real two-server rsync and whole packaged-app crash recovery now pass.
+**0.12.3:** Windows installer, responsive server switching and persistent terminal sessions/scrollback across tabs, servers and the overview. Download `ServerConsole-Setup-0.12.3.exe`, install once, then launch from the desktop or Start menu. [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Windows downloads are unsigned. SmartScreen may show a warning. Compare the download SHA-256 with the release checksum file.**
 
@@ -15,7 +15,7 @@
 
 ![Resource workbench with per-card free memory and owners](assets/screenshots/workbench-en.png)
 
-*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.2.md) for platform coverage.*
+*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.3](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) provides Windows x64 installer, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.3.md) for platform coverage.*
 
 [Detailed usage, transfer decisions, recovery and source map (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -91,7 +91,7 @@ npm run benchmark
 
 The current source passes 164 regressions, type checking, ESLint/Hooks and two loopback SSH/SFTP byte checks. Production browser checks cover the workbench, file/editor/relay, all ten locales, resource-load failures and keyboard language races. A current packaged Windows build passed 16 native terminal checks and 36 native layout checks at 100/125/150% scaling. Two real Linux hosts passed 16 MiB upload and rsync relay SHA-256 checks after separately forcing the entire Electron main process to terminate; restart restored prefix-verified upload recovery and removed exact old direct keys/scratch. These bounded checks do not establish production fleet or 100 GB performance.
 
-The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.12.2.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.12.3.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
 
 Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The current platform/package results are recorded in the validation ledger. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
 

@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.2:** korrekte Fehler entfernter Befehle, gespeicherte Sprache, geprüfte Update-Antworten und dauerhafte Bereinigung direkter Schlüssel. Zwei echte Server bestanden rsync, Wiederherstellung nach erzwungenem Ende des Hauptprozesses und SHA-256.
+**0.12.3:** Windows-Installer, schneller Serverwechsel und erhaltene Terminalsitzungen, Verlauf und Hintergrundausgaben beim Wechsel zwischen Terminals, Servern und Übersicht. Installieren Sie `ServerConsole-Setup-0.12.3.exe` einmal und starten Sie über Desktop oder Startmenü. [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Windows-Dateien sind nicht signiert. SmartScreen kann warnen. Vergleichen Sie SHA-256 mit der Prüfsummendatei der Version.**
 

@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.2:** 원격 명령 실패 판정, 언어 저장, 업데이트 응답 검증과 직접 전송 키 복구·정리를 수정했습니다. 실제 서버 두 대에서 rsync, 앱 메인 프로세스 강제 종료 후 복구와 SHA-256을 확인했습니다.
+**0.12.3:** Windows 설치 프로그램을 제공합니다. 서버 전환 지연을 수정하고 터미널·서버·개요 간 전환에서도 세션, 기록, 백그라운드 출력을 유지합니다. `ServerConsole-Setup-0.12.3.exe`를 설치한 후 바탕 화면이나 시작 메뉴에서 실행하세요. [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Windows 배포 파일은 서명되지 않았으며 SmartScreen 경고가 나타날 수 있습니다. Release의 SHA-256 파일과 비교하세요.**
 
@@ -39,7 +39,7 @@ ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

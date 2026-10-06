@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.3 — 2026-10-06
+
+- Publish an assisted Windows NSIS installer as the primary Windows release download.
+- Preserve terminal instances, scrollback, background output and per-server selected tabs across session/server/overview navigation.
+- Maintain bounded terminal replay while attached and sequence live messages to avoid replay races; recover history on renderer reload.
+- Select remaining sessions after close and discard terminal opens belonging to removed or updated server configurations.
+- Cache directory sorts with a reusable collator, load local/remote paths independently and keep file/terminal tabs accessible without fresh metrics.
+- Add seven responsive-navigation/race checks and extend native terminal checks from 16 to 21.
+
+Scope and evidence: [0.12.3 validation ledger](docs/VALIDATION-0.12.3.md).
+
 ## 0.12.2 — 2026-10-06
 
 - Require SSH command exit success for process termination and service restart; reject failures, signals and missing statuses.

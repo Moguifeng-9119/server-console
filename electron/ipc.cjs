@@ -232,6 +232,7 @@ function registerIpc() {
       const next = [...servers];
       next[i] = { ...servers[i], ...patch, ...v };
       persist(next);
+      closeServerTerminals(cfg.id);
       pool.remove(servers[i].id); // 凭据/端口可能已变，丢弃旧连接让下个采集周期用新配置重建
       return { ok: true, server: store.publicView(servers[i]) };
     } catch (e) {
@@ -241,6 +242,7 @@ function registerIpc() {
 
   ipcMain.handle('servers:remove', (_e, id) => {
     persist(servers.filter((s) => s.id !== id));
+    closeServerTerminals(id);
     pool.remove(id);
     return true;
   });
@@ -576,23 +578,40 @@ function registerIpc() {
   // ============ 内嵌 SSH 终端 ============
   // ============ 内嵌 SSH 终端（多会话：主进程持有，切 tab/重开不丢，缓冲有界） ============
   const TERMINAL_BUF_CAP = 256 * 1024; // 每会话回放缓冲上限（环形裁剪）
-  const terminals = new Map(); // termId -> { stream, serverId, buf, attached, createdAt }
+  const terminals = new Map(); // termId -> { stream, serverId, buf, sequence, attached, createdAt }
   const termData = (termId, s) => {
     const t = terminals.get(termId);
-    if (t && t.attached) broadcast('terminal:data', { termId, data: s });
-    else if (t) t.buf = (t.buf + s).slice(-TERMINAL_BUF_CAP);
+    if (!t) return;
+    t.buf = (t.buf + s).slice(-TERMINAL_BUF_CAP);
+    t.sequence += 1;
+    if (t.attached) broadcast('terminal:data', { termId, data: s, sequence: t.sequence });
   };
   const broadcastSessions = () => broadcast('terminal:sessions', [...terminals.entries()].map(([termId, t]) => ({ termId, serverId: t.serverId, createdAt: t.createdAt })));
+  const closeServerTerminals = (serverId) => {
+    for (const [termId, t] of terminals) {
+      if (t.serverId !== serverId) continue;
+      terminals.delete(termId);
+      t.stream.destroy();
+      broadcast('terminal:closed', { termId });
+    }
+    broadcastSessions();
+  };
 
   ipcMain.handle('terminal:open', wrap(async ({ id, cols, rows }) => {
-    const conn = await getConn(id);
+    const cfg = getCfg(id);
+    const conn = pool.get(cfg);
     const client = await new Promise((resolve, reject) => conn.connect().then(() => resolve(conn.client)).catch(reject));
+    if (servers.find((s) => s.id === id) !== cfg) throw new Error(lang.t('serverMissing'));
     const termId = 'tm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
     await new Promise((resolve, reject) => {
       client.shell({ term: 'xterm-256color', cols: cols || 80, rows: rows || 24 }, (err, stream) => {
         if (err) return reject(err);
+        if (servers.find((s) => s.id === id) !== cfg) {
+          stream.destroy();
+          return reject(new Error(lang.t('serverMissing')));
+        }
         // attached=false 期间输出进会话缓冲；挂接后实时广播。缓冲即会话记忆（切换/重开不丢）
-        terminals.set(termId, { stream, serverId: id, buf: '', attached: false, createdAt: Date.now() });
+        terminals.set(termId, { stream, serverId: id, buf: '', sequence: 0, attached: false, createdAt: Date.now() });
         stream.on('data', (d) => termData(termId, d.toString('utf8')));
         stream.stderr?.on?.('data', (d) => termData(termId, d.toString('utf8')));
         stream.on('close', () => {
@@ -609,7 +628,7 @@ function registerIpc() {
   // 挂接：返回累积缓冲（会话记忆回放），之后实时广播
   ipcMain.handle('terminal:attach', (_e, { termId }) => {
     const t = terminals.get(String(termId));
-    const replay = t ? t.buf : '';
+    const replay = t ? { data: t.buf, sequence: t.sequence } : null;
     if (t) t.attached = true;
     return replay;
   });

@@ -7,7 +7,6 @@ import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { FileManager } from './FileManager';
-import { TerminalSessions } from './TerminalPane';
 
 type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
@@ -340,13 +339,13 @@ export function ServerPanel({
         )}
       </div>
 
-      {s.status !== 'online' ? (
+      {s.status !== 'online' && (
         <div className="empty">
           {t('server.offline', {status: t(s.status === 'timeout' ? 'server.timeout' : 'server.offlineWord')})}
         </div>
-      ) : (
+      )}
         <>
-          {fresh ? <KpiStrip s={s} /> : <div className="inline-status" role="status">{t('workbench.staleDetail')}</div>}
+          {fresh && s.status === 'online' ? <KpiStrip s={s} /> : s.status === 'online' && <div className="inline-status" role="status">{t('workbench.staleDetail')}</div>}
           <div className="tabs">
             <button className={tab === 'gpu' ? 'on' : ''} onClick={() => onTab('gpu')}>
               {t('server.gpuTab', { n: s.gpus.length })}
@@ -364,15 +363,10 @@ export function ServerPanel({
               {t(tab === 'files' ? 'server.filesHint' : 'workbench.processHint')}
             </span>
           </div>
-          {/* 终端会话常驻挂载（切 tab 只隐藏不卸载，xterm 与输出保留） */}
-          <div style={{ display: tab === 'term' ? 'block' : 'none' }}>
-            <TerminalSessions serverId={s.id} visible={tab === 'term'} />
-          </div>
-          {tab === 'gpu' && fresh && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
-          {tab === 'proc' && fresh && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'gpu' && fresh && s.status === 'online' && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'proc' && fresh && s.status === 'online' && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
           {tab === 'files' && <FileManager serverId={s.id} />}
         </>
-      )}
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>

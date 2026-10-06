@@ -9,6 +9,7 @@ import { AlertCenter } from './components/AlertCenter';
 import { useDialogFocus } from './hooks/useDialogFocus';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
+import { TerminalWorkspace } from './components/TerminalPane';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { ServerManager } from './components/ServerManager';
 import { ImportSshConfig } from './components/ImportSshConfig';
@@ -47,6 +48,7 @@ export default function App() {
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
   const [view, updateView] = useState<ReturnType<typeof loadView>>(loadView);
+  const serverTabs = useRef<Record<string, ServerTab>>({});
   const setView = useCallback((next: SetStateAction<ReturnType<typeof loadView>>) => {
     if (document.querySelector('[data-unsaved="true"]')) {
       window.dispatchEvent(new Event('sc:blocked-navigation'));
@@ -65,8 +67,10 @@ export default function App() {
   // 页面/标签持久化
   useEffect(() => {
     localStorage.setItem(LS_VIEW, JSON.stringify(view));
-    void api?.setFocusedServer(view.kind === 'server' ? view.id : null);
+    if (view.kind === 'server') serverTabs.current[view.id] = view.tab;
   }, [view]);
+  const focusedId = view.kind === 'server' ? view.id : null;
+  useEffect(() => { void api?.setFocusedServer(focusedId); }, [focusedId]);
 
   // 上次页面对应的服务器已被删除 → 回总览
   const serversReady = servers.length > 0;
@@ -108,12 +112,12 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // 打开服务器：同一台保留当前 tab，换台回到 GPU；tab 状态提升到这里，避免切 tab 重挂载丢文件面板状态
+  // Each server remembers its selected tab for this app window.
   const openServer = useCallback((id: string, tab?: ServerTab) =>
     setView((v) => ({
       kind: 'server',
       id,
-      tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
+      tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : serverTabs.current[id] || 'gpu'),
     })), [setView]);
 
   const quitRef = useRef<HTMLDivElement>(null);
@@ -328,6 +332,7 @@ export default function App() {
           ) : (
             <div className="empty">{t('overview.serverNotFound', '未找到该服务器')}</div>
           )}
+          <TerminalWorkspace serverIds={servers.map((s) => s.id)} activeServerId={view.kind === 'server' && view.tab === 'term' ? view.id : null} />
         </div>
       </main>
 

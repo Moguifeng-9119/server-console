@@ -6,7 +6,7 @@
 
 [下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
 
-**0.12.2：**修复远程命令误报成功、主进程语言持久化、更新响应校验、直传临时密钥崩溃清理和传输限速；真实双服务器 rsync 与整个桌面主进程强杀恢复已通过。
+**0.12.3：**提供 Windows 安装版，修复服务器切换卡顿；切换终端、服务器或总览时保留会话、历史输出和后台输出。下载 `ServerConsole-Setup-0.12.3.exe`，安装后从桌面或开始菜单启动。 [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Windows 下载包未签名，SmartScreen 可能显示警告。请使用 Release 附带的 SHA-256 文件核对下载内容。**
 
@@ -15,7 +15,7 @@
 
 ![按单卡空闲显存和占用用户找资源的工作台](assets/screenshots/workbench-light.png)
 
-*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.2.md)。*
+*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.3](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) 提供 Windows x64 安装版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.3.md)。*
 
 详细操作、传输决策流程、崩溃恢复和源码布局见[使用与恢复指南](docs/USER-GUIDE.zh-CN.md)。
 
@@ -91,9 +91,9 @@ npm run benchmark
 
 当前源码通过 164 项回归、类型检查、ESLint/Hooks 和双本机 SSH/SFTP 字节检查；生产浏览器覆盖工作台、文件/编辑/互传、十语言，以及语言资源失败和真实键盘竞争操作。新版 Windows 包通过 16 项原生终端与 36 项原生布局检查，涵盖 100/125/150% 缩放。两台真实 Linux 主机完成 16 MiB 上传和 rsync 互传 SHA-256；分别强杀整个 Electron 主进程后，上传恢复包含前缀校验，直传重连会清除原有的精确临时密钥和目录。这些有界测试不代表生产集群或 100 GB 性能已验证。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.2.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.3.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
 
-构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.2.md)。
+构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.3.md)。
 
 ## 语言、贡献与后续方向
 

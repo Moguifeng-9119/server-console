@@ -100,6 +100,9 @@ async function main() {
       assert.deepEqual(result.after, result.before);
       pass('failed config writes preserve the in-memory server list');
     } finally { fs.rmdirSync(writeBlock); }
+    const secondServer = await page.evaluate((port) => window.api.addServer({name: 'e2e-second', host: '127.0.0.1', port, username: 'fixture', authType: 'password', password: 'fixture'}), sshd.address().port);
+    assert(secondServer.ok);
+    await page.reload(); await page.waitForSelector('.nav');
     await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
     await page.waitForFunction(() => !!document.querySelector('.tabs'));
     await page.getByRole('button', {name: '终端', exact: true}).click();
@@ -123,6 +126,55 @@ async function main() {
     await page.waitForFunction(() => document.querySelectorAll('.term-chip:not(.add)').length === 2);
     await page.waitForFunction(async () => (await window.api.terminalList()).length === 2);
     pass('two native SSH sessions coexist');
+    const ids = await page.evaluate(async () => (await window.api.terminalList()).map((s) => s.termId));
+    const dumpId = (id) => page.evaluate((id) => window.__scTerms?.[id]?.dump() || '', id);
+    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().includes('fake-shell ready'), ids[1]);
+    await page.evaluate(() => { window.__originalTermNodes = [...document.querySelectorAll('.term-host')]; });
+    await page.locator('.term:visible .term-chip-select').first().click();
+    assert((await dumpId(ids[0])).includes('sc-e2e-marker'));
+    await page.evaluate(({id, command}) => window.api.terminalWrite(id, command + '\r'), {
+      id: ids[0], command: process.platform === 'win32' ? "$scSessionToken = ('alpha' + '-one')" : "scSessionToken=alpha-one"
+    });
+    await page.locator('.term:visible .term-chip-select').nth(1).click();
+    await page.evaluate(({id, command}) => window.api.terminalWrite(id, command + '\r'), {
+      id: ids[0], command: process.platform === 'win32' ? "1..45 | ForEach-Object { Write-Output ('bg-' + $_); Start-Sleep -Milliseconds 15 }" : "i=1; while [ $i -le 45 ]; do printf 'bg-%s\\n' $i; i=$((i+1)); sleep 0.015; done"
+    });
+    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().split(/\r?\n/).some((line) => line.trim() === 'bg-45'), ids[0], {timeout: 30000});
+    await page.locator('.term:visible .term-chip-select').first().click();
+    const background = await dumpId(ids[0]);
+    for (let i = 1; i <= 45; i++) assert.equal(background.split(/\r?\n/).filter((line) => line.trim() === 'bg-' + i).length, 1);
+    assert(await page.evaluate(() => window.__originalTermNodes.every((node) => node.isConnected && document.querySelector(`[data-term-id="${node.dataset.termId}"]`) === node)));
+    pass('session switches retain xterm DOM, scrollback and 45 background output lines exactly once');
+    await page.locator('.nav-server').filter({hasText: 'e2e-second'}).click();
+    assert.equal(await page.locator('.topbar .title').innerText(), 'e2e-second');
+    await page.getByRole('button', {name: '终端', exact: true}).click();
+    await page.waitForFunction(async () => (await window.api.terminalList()).length === 3);
+    await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
+    assert.equal(await page.locator('.tabs button.on').innerText(), '终端');
+    await page.locator('.nav > button').first().click();
+    await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
+    assert((await dumpId(ids[0])).includes('sc-e2e-marker'));
+    assert.equal((await page.evaluate(() => window.api.terminalList())).length, 3);
+    assert(await page.evaluate(() => window.__originalTermNodes.every((node) => node.isConnected)));
+    await page.evaluate(({id, command}) => window.api.terminalWrite(id, command + '\r'), {
+      id: ids[0], command: process.platform === 'win32' ? 'Write-Output $scSessionToken' : 'printf "%s\\n" "$scSessionToken"'
+    });
+    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().split(/\r?\n/).some((line) => line.trim() === 'alpha-one'), ids[0]);
+    pass('server and overview navigation preserves selected terminal, shell variables and session IDs');
+    await page.locator('.term:visible .term-chip-select').nth(1).click();
+    await page.locator('.term:visible .term-chip-x').nth(1).click();
+    await page.waitForFunction(() => document.querySelectorAll('.term:not([style*="none"]) .term-chip:not(.add)').length === 1);
+    assert.equal(await page.locator('.term:visible .term-chip-select').getAttribute('aria-pressed'), 'true');
+    pass('closing the selected session activates the remaining terminal');
+    await page.reload(); await page.waitForSelector('.nav');
+    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().includes('alpha-one'), ids[0]);
+    const replayed = await dumpId(ids[0]);
+    assert.equal(replayed.split(/\r?\n/).filter((line) => line.trim() === 'sc-e2e-marker').length, 1);
+    assert.equal(replayed.split(/\r?\n/).filter((line) => line.trim() === 'bg-45').length, 1);
+    pass('renderer reload restores already displayed terminal history without duplication');
+    await page.evaluate((id) => window.api.removeServer(id), secondServer.server.id);
+    assert(!(await page.evaluate(() => window.api.terminalList())).some((s) => s.serverId === secondServer.server.id));
+    pass('removing a server closes its SSH terminal sessions');
     const termId = await page.evaluate(async () => (await window.api.terminalList())[0].termId);
     await page.evaluate(({termId}) => window.api.terminalResize(termId, 123, 37), {termId});
     await waitUntil(() => sizes.some((size) => size.cols === 123 && size.rows === 37), 'SSH server did not receive terminal resize');

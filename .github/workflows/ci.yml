@@ -55,6 +55,9 @@ jobs:
       - name: Language initialization and failed-load checks
         run: npm run test:language-ui
 
+      - name: Responsive navigation and persistent terminal checks
+        run: npm run test:navigation
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -64,4 +67,5 @@ jobs:
             test-artifacts/workflow
             test-artifacts/window-layout
             test-artifacts/languages
+            test-artifacts/navigation
           if-no-files-found: ignore

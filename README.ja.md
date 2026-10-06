@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.2：**リモートコマンドの失敗判定、言語の保存、更新応答の検証、直接転送用の鍵の復元・削除を修正。実サーバー2台で rsync、アプリ主プロセスの強制終了後の復元と SHA-256 を確認しました。
+**0.12.3：**Windows インストーラーを提供。サーバー切り替えの遅延を修正し、端末・サーバー・概要の切り替え中もセッション、履歴、バックグラウンド出力を保持します。`ServerConsole-Setup-0.12.3.exe` を一度インストールし、デスクトップまたはスタートメニューから起動してください。 [0.12.3](docs/VALIDATION-0.12.3.md)
 
 **Windows 配布ファイルは未署名です。SmartScreen が警告する場合があります。Release の SHA-256 と照合してください。**
 
@@ -39,7 +39,7 @@ ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向け
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
