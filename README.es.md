@@ -1,28 +1,79 @@
 # ServerConsole
 
-Encuentra una GPU con memoria libre suficiente, consulta quién la usa y abre la terminal o los archivos.
-
-[Descargar versiones de escritorio](https://github.com/Moguifeng-9119/server-console/releases) · [English guide](README.md) · [中文指南](README.zh-CN.md)
+**Encuentra una GPU con memoria libre suficiente, identifica quién la usa y abre terminal o archivos en el mismo escritorio.**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-![Resource workbench — simulated metrics](assets/screenshots/workbench-en.png)
+[Descargar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [Informar de un problema](https://github.com/Moguifeng-9119/server-console/issues)
 
-Las capturas muestran el código v0.11.0 con datos simulados. Los paquetes publicados pueden corresponder a una versión anterior.
+![Recursos GPU: datos simulados](assets/screenshots/workbench-en.png)
 
-La nueva interfaz se mantiene primero en inglés y chino simplificado; los textos nuevos sin traducción usan inglés.
+Las capturas muestran v0.11.0 con datos simulados. v0.11.1 ofrece Windows x64 portátil, AppImage Linux x86_64 y DMG universal macOS con sumas SHA-256. Los paquetes no están firmados; macOS no está notarizado.
 
-[Architecture](docs/ARCHITECTURE.md) · [Validation](docs/VALIDATION.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [MIT](LICENSE)
+## Funciones
 
-## Source demo
+Una herramienta personal para servidores compartidos **Linux / NVIDIA GPU**, mediante SSH sin agente de monitorización remoto.
 
-Node.js 22 / npm:
+- Filtrar GiB libres por GPU, modelo y usuario, ordenar por memoria libre y abrir directamente monitorización, terminal o archivos.
+- Consultar procesos, varias GPU por PID, CPU Linux por diferencias de contadores, actualidad e historial con marcas de tiempo y huecos.
+- Colas de transferencia, reanudación verificada, recuperación tras reiniciar, rsync directo o retransmisión SFTP; importar SSH config, grupos, ProxyJump, comandos y reenvío de puertos.
+- Alertas activas/resueltas y como máximo dos avisos descartables; la demo no envía alertas externas.
+
+No incluye cuentas de equipo, reservas, planificación de clústeres, telemetría AMD/Intel GPU ni diagnóstico NVML completo. Memoria libre no equivale a reserva.
+
+## Primeros pasos
+
+Descarga tu paquete, prueba y añade un servidor o importa SSH config. GPU requiere nvidia-smi remoto; sistema usa Linux /proc. Para el código necesitas Node.js 22 y npm:
 
 ```sh
+git clone https://github.com/Moguifeng-9119/server-console.git
+cd server-console
 npm ci
 npm run dev
-# Desktop SSH / SFTP:
+```
+
+El navegador es una simulación identificada. SSH, credenciales, terminal y SFTP reales requieren el proceso de escritorio:
+
+```sh
 npm run electron:dev
 ```
 
-Browser mode uses simulated data. Real connections require the desktop process and a Linux SSH host; GPU telemetry requires nvidia-smi. Platform package availability must be checked in the release attachments.
+Indica los GiB libres por tarjeta, modelo o usuario. Los ajustes están agrupados. Ctrl/Cmd+K abre la paleta; los diálogos principales admiten Tab, Shift+Tab, Escape y restauración del foco.
+
+## Transferencias y credenciales
+
+- Un destino arbitrario no se usa como prefijo de reanudación: archivos temporales propios y comparación SHA-256 de todo el prefijo.
+- SFTP verifica bytes y tamaño/fecha de la fuente antes de sustituir, serializa destinos solapados y conserva datos al fallar. Si falla la limpieza al cancelar/eliminar, mantiene el registro de recuperación y comunica el error.
+- MD5 opcional se verifica antes de sustituir archivos individuales; directorios y retransmisiones no se presentan como verificados por MD5.
+- El envío directo exige rsync en ambas máquinas y acceso de origen a destino, con clave SSH temporal y huella confiable; si no, SFTP con archivos de preparación. Alternativas tar/scp que sobrescribían directamente desactivadas.
+- Un almacén seguro del sistema cifra contraseñas y frases secretas. Si falta o es Linux basic_text, las nuevas credenciales quedan solo en la sesión y se reintroducen tras reiniciar. Los ajustes muestran el modo real; las claves privadas mantienen su ruta.
+
+Tamaño/fecha no bloquean una fuente modificada en paralelo. Consulta [seguridad](SECURITY.md); rsync entre servidores reales sigue sin validarse.
+
+## Validación
+
+v0.11.1 pasó en cada sistema Windows/Linux/macOS tipado, 84 pruebas de regresión, smoke SFTP, compilación y 22 comprobaciones de navegador. Cada aplicación empaquetada pasó 16 comprobaciones nativas: IPC, shell SSH local, tamaño, reenvío y reinicio autenticado.
+
+Windows DPAPI se probó realmente. macOS usa MockKeychain, sin validar Keychain real; ejecución en arm64, no Intel. Linux comprueba credenciales de sesión sin almacén seguro. GPU/MIG físicas, PTY remoto completo, rsync/red en producción, almacenes macOS/Linux reales, instaladores y actualizaciones requieren pruebas. El benchmark de 10/30 sesiones SSH simuladas no demuestra rendimiento de clúster ni ahorro porcentual.
+
+## Desarrollo
+
+React, TypeScript, Electron, Vite y ssh2; versiones exactas en [package.json](package.json) y archivo de bloqueo. Comprobaciones:
+
+```sh
+npm run typecheck
+npm test
+npm run smoke
+npm run build
+npx playwright-core install chromium
+npm run test:ui
+npm run benchmark
+```
+
+Define SC_ELECTRON_PATH con el ejecutable actual desempaquetado y ejecuta npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux y dist:mac desactivan publicación automática. El [CI de paquetes](.github/workflows/package.yml) valida antes de subir. ESLint/Hooks lint no está configurado.
+
+## Idiomas y colaboración
+
+Las guías README están en diez idiomas. La interfaz aún no está completamente traducida: el nuevo panel se mantiene en inglés/chino simplificado, textos nuevos faltantes usan inglés y pantallas antiguas contienen chino fijo. Consulta el [estado de traducción](docs/LOCALIZATION.md).
+
+[Evidencias](docs/VALIDATION-0.11.1.md) · [Metodología](docs/BENCHMARKS.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Contribuir](CONTRIBUTING.md) · [Hoja de ruta](docs/ROADMAP.md) · [Cambios](CHANGELOG.md) · [Licencia MIT](LICENSE)

@@ -2,7 +2,9 @@
 
 **找到显存够用的 GPU，看清占用用户，从一个桌面直接进入终端、监控和文件管理。**
 
-[下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [English](README.md) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
+[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
+
+[下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
 
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
@@ -73,12 +75,12 @@ npm run benchmark
 
 类型检查覆盖严格 TypeScript 前端与 Electron checkJs。smoke 使用假 SSH 服务但真实 SFTP 协议；UI 检查生产构建的浏览器演示并生成截图。v0.11.1 含 84 项回归测试、22 项浏览器检查、16 项打包程序原生检查，覆盖真实 IPC、本机 SSH shell、尺寸同步、端口转发和重启恢复；运行原生检查前需将 SC_ELECTRON_PATH 指向当前解包程序，然后执行 npm run e2e:terminal。Windows 验证 DPAPI 加密；macOS 自动化使用 MockKeychain，Linux CI 无密钥库时验证密码只存当前会话。基准仅测试本机 10/30 个模拟 SSH 会话，不承诺真实集群性能或节省百分比。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [本轮改进](docs/IMPROVEMENTS.zh-CN.md)、[本地 Windows 预览](docs/LOCAL_PREVIEW.zh-CN.md)、[架构](docs/ARCHITECTURE.md)、[验证证据](docs/VALIDATION.md)、[基准说明](docs/BENCHMARKS.md)。未配置 ESLint/Hooks lint，不声称该项已通过。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [本轮改进](docs/IMPROVEMENTS.zh-CN.md)、[原评估问题逐项状态](docs/ASSESSMENT-STATUS.zh-CN.md)、[架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.11.1.md)、[基准说明](docs/BENCHMARKS.md)。未配置 ESLint/Hooks lint，不声称该项已通过。
 
 构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.11.1.md)。
 
 ## 语言、贡献与后续方向
 
-保留十种语言选项。新版工作台优先维护英文与简体中文，其他语言新增字符串回退英文；旧页面仍有待翻译部分，见 [国际化状态](docs/LOCALIZATION.md)。
+README 提供十种语言的使用说明，每页顶部均可切换。应用界面翻译是另一项尚未完成的工作，保留十种语言选项。新版工作台优先维护英文与简体中文，其他语言新增字符串回退英文；旧页面仍有待翻译部分，见 [国际化状态](docs/LOCALIZATION.md)。
 
 欢迎按 [贡献指南](CONTRIBUTING.md) 提交可复现问题或 PR。查看 [变更记录](CHANGELOG.md)、[路线图](docs/ROADMAP.md) 与 [MIT 许可证](LICENSE)。

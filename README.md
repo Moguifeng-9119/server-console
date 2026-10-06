@@ -2,7 +2,9 @@
 
 **Find a GPU with enough free memory, see who is using it, and open your terminal or files from one desktop.**
 
-[Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [简体中文](README.zh-CN.md) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
+[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
+
+[Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
@@ -71,14 +73,14 @@ npm run test:ui
 npm run benchmark
 ```
 
-Typecheck covers strict renderer TypeScript and Electron checkJs. Smoke tests use two loopback fake SSH servers with real SFTP transport. UI checks use the production renderer with simulated metrics. Windows packaged IPC and loopback SSH/local-shell checks also pass locally; set SC_ELECTRON_PATH to the current unpacked app executable and run npm run e2e:terminal. Benchmarks use 10/30 synthetic loopback SSH sessions; they make no real-cluster performance or percentage-savings promise.
+Typecheck covers strict renderer TypeScript and Electron checkJs. Smoke tests use two loopback fake SSH servers with real SFTP transport. UI checks use the production renderer with simulated metrics. v0.11.1 passed source CI on Windows/Linux/macOS with 84 regression tests and 22 browser checks per platform. The package workflow passed 16 native checks per platform, including IPC, local SSH shell, resize, forwarding and authenticated restart; set SC_ELECTRON_PATH to the current unpacked app executable and run npm run e2e:terminal. Benchmarks use 10/30 synthetic loopback SSH sessions; they make no real-cluster performance or percentage-savings promise.
 
-The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [validation evidence](docs/VALIDATION.md) and [benchmark methodology](docs/BENCHMARKS.md). There is no current ESLint/Hooks lint result.
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.11.1.md) and [benchmark methodology](docs/BENCHMARKS.md). There is no current ESLint/Hooks lint result.
 
-Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. Packaging, signing and native app checks require target environments.
+Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The v0.11.1 three-platform builds and native checks passed. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
 
 ## Languages and contributing
 
-The selector retains English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Русский and Português (Brasil). The redesigned workbench is maintained in English and Simplified Chinese; untranslated new strings fall back to English. Older screens still need translation work. See [localization status](docs/LOCALIZATION.md).
+README usage guides are available in ten languages using the navigation at the top of each page. Application localization is separate. The selector retains English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Русский and Português (Brasil). The redesigned workbench is maintained in English and Simplified Chinese; untranslated new strings fall back to English. Older screens still need translation work. See [localization status](docs/LOCALIZATION.md) and the [original assessment follow-up (Chinese)](docs/ASSESSMENT-STATUS.zh-CN.md).
 
 [Contribution guide](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md) · [MIT License](LICENSE)
