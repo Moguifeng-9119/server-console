@@ -1,4 +1,5 @@
 const { Client } = require('ssh2');
+const lang = require('./lang.cjs');
 const fs = require('node:fs');
 
 // 一次 exec 取回 GPU / 进程 / 负载 / 内存，尽量少打扰服务器
@@ -199,11 +200,11 @@ class Connection {
             Promise.resolve()
               .then(() => hostKeyCheck(this.cfg.host, this.cfg.port || 22, hkey))
               .then((ok) => {
-                if (!ok) this._hostKeyError = this._hostKeyError || '主机指纹校验未通过';
+                if (!ok) this._hostKeyError = this._hostKeyError || lang.t('hostVerify');
                 cb(ok !== false);
               })
               .catch((e) => {
-                this._hostKeyError = (e && e.message) || '主机指纹校验失败';
+                this._hostKeyError = (e && e.message) || lang.t('hostVerify');
                 cb(false);
               });
           };
@@ -213,7 +214,7 @@ class Connection {
           const jump = await Promise.resolve()
             .then(() => jumpResolver(this.cfg))
             .catch((e) => {
-              throw new Error(`跳板机解析失败：${e.message}`);
+              throw new Error(lang.t('jumpFailed', { detail: e.message }));
             });
           if (jump) {
             const jc = new Client();
@@ -228,7 +229,7 @@ class Connection {
             });
             await new Promise((res, rej) => {
               jc.once('ready', res);
-              jc.once('error', (e) => rej(new Error(`跳板机连接失败：${e.message}`)));
+              jc.once('error', (e) => rej(new Error(lang.t('jumpFailed', { detail: e.message }))));
               jc.connect({ host: jump.host, port: jump.port || 22, ...authOpts(jump) });
             });
             connectOpts.sock = await new Promise((res, rej) =>
@@ -333,12 +334,12 @@ class Connection {
               } catch {
                 /* noop */
               }
-              reject(new Error('命令执行超时'));
+              reject(new Error(lang.t('timeout')));
             }, timeout);
             stream
-              .on('close', () => {
+              .on('close', (code, signal) => {
                 clearTimeout(timer);
-                resolve({ stdout: out, stderr: errOut });
+                resolve({ stdout: out, stderr: errOut, code, signal });
               })
               .on('data', (d) => (out += d.toString()))
               .stderr.on('data', (d) => (errOut += d.toString()));
@@ -377,7 +378,7 @@ class Connection {
                   } catch {
                     /* noop */
                   }
-                  reject(new Error('命令执行超时'));
+                  reject(new Error(lang.t('timeout')));
                 }, timeout)
               : null;
             const feed = (chunk) => {
@@ -413,23 +414,36 @@ class Connection {
     const { cpuSample, ...snap } = parsed;
     if (!snap.gpus.length) {
       // 没有 nvidia-smi 或驱动异常时，不要当成整体失败
-      snap.gpuError = /nvidia-smi/i.test(stdout) ? '未获取到 GPU 数据（驱动异常或无 NVIDIA 显卡）' : undefined;
+      snap.gpuError = /nvidia-smi/i.test(stdout) ? lang.t('gpuMissing') : undefined;
     }
     return snap;
   }
 
   async kill(pid, signal) {
+    if (!Number.isSafeInteger(Number(pid)) || Number(pid) <= 0 || !['TERM', 'KILL'].includes(signal)) {
+      return { ok: false, error: lang.t('invalidConfig', { detail: 'PID / signal' }) };
+    }
     const flag = signal === 'KILL' ? '-9' : '-15';
-    const { stdout, stderr } = await this.exec(`kill ${flag} ${Number(pid)}`, 8000);
-    if (stderr && /no such process/i.test(stderr)) return { ok: false, error: '进程不存在' };
-    if (stderr && /not permitted|permission denied/i.test(stderr))
-      return { ok: false, error: '权限不足（需要该进程属主或 root）' };
+    const { stdout, stderr, code, signal: exitSignal } = await this.exec(`LC_ALL=C kill ${flag} ${Number(pid)}`, 8000);
+    if (code !== 0 || exitSignal) {
+      const error = /no such process/i.test(stderr) ? lang.t('processMissing')
+        : /not permitted|permission denied/i.test(stderr) ? lang.t('permission')
+        : code === undefined && !exitSignal ? lang.t('commandUnknown')
+        : lang.t('commandFailed', { code: exitSignal || code, detail: stderr || stdout || '—' });
+      return { ok: false, error, code, signal: exitSignal };
+    }
     return { ok: true, stdout };
   }
 
   async restartService(name) {
-    const { stdout, stderr } = await this.exec(`systemctl restart ${shq(name)}`, 20000);
-    if (stderr && /access denied|not permitted/i.test(stderr)) return { ok: false, error: '权限不足' };
+    if (typeof name !== 'string' || !/^[A-Za-z0-9_@][A-Za-z0-9_.@:-]{0,254}$/.test(name)) {
+      return { ok: false, error: lang.t('invalidConfig', { detail: 'systemd unit' }) };
+    }
+    const { stdout, stderr, code, signal } = await this.exec(`LC_ALL=C systemctl restart -- ${shq(name)}`, 20000);
+    if (code !== 0 || signal) {
+      return { ok: false, code, signal, error: code === undefined && !signal ? lang.t('commandUnknown')
+        : lang.t('commandFailed', { code: signal || code, detail: stderr || stdout || '—' }) };
+    }
     return { ok: true, stdout: stdout || stderr };
   }
 
@@ -598,14 +612,14 @@ function authOpts(cfg) {
   if (cfg.authType === 'agent') {
     const agent =
       cfg.agentPath || process.env.SSH_AUTH_SOCK || (process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : undefined);
-    if (!agent) throw new Error('未找到系统 ssh-agent（未设置 SSH_AUTH_SOCK）');
+    if (!agent) throw new Error(lang.t('agentMissing'));
     return { ...base, agent };
   }
   if (cfg.keyPath) {
     try {
       return { ...base, privateKey: fs.readFileSync(cfg.keyPath), passphrase: cfg.passphrase || undefined };
     } catch (e) {
-      throw new Error(`读取私钥失败：${e.message}`);
+      throw new Error(lang.t('keyRead', { detail: e.message }));
     }
   }
   return { ...base, password: cfg.password };

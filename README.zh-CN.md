@@ -6,12 +6,16 @@
 
 [下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
 
+**0.12.2：**修复远程命令误报成功、主进程语言持久化、更新响应校验、直传临时密钥崩溃清理和传输限速；真实双服务器 rsync 与整个桌面主进程强杀恢复已通过。
+
+**Windows 下载包未签名，SmartScreen 可能显示警告。请使用 Release 附带的 SHA-256 文件核对下载内容。**
+
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
 ![按单卡空闲显存和占用用户找资源的工作台](assets/screenshots/workbench-light.png)
 
-*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.0.md)。*
+*截图来自 v0.12.0，使用明确标注的模拟数据。[v0.12.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) 提供 Windows x64 便携版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.12.2.md)。*
 
 详细操作、传输决策流程、崩溃恢复和源码布局见[使用与恢复指南](docs/USER-GUIDE.zh-CN.md)。
 
@@ -69,7 +73,7 @@ npm run electron:dev
 - 服务器直传要求两端 rsync 和源到目标的可达性，使用临时密钥与已信任目标指纹。不能直传时回退本机 SFTP；不再使用传输中直接覆盖目标的 tar/scp 回退。
 - 安全系统密钥库可用时，密码与私钥口令由 OS 加密保存；不可用或 Linux basic_text 时，新凭据只留在当前会话，重启后需重新输入。安全页显示实际后端与迁移错误；私钥保留在原有路径。
 
-[SECURITY.md](SECURITY.md) 记录完整边界。大小与修改时间检查不能锁住持续变化的源文件；本轮没有把假服务器测试写成真实远程 rsync 验证。
+[SECURITY.md](SECURITY.md) 记录完整边界。大小与修改时间检查不能锁住持续变化的源文件。直传密钥和目录在远端操作前提交精确归属记录，重连后清理；未知旧资源仍保留供人工检查。
 
 ## 开发、测试与构建
 
@@ -85,14 +89,14 @@ npm run test:workflow
 npm run benchmark
 ```
 
-类型检查覆盖严格 TypeScript 前端与 Electron checkJs。当前 106 项回归通过；两台本机假 SSH 服务的真实 SFTP 协议检查比对最终字节；生产浏览器检查覆盖工作台与文件/编辑/互传/十语言加载切换。ESLint/Hooks 已通过。真实 Linux 六张 H100 主机通过 16 MiB 上传/下载 SHA-256、强杀传输子进程恢复和暂存清理；第二台测试机不可达，跨机 rsync 待验。三平台原生和发布证据、密钥库边界见验证记录。基准仅为本机 10/30 模拟 SSH 会话。
+当前源码通过 164 项回归、类型检查、ESLint/Hooks 和双本机 SSH/SFTP 字节检查；生产浏览器覆盖工作台、文件/编辑/互传、十语言，以及语言资源失败和真实键盘竞争操作。新版 Windows 包通过 16 项原生终端与 36 项原生布局检查，涵盖 100/125/150% 缩放。两台真实 Linux 主机完成 16 MiB 上传和 rsync 互传 SHA-256；分别强杀整个 Electron 主进程后，上传恢复包含前缀校验，直传重连会清除原有的精确临时密钥和目录。这些有界测试不代表生产集群或 100 GB 性能已验证。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.0.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.12.2.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
 
-构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.0.md)。
+构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.12.2.md)。
 
 ## 语言、贡献与后续方向
 
-README 十页都有实质使用说明与相互导航。界面十语言各 635 个键，插值一致，旧硬编码中文已迁移，语言按需加载。非中英文包含机器辅助初稿，完整母语审校仍待完成；远端命令输出与后端详细错误保留原语言。详见 [国际化状态](docs/LOCALIZATION.md)。
+README 十页都有实质使用说明与相互导航。界面十语言各 678 个键，插值一致，旧硬编码中文已迁移，语言按需加载。非中英文包含机器辅助初稿，完整母语审校仍待完成；远端命令输出与后端详细错误保留原语言。详见 [国际化状态](docs/LOCALIZATION.md)。
 
 欢迎按 [贡献指南](CONTRIBUTING.md) 提交可复现问题或 PR。查看 [变更记录](CHANGELOG.md)、[路线图](docs/ROADMAP.md) 与 [MIT 许可证](LICENSE)。

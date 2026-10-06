@@ -93,7 +93,7 @@ describe('security persistence', () => {
     } finally { rename.mockRestore(); }
     expect(verify('fixture', 22, Buffer.from('key'))).toBe(true);
     hostkeys.init(dir);
-    expect(() => verify('fixture', 22, Buffer.from('changed'))).toThrow('指纹');
+    expect(() => verify('fixture', 22, Buffer.from('changed'))).toThrow('fingerprint');
   });
 
   it('restores a trusted host when removal cannot be persisted', () => {
@@ -102,7 +102,7 @@ describe('security persistence', () => {
     const rename = vi.spyOn(fs, 'renameSync').mockImplementation(() => { throw new Error('fixture write denied'); });
     try {
       expect(() => hostkeys.remove('fixture|22')).toThrow('fixture write denied');
-      expect(() => verify('fixture', 22, Buffer.from('changed'))).toThrow('指纹');
+      expect(() => verify('fixture', 22, Buffer.from('changed'))).toThrow('fingerprint');
     } finally { rename.mockRestore(); }
   });
 });

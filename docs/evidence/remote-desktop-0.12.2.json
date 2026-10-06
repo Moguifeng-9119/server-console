@@ -1,0 +1,19 @@
+{
+  "version": "0.12.2",
+  "at": "2026-10-06T12:26:23.043Z",
+  "scope": "Real two-server SSH/SFTP/rsync through current packaged Windows app; isolated data; exact main-process forced crash",
+  "checks": [
+    "both SSH hosts matched existing OpenSSH known_hosts; isolated app trust seeded without TOFU",
+    "packaged backend, production assets and all native catalogs match current source SHA-256",
+    "real failed systemctl command reports failure through preload IPC",
+    "forced termination of recorded packaged Electron main PID and its child processes",
+    "whole packaged main crash: paused task, verified-prefix resume, final SHA-256 and stage removal",
+    "forced termination of recorded packaged Electron main PID and its child processes",
+    "whole packaged main crash: application removed exact old direct public key and owned source scratch on reconnect",
+    "real server-to-server rsync after crash: mode assertion, final SHA-256 and empty direct cleanup journal"
+  ],
+  "result": "passed",
+  "payloadBytes": 16777216,
+  "payloadSha256": "63f248899bb026bbb29ab843306309be552d301501c4fd0687ac6ce0c746e5f7",
+  "mainPidMatchedLauncher": false
+}

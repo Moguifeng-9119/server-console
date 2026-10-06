@@ -4,21 +4,25 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
+[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2：**遠端命令失敗判斷、原生與介面語言保存、更新回應驗證及直傳金鑰清理已修正。兩台真實伺服器已通過 rsync、整個主程序強制終止後的恢復及 SHA-256 驗證。
+
+**Windows 套件尚未簽署，SmartScreen 可能顯示警告。請核對 Release 的 SHA-256 檔案。**
 
 ![GPU 資源工作台：模擬資料](assets/screenshots/workbench-en.png)
 
 **0.12.0 更新**
 
-新增任務暫存檔持久記錄、崩潰恢復及重新連線清理；SHA-256 前綴驗證有獨立進度，舊任務提供明確說明。補齊檔案與互傳鍵盤操作、未儲存文字保護及 ESLint/Hooks。十語言各 635 個鍵，機器輔助初稿仍需完整母語審校。
+新增任務暫存檔持久記錄、崩潰恢復及重新連線清理；SHA-256 前綴驗證有獨立進度，舊任務提供明確說明。補齊檔案與互傳鍵盤操作、未儲存文字保護及 ESLint/Hooks。十語言各 678 個鍵，機器輔助初稿仍需完整母語審校。
 
-真機 SSH/SFTP 已在六張 H100 的 Linux 主機通過；第二台測試機無法連線，跨伺服器 rsync 仍待驗。以下 0.11.1 數字是歷史記錄。 [0.12.0](docs/VALIDATION-0.12.0.md).
+0.12.2 已在兩台真實 Linux 伺服器驗證 16 MiB 上傳與 rsync、整個桌面主程序崩潰恢復、前綴進度及精確金鑰/目錄清理。下列 0.11.1 數字為歷史結果，最新範圍見 [0.12.2](docs/VALIDATION-0.12.2.md)。
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
 <p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
 
-截圖來自 v0.12.0，使用模擬資料。v0.12.0 提供 Windows x64 便攜版、Linux x86_64 AppImage、macOS 通用 DMG 和 SHA-256 校驗檔。套件未簽署，macOS 未公證；各系統驗證範圍見[最新紀錄](docs/VALIDATION-0.12.0.md)。
+截圖來自 v0.12.0，使用模擬資料。v0.12.0 提供 Windows x64 便攜版、Linux x86_64 AppImage、macOS 通用 DMG 和 SHA-256 校驗檔。套件未簽署，macOS 未公證；各系統驗證範圍見[最新紀錄](docs/VALIDATION-0.12.2.md)。
 
 [Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -35,7 +39,7 @@ ServerConsole 是面向共用 **Linux / NVIDIA GPU 伺服器**的個人桌面工
 
 ## 開始使用
 
-從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
+從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -60,7 +64,7 @@ npm run electron:dev
 - 直傳需要兩端 rsync 與來源到目標可達，使用臨時 SSH 金鑰和已信任指紋；否則回退分階段 SFTP。已停用直接覆寫的 tar/scp 回退。
 - 安全系統金鑰庫可用時加密密碼與私鑰口令；不可用或為 Linux basic_text 時，新憑據只留在記憶體，重啟後需重輸。安全設定顯示實際後端；私鑰留在原有路徑。
 
-詳見[安全說明](SECURITY.md)。大小／修改時間不會鎖住持續變動的來源；真實遠端 rsync 尚未驗證。
+大小與修改時間不能鎖定並行改寫的來源。見 [安全說明](SECURITY.md)；真實雙伺服器 rsync 與崩潰清理已在隔離測試中通過。
 
 ## 已完成的驗證
 

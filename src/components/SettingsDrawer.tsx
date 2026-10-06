@@ -4,7 +4,7 @@ import { useStore, type Density, type ThemeMode } from '../state';
 import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { CredentialStatus } from './CredentialStatus';
-import { LANGUAGES } from '../i18n';
+import { LANGUAGES, changeLanguage } from '../i18n';
 import type { ForwardingRule, TrustedHost } from '../types';
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
@@ -27,6 +27,12 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     refresh,
   } = useStore();
   const { t, i18n } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
+  const languageRequest = useRef(0);
+  const languagePending = useRef(false);
+  useEffect(() => {
+    if (!languagePending.current) setSelectedLanguage(i18n.language);
+  }, [i18n.language]);
   const ref = useRef<HTMLDivElement>(null);
   useDialogFocus(true, ref, onClose);
   const [section, setSection] = useState('appearance');
@@ -94,11 +100,21 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
 
         <div className="field">
           <label>{t('settings.language')}</label>
-          <select className="mini" value={i18n.language} onChange={(e) => {
-            i18n.changeLanguage(e.target.value);
-            try { localStorage.setItem('sc.lang', e.target.value); } catch { /* noop */ }
-            document.documentElement.lang = e.target.value;
-            void api?.setAppLanguage(e.target.value);
+          <select className="mini" aria-label={t('settings.language')} value={selectedLanguage} onChange={(e) => {
+            const code = e.target.value;
+            const request = ++languageRequest.current;
+            languagePending.current = true;
+            setSelectedLanguage(code);
+            void changeLanguage(code).then(() => {
+              if (request !== languageRequest.current) return;
+              languagePending.current = false;
+              setSelectedLanguage(i18n.language);
+            }).catch((error: unknown) => {
+              if (request !== languageRequest.current) return;
+              languagePending.current = false;
+              setSelectedLanguage(i18n.language);
+              fail(error);
+            });
           }}>
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.name}</option>

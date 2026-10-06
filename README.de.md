@@ -4,15 +4,19 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2:** korrekte Fehler entfernter Befehle, gespeicherte Sprache, geprüfte Update-Antworten und dauerhafte Bereinigung direkter Schlüssel. Zwei echte Server bestanden rsync, Wiederherstellung nach erzwungenem Ende des Hauptprozesses und SHA-256.
+
+**Windows-Dateien sind nicht signiert. SmartScreen kann warnen. Vergleichen Sie SHA-256 mit der Prüfsummendatei der Version.**
 
 ![GPU-Arbeitsbereich: simulierte Daten](assets/screenshots/workbench-en.png)
 
 **Neu in 0.12.0**
 
-Dauerhafte Wiederherstellung und gezielte Bereinigung eigener temporärer Dateien; sichtbarer SHA-256-Prüffortschritt und verständliche Hinweise für alte Aufgaben. Datei-/Relay-Tastaturbedienung, Schutz ungespeicherter Texte und ESLint/Hooks-Prüfungen ergänzt. Alle zehn Sprachdateien haben 635 Schlüssel; maschinell unterstützte Texte benötigen noch vollständige muttersprachliche Prüfung.
+Dauerhafte Wiederherstellung und gezielte Bereinigung eigener temporärer Dateien; sichtbarer SHA-256-Prüffortschritt und verständliche Hinweise für alte Aufgaben. Datei-/Relay-Tastaturbedienung, Schutz ungespeicherter Texte und ESLint/Hooks-Prüfungen ergänzt. Alle zehn Sprachdateien haben 678 Schlüssel; maschinell unterstützte Texte benötigen noch vollständige muttersprachliche Prüfung.
 
-Aktuelle Nachweise: echte SSH/SFTP-Wiederherstellung auf einem Linux-Host mit sechs H100-GPUs. Der zweite Testhost ist nicht erreichbar; echtes serverübergreifendes rsync bleibt ungeprüft. Die folgenden 0.11.1-Zahlen sind historische Ergebnisse. [0.12.0](docs/VALIDATION-0.12.0.md).
+0.12.2 prüfte 16-MiB-Upload und rsync auf zwei echten Linux-Servern, Wiederherstellung nach erzwungenem Ende des gesamten Hauptprozesses, Präfixfortschritt und gezielte Schlüssel-/Verzeichnisbereinigung. Die folgenden 0.11.1-Zahlen sind historisch. Aktueller Umfang: [0.12.2](docs/VALIDATION-0.12.2.md).
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
@@ -60,7 +64,7 @@ Gib die nötigen freien GiB pro Karte an und wähle Modell oder Nutzer. Einstell
 - Direkttransfer benötigt rsync auf beiden Seiten und Erreichbarkeit von Quelle zu Ziel, mit temporärem SSH-Schlüssel und vertrauenswürdigem Fingerabdruck; sonst gestaffelte SFTP-Weiterleitung. Direkt überschreibende tar/scp-Ausweichwege sind deaktiviert.
 - Sicherer OS-Schlüsselspeicher verschlüsselt Passwörter und Passphrasen. Fehlt er oder ist er Linux basic_text, bleiben neue Geheimnisse nur im Sitzungsspeicher und werden nach Neustart erneut eingegeben. Der echte Modus wird angezeigt; private Schlüssel behalten ihren Pfad.
 
-Größe/Zeit sperren keine parallel veränderte Quelle. Siehe [Sicherheit](SECURITY.md); rsync zwischen echten Servern ist noch nicht validiert.
+Größe/Zeit sperren keine parallel veränderte Quelle. Siehe [Sicherheit](SECURITY.md); echter rsync und Bereinigung nach Absturz bestanden isolierte Tests.
 
 ## Validierung
 

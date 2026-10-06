@@ -45,6 +45,7 @@ async function main() {
     const sourceRoot = path.resolve(__dirname, '..');
     const files = fs.readdirSync(path.join(sourceRoot, 'electron')).filter((name) => name.endsWith('.cjs')).map((name) => 'electron/' + name);
     files.push('dist/index.html', ...fs.readdirSync(path.join(sourceRoot, 'dist/assets')).map((name) => 'dist/assets/' + name));
+    files.push(...fs.readdirSync(path.join(sourceRoot, 'src/i18n/locales')).map((name) => 'src/i18n/locales/' + name));
     const expected = files.map((file) => ({file, hash: crypto.createHash('sha256').update(fs.readFileSync(path.join(sourceRoot, file))).digest('hex')}));
     const mismatches = await application.evaluate(({app}, expectedFiles) => {
       const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path'), crypto = process.getBuiltinModule('node:crypto');

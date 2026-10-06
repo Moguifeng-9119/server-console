@@ -1,3 +1,4 @@
+const lang = require('./lang.cjs');
 // 本地端口转发：把本机端口 → 经 SSH 通道 → 远程 host:port（等价 ssh -L）。
 // 规则持久化 userData/forwardings.json；由 ipc 注入 getConn/closeStream。
 const fs = require('node:fs');
@@ -74,7 +75,7 @@ class ForwardingManager {
       enabled: !!rule.enabled,
     };
     if (!clean.serverId || clean.localPort < 1 || clean.localPort > 65535 || !clean.remoteHost || clean.remotePort < 1 || clean.remotePort > 65535) {
-      throw new Error('转发规则不完整（服务器 / 本地端口 / 远程 host:port）');
+      throw new Error(lang.t('invalidConfig', { detail: 'SSH forwarding: server / port / host:port' }));
     }
     const idx = list.findIndex((r) => r.id === id);
     if (idx >= 0) list[idx] = clean;
@@ -113,11 +114,11 @@ class ForwardingManager {
     if (!this._current(rule.id, token)) return;
     const conn = await this.getConn(rule.serverId);
     if (!this._current(rule.id, token)) return;
-    if (!conn) throw new Error('服务器连接不可用');
+    if (!conn) throw new Error(lang.t('connectionMissing'));
     await conn.connect();
     if (!this._current(rule.id, token)) return;
     const client = conn.client;
-    if (!client) throw new Error('SSH 客户端未就绪');
+    if (!client) throw new Error(lang.t('clientMissing'));
     await this._withListenerLock(rule.id, async () => {
       if (!this._current(rule.id, token)) return;
       const sockets = new Set();

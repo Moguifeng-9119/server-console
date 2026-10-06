@@ -4,15 +4,19 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
+[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2:** falhas remotas corretas, idioma persistente, respostas de atualização validadas e limpeza durável de chaves diretas. Dois servidores reais passaram rsync, recuperação após encerrar o processo principal e SHA-256.
+
+**Os arquivos Windows não são assinados. O SmartScreen pode avisar. Compare o SHA-256 com o arquivo da versão.**
 
 ![Recursos GPU: dados simulados](assets/screenshots/workbench-en.png)
 
 **Novidades da 0.12.0**
 
-Registro persistente para recuperar e limpar arquivos temporários da tarefa; progresso SHA-256 visível e explicação de tarefas antigas. Foram adicionados controles de arquivos/retransmissão por teclado, proteção do texto não salvo e ESLint/Hooks. Os dez idiomas têm 635 chaves; falta a revisão nativa de todos os rascunhos auxiliados por tradução automática.
+Registro persistente para recuperar e limpar arquivos temporários da tarefa; progresso SHA-256 visível e explicação de tarefas antigas. Foram adicionados controles de arquivos/retransmissão por teclado, proteção do texto não salvo e ESLint/Hooks. Os dez idiomas têm 678 chaves; falta a revisão nativa de todos os rascunhos auxiliados por tradução automática.
 
-Evidência atual: recuperação SSH/SFTP real em um servidor Linux com seis H100. O segundo servidor está inacessível; rsync real entre servidores continua pendente. Os números da 0.11.1 abaixo são históricos. [0.12.0](docs/VALIDATION-0.12.0.md).
+A 0.12.2 validou upload de 16 MiB e rsync em dois servidores Linux reais, recuperação após encerrar todo o processo principal, progresso do prefixo e limpeza exata das chaves/diretórios das tarefas. Os números 0.11.1 abaixo são históricos. Escopo atual: [0.12.2](docs/VALIDATION-0.12.2.md).
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
@@ -60,7 +64,7 @@ Informe os GiB livres por placa, modelo ou usuário. Configurações são agrupa
 - Transferência direta exige rsync nas duas pontas e acesso da origem ao destino, com chave SSH temporária e impressão digital confiável; caso contrário, SFTP com arquivos de preparação. Alternativas tar/scp que sobrescreviam diretamente desativadas.
 - Armazenamento seguro do sistema criptografa senhas e frases secretas. Se ausente ou Linux basic_text, novas credenciais ficam apenas na sessão e devem ser reinseridas após reiniciar. Configurações mostram o modo real; chaves privadas mantêm seus caminhos.
 
-Tamanho/data não bloqueiam uma origem alterada em paralelo. Veja [segurança](SECURITY.md); rsync entre servidores reais ainda não foi validado.
+Tamanho/data não bloqueiam uma origem alterada em paralelo. Veja [segurança](SECURITY.md); rsync real e limpeza após falha passaram testes isolados.
 
 ## Validação
 

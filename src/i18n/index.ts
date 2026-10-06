@@ -46,7 +46,7 @@ export function saveLanguage(code: string) {
   }
   document.documentElement.lang = code;
   // 主进程通知也需要语言
-  void api?.setAppLanguage(code);
+  void api?.setAppLanguage(code).catch((error) => console.error('Language persistence failed', error));
 }
 
 const localeImports = import.meta.glob<ResourceKey>(['./locales/*.json', '!./locales/en.json'], { import: 'default' });
@@ -60,18 +60,48 @@ const backend: BackendModule = {
   },
 };
 
-const lng = detectLanguage();
-document.documentElement.lang = lng;
+let languageRequest = 0;
+export let initializationWarning = '';
+async function resourcesFor(code: string) {
+  if (!LANGUAGES.some((language) => language.code === code)) throw new Error('Unknown locale: ' + code);
+  if (code === 'en') return en;
+  return localeImports['./locales/' + code + '.json']();
+}
 
-i18n.use(backend).use(initReactI18next).init({
-  resources: { en: { translation: en } },
+export async function changeLanguage(code: string) {
+  const request = ++languageRequest;
+  const resources = await resourcesFor(code);
+  if (request !== languageRequest) return;
+  i18n.addResourceBundle(code, 'translation', resources, true, true);
+  await i18n.changeLanguage(code);
+}
+
+async function initialize() {
+  let lng = detectLanguage();
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    const settings = await api?.getAppSettings();
+    if (!LANGUAGES.some((language) => language.code === saved) && settings?.language && LANGUAGES.some((language) => language.code === settings.language)) lng = settings.language;
+  } catch (error) { console.error('Language settings unavailable', error); }
+  let selected;
+  try { selected = await resourcesFor(lng); }
+  catch (error) {
+    initializationWarning = 'The selected language could not be loaded. English is shown; restart or select the language again. ' + String(error);
+    console.error('Language initialization failed', error);
+    lng = 'en'; selected = en;
+  }
+  await i18n.use(backend).use(initReactI18next).init({
+  resources: { en: { translation: en }, [lng]: { translation: selected } },
   partialBundledLanguages: true,
   load: 'currentOnly',
   lng,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
-});
-
-void api?.setAppLanguage(lng);
+  });
+  if (!initializationWarning) saveLanguage(i18n.language);
+  else document.documentElement.lang = i18n.language;
+  i18n.on('languageChanged', saveLanguage);
+}
+export const ready = initialize();
 
 export default i18n;

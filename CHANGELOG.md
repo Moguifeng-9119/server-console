@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.2 — 2026-10-06
+
+- Require SSH command exit success for process termination and service restart; reject failures, signals and missing statuses.
+- Reuse ten language catalogs for native/backend text, persist language safely, preserve preferences after resource failures and support keyboard cancellation of delayed switches.
+- Reject failed HTTP update responses, malformed releases and invalid stable version numbers.
+- Persist exact direct-transfer key ownership and relay execution inputs before remote changes; recover after crashes, serialize account key edits, preserve failed cleanup records and prevent removed tasks from resurrecting.
+- Fix SFTP rate limiting under backpressure, shared concurrent accounting and live limit changes; apply limits to direct rsync.
+- Add 58 regressions since 0.12.0, six production-language failure/race cases and an opt-in real two-server packaged-desktop acceptance harness.
+
+Current evidence: [0.12.2 validation ledger](docs/VALIDATION-0.12.2.md). Packages remain unsigned.
+
 ## 0.12.1
 
 - Reserve a separate Windows title-bar band for native window controls, including settings, transfers and dialog overlays.

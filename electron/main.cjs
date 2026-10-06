@@ -3,17 +3,21 @@ const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, shell } = 
 const path = require('node:path');
 const fs = require('node:fs');
 const ipc = require('./ipc.cjs');
+const lang = require('./lang.cjs');
+const { checkUpdate } = require('./updates.cjs');
 
 let mainWindow = null;
 let forceQuit = false; // 用户在确认框里选了强制退出后置位，绕过关窗拦截
 let tray = null;
 let closeAction = 'ask'; // ask=每次询问 | minimize=隐藏到托盘 | exit=直接退出
+let savedLanguage;
 
 const appSettingsFile = () => path.join(app.getPath('userData'), 'appsettings.json');
 function loadAppSettings() {
   try {
     const o = JSON.parse(fs.readFileSync(appSettingsFile(), 'utf8'));
     if (['ask', 'minimize', 'exit'].includes(o.closeAction)) closeAction = o.closeAction;
+    if (lang.setLanguage(o.language)) savedLanguage = o.language;
   } catch {
     /* 默认 ask */
   }
@@ -126,35 +130,29 @@ ipcMain.on('app:show-main', () => {
   mainWindow.show();
   mainWindow.focus();
 });
-ipcMain.handle('app:get-settings', () => ({ closeAction }));
+ipcMain.handle('app:get-settings', () => ({ closeAction, language: savedLanguage }));
 // 语言：主进程通知文案跟随设置里选择的语言
-const lang = require('./lang.cjs');
 ipcMain.handle('app:set-language', (_e, payload) => {
-  lang.setLanguage(payload && typeof payload === 'object' ? payload.lang : payload);
+  const language = payload && typeof payload === 'object' ? payload.lang : payload;
+  if (!lang.supported(language)) return false;
+  saveAppSettings({ closeAction, language });
+  lang.setLanguage(language);
+  savedLanguage = language;
+  refreshTrayMenu();
   return true;
 });
 
 ipcMain.handle('app:check-update', async () => {
   try {
-    const res = await fetch('https://api.github.com/repos/Moguifeng-9119/server-console/releases/latest', {
-      headers: { 'user-agent': 'server-console' },
-      signal: AbortSignal.timeout(8000),
-    });
-    const j = /** @type {Record<string, unknown>} */ (await res.json());
-    const latest = String(j.tag_name || '');
-    const current = 'v' + app.getVersion();
-    const pa = latest.replace(/^v/, '').split('.').map(Number);
-    const pb = current.replace(/^v/, '').split('.').map(Number);
-    const isNew = pa[0] > pb[0] || (pa[0] === pb[0] && (pa[1] > pb[1] || (pa[1] === pb[1] && (pa[2] || 0) > (pb[2] || 0))));
-    return { ok: true, data: { latest, current, isNew, url: typeof j.html_url === 'string' ? j.html_url : '' } };
+    return { ok: true, data: await checkUpdate(app.getVersion()) };
   } catch (e) {
-    return { ok: false, error: String((e && e.message) || e) };
+    return { ok: false, error: lang.t('updateFailed', { detail: String((e && e.message) || e) }) };
   }
 });
 ipcMain.handle('app:set-settings', (_e, o) => {
-  if (['ask', 'minimize', 'exit'].includes(o?.closeAction)) closeAction = o.closeAction;
-  fs.mkdirSync(path.dirname(appSettingsFile()), { recursive: true });
-  fs.writeFileSync(appSettingsFile(), JSON.stringify({ closeAction }, null, 2), { mode: 0o600 });
+  const nextCloseAction = ['ask', 'minimize', 'exit'].includes(o?.closeAction) ? o.closeAction : closeAction;
+  saveAppSettings({ closeAction: nextCloseAction, language: savedLanguage });
+  closeAction = nextCloseAction;
   return true;
 });
 
@@ -174,15 +172,21 @@ ipcMain.handle('app:set-theme-overlay', (_e, payload) => {
   }
 });
 
-function createTray() {
-  const iconPath = path.join(__dirname, '../build/icon_512.png');
-  const img = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 }) : undefined;
-  tray = new Tray(img || nativeImage.createEmpty());
+function saveAppSettings(settings) {
+  const file = appSettingsFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = file + '.tmp';
+  fs.writeFileSync(temporary, JSON.stringify(settings, null, 2), { mode: 0o600 });
+  fs.renameSync(temporary, file);
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
   const menu = Menu.buildFromTemplate([
-    { label: '显示主窗口', click: () => mainWindow && !mainWindow.isDestroyed() ? (mainWindow.show(), mainWindow.focus()) : createWindow() },
+    { label: lang.t('trayShow'), click: () => mainWindow && !mainWindow.isDestroyed() ? (mainWindow.show(), mainWindow.focus()) : createWindow() },
     { type: 'separator' },
     {
-      label: '退出',
+      label: lang.t('trayQuit'),
       click: () => {
         forceQuit = true;
         app.quit();
@@ -190,6 +194,13 @@ function createTray() {
     },
   ]);
   tray.setContextMenu(menu);
+}
+
+function createTray() {
+  const iconPath = path.join(__dirname, '../build/icon_512.png');
+  const img = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 }) : undefined;
+  tray = new Tray(img || nativeImage.createEmpty());
+  refreshTrayMenu();
   tray.setToolTip('ServerConsole');
   tray.on('click', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {

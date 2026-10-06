@@ -1,3 +1,5 @@
+const lang = require('./lang.cjs');
+const { DirectResources, keyCommand } = require('./direct-resources.cjs');
 // 传输引擎：多任务队列 + 任务级并发 + 进度/速度 + 暂停/取消 + 断点续传
 // 支持：upload（本地→远程）、download（远程→本地，先写 .scpart 完成后改名）、
 //      relay（服务器 A→服务器 B，本机内存流中继、不落盘）
@@ -66,13 +68,13 @@ function makeGate() {
 // 给 SFTP 操作加超时，防止异常目录/网络抖动让任务无限 pending
 function withTimeout(p, ms, label) {
   let timer;
-  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label || '操作'}超时（${Math.round(ms / 1000)}s）`)), ms); });
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(lang.t('operationTimeout', { seconds: Math.round(ms / 1000), detail: label || 'SFTP' }))), ms); });
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
 function humanErr(e) {
-  const m = String((e && e.message) || e || '传输失败');
-  return m === '__ABORT__' ? '已中止' : m;
+  const m = String((e && e.message) || e || lang.t('transferFailed', { detail: '—' }));
+  return m === '__ABORT__' ? lang.t('aborted') : m;
 }
 
 // 把可读流泵到可写流，带背压、字节计数、可中止、可选全局限速
@@ -81,12 +83,21 @@ function pump(rs, ws, onBytes, gate, limitTake) {
   return new Promise((resolve, reject) => {
     let bytes = 0;
     let settled = false;
+    let backpressured = false;
+    let limitTimer = null;
+    let offLimit = () => {};
+    const maybeResume = () => {
+      if (!settled && !backpressured && !limitTimer) rs.resume();
+    };
+    const drained = () => { backpressured = false; maybeResume(); };
     gate.track(rs);
     gate.track(ws);
     const cleanup = () => {
       gate.untrack(rs);
       gate.untrack(ws);
       if (limitTimer) clearTimeout(limitTimer);
+      ws.removeListener('drain', drained);
+      offLimit();
       try {
         rs.destroy();
       } catch {
@@ -103,10 +114,14 @@ function pump(rs, ws, onBytes, gate, limitTake) {
       settled = true;
       offAbort();
       cleanup();
-      reject(e || new Error('流异常'));
+      reject(e || new Error(lang.t('streamFailed')));
     };
     const offAbort = gate.onAbort(() => fail(ABORT));
-    let limitTimer = null;
+    if (limitTake?.subscribe) offLimit = limitTake.subscribe(() => {
+      if (limitTimer) clearTimeout(limitTimer);
+      limitTimer = null;
+      maybeResume();
+    });
     rs.on('error', fail);
     ws.on('error', fail);
     rs.on('data', (d) => {
@@ -115,16 +130,16 @@ function pump(rs, ws, onBytes, gate, limitTake) {
       const ok = ws.write(d);
       const wait = limitTake ? limitTake(d.length) : 0;
       if (ok === false) {
+        backpressured = true;
         rs.pause();
-        ws.once('drain', () => {
-          if (!settled) rs.resume();
-        });
-      } else if (wait > 0 && !limitTimer) {
+        ws.once('drain', drained);
+      }
+      if (wait > 0 && !limitTimer) {
         rs.pause();
         limitTimer = setTimeout(() => {
           limitTimer = null;
-          if (!settled) rs.resume();
-        }, Math.min(wait, 500));
+          maybeResume();
+        }, wait);
       }
     });
     rs.on('end', () => ws.end());
@@ -148,6 +163,7 @@ class TransferManager {
     this.knownHostsLine = typeof knownHostsLine === 'function' ? knownHostsLine : null;
     this.maxConcurrent = DEFAULT_CONCURRENCY;
     this.options = { notifyDone: true, notifyFail: true, verify: false, limitBytes: 0 };
+    this._rateListeners = new Set();
     this.tasks = new Map();
     this.queue = [];
     this.running = 0;
@@ -157,6 +173,7 @@ class TransferManager {
     this._load();
     this.staging = new TransferStaging(this, endpointIdentity);
     this.staging.restore();
+    this.directResources = new DirectResources(this);
     setImmediate(() => this.collectStaging({ localOnly: true }));
   }
 
@@ -168,8 +185,19 @@ class TransferManager {
   }
 
   setOptions(o = {}) {
+    const previousLimit = this.options.limitBytes;
     this.options = { ...this.options, ...o };
-    if (!this.options.limitBytes) this._bucket = { tokens: 0, last: Date.now() };
+    if (previousLimit !== this.options.limitBytes) {
+      this._bucket = { tokens: 0, last: Date.now() };
+      for (const listener of this._rateListeners) listener();
+    }
+  }
+
+  _limiter() {
+    return Object.assign((n) => this._limitTake(n), { subscribe: (listener) => {
+      this._rateListeners.add(listener);
+      return () => { this._rateListeners.delete(listener); };
+    } });
   }
 
   // 全局令牌桶限速：返回需要暂停的毫秒数（0 = 放行）
@@ -180,11 +208,9 @@ class TransferManager {
     const b = this._bucket || (this._bucket = { tokens: 0, last: now });
     b.tokens = Math.min(limit * 2, b.tokens + ((now - b.last) / 1000) * limit);
     b.last = now;
-    if (b.tokens >= n) {
-      b.tokens -= n;
-      return 0;
-    }
-    return ((n - b.tokens) / limit) * 1000;
+    // Reserve every chunk, including concurrent streams awaiting their timer.
+    b.tokens -= n;
+    return Math.max(0, (-b.tokens / limit) * 1000);
   }
 
   onUpdate(fn) {
@@ -290,14 +316,22 @@ class TransferManager {
   }
 
   async _persistNow() {
-    if (!this.storeFile) return;
-    if (this._writing) {
-      this._dirty = true; // 写盘期间又有变更，写完再补一次
-      return;
+    if (!this.storeFile) return false;
+    if (this._writePromise) {
+      this._dirty = true;
+      return this._writePromise;
     }
+    this._writePromise = this._writeRecoveryLoop();
+    try { return await this._writePromise; }
+    finally { this._writePromise = null; }
+  }
+
+  async _writeRecoveryLoop() {
     this._writing = true;
     const previousError = this.persistenceError;
     try {
+      do {
+      this._dirty = false;
       this._prune();
       // recentFiles 仅用于实时展示，不落盘（避免大目录把 transfers.json 撑大）
       const data = [...this.tasks.values()].map((t) => {
@@ -308,6 +342,7 @@ class TransferManager {
       await fsp.writeFile(tmp, JSON.stringify(data), 'utf8');
       await fsp.rename(tmp, this.storeFile);
       this.persistenceError = '';
+      } while (this._dirty);
     } catch (error) {
       this.persistenceError = `Unable to save transfer recovery data: ${error.message}`;
     } finally {
@@ -315,11 +350,8 @@ class TransferManager {
       if (this.listener && previousError !== this.persistenceError) {
         for (const task of this.tasks.values()) this.listener(this.pub(task));
       }
-      if (this._dirty) {
-        this._dirty = false;
-        this._persistNow();
-      }
     }
+    return !this.persistenceError;
   }
 
   _load() {
@@ -518,7 +550,7 @@ class TransferManager {
       if (t.kind === 'upload') await this._runUpload(t, gate, makeProgress());
       else if (t.kind === 'download') await this._runDownload(t, gate, makeProgress());
       else if (t.kind === 'relay') await this._runRelay(t, gate);
-      else throw new Error('未知任务类型');
+      else throw new Error(lang.t('invalidConfig', { detail: 'transfer kind' }));
       t.speed = 0;
       t.transferred = t.size;
       t.finishedAt = Date.now();
@@ -583,10 +615,17 @@ class TransferManager {
     return true;
   }
 
-  _cleanup(t) { return this.staging.cleanup(t); }
+  async _cleanup(t) {
+    const staged = await this.staging.cleanup(t);
+    const direct = await this.directResources.cleanupTask(t.id);
+    return staged && direct;
+  }
   _stage(t, key, staged, target, connection) { return this.staging.stage(t, key, staged, target, connection); }
   _unstage(t, key, staged) { return this.staging.unstage(t, key, staged); }
-  collectStaging(options) { return this.staging.collect(options); }
+  async collectStaging(options) {
+    await this.staging.collect(options);
+    await this.directResources.collect(options);
+  }
 
   async _verified(t, key, run) {
     const checks = t._resumeChecks || (t._resumeChecks = new Map());
@@ -608,7 +647,7 @@ class TransferManager {
 
   async _conn(id) {
     const c = await this.getConn(id);
-    if (!c) throw new Error('服务器连接不可用');
+    if (!c) throw new Error(lang.t('connectionMissing'));
     return c;
   }
 
@@ -656,7 +695,7 @@ class TransferManager {
       flags: offset ? 'a' : 'w',
       chunkSize: STREAM_CHUNK,
     });
-    const bytes = await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+    const bytes = await pump(local, remote, (d) => onBytes && onBytes(offset + d), gate, this._limiter());
     if (bytes !== size - offset) throw new Error('Source upload length changed');
   }
 
@@ -752,7 +791,7 @@ class TransferManager {
     } else if (offset < size) {
       const remote = sftp.createReadStream(remoteAbs, { start: offset, chunkSize: STREAM_CHUNK });
       const local = fs.createWriteStream(part, { flags: offset ? 'a' : 'w' });
-      const bytes = await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n));
+      const bytes = await pump(remote, local, (d) => onBytes && onBytes(offset + d), gate, this._limiter());
       if (bytes !== size - offset) throw new Error('Source download length changed. Destination was preserved.');
     } else if (onBytes) onBytes(size);
     const after = await remoteStat(sftp, remoteAbs);
@@ -777,7 +816,7 @@ class TransferManager {
       // 展开一个远程目录：建本地目录 + 列远程子项（readdir 自带属性，无额外往返）
       async (j) => {
         await fsp.mkdir(j.local, { recursive: true });
-        const listing = await withTimeout(conn.listDir(j.remote), DIR_LIST_TIMEOUT, '列举目录 ' + j.remote);
+        const listing = await withTimeout(conn.listDir(j.remote), DIR_LIST_TIMEOUT, j.remote);
         return listing.entries.map((e) => ({
           key: posixJoin(j.remote, e.name),
           isDir: e.type === 'dir' || !!e.linkToDir,
@@ -814,6 +853,7 @@ class TransferManager {
       }
     } catch (e) {
       if (e && e.aborted) throw e;
+      if (t.directCleanupPending) throw e;
       t.direct = false; // 直传不可用/中断 → 静默回退本机中继，保证一定能传
     }
     await this._runRelayPump(t, gate, a, b);
@@ -822,11 +862,16 @@ class TransferManager {
   // 服务器直传：在源 A 上生成临时密钥、把公钥临时注入目标 B，由 A 用 rsync/scp 直接推到 B，结束即焚
   // 返回 true=直传完成；抛出异常=不可用（调用方回退）
   async _runRelayDirect(t, gate, connA, connB) {
+    t.directCleanupPending = false;
+    if (!await this.directResources.cleanupTask(t.id)) {
+      t.directCleanupPending = true;
+      throw new Error('Direct-transfer cleanup is pending; reconnect the original servers first');
+    }
     const cfgB = connB.cfg || {};
     const host = cfgB.host;
     const port = cfgB.port || 22;
     const user = cfgB.username || 'root';
-    if (!host) throw new Error('目标缺少主机地址');
+    if (!host) throw new Error(lang.t('hostRequired'));
     // tag 格式：sckey- + 8 位随机 hex（GC 端用 / sckey-[a-z0-9]{8}$/ 精确匹配，
     // 避免误删 authorized_keys 中碰巧以 sc 开头 8 位的用户自有密钥注释）
     const tag = 'sckey-' + crypto.randomBytes(4).toString('hex');
@@ -844,26 +889,25 @@ class TransferManager {
     // 0) 目标机指纹：必须已经通过本机连接并记录在信任库，写进源机临时 known_hosts（随临时目录即焚）。
     //    取不到说明目标机从未成功连接过 —— 放弃直传，回退本机中继。
     const khLine = this.knownHostsLine ? this.knownHostsLine(host, port) : null;
-    if (!khLine) throw new Error('无法获取目标主机指纹（目标机尚未连接过）');
+    if (!khLine) throw new Error(lang.t('hostVerify'));
     const khfile = dir + '/known_hosts';
-    let installed = false;
+    let ownership = await this.directResources.register(t, connA, connB, tag);
     try {
-      await connA.exec(`mkdir -p ${dir} && chmod 700 ${dir}`);
+      const created = await connA.exec(`umask 077; mkdir -- ${dir} && printf '%s' ${q(ownership.owner)} >${dir}/owner`);
+      if (created.code !== 0 || created.signal) throw new Error('Cannot create owned direct-transfer scratch');
       await wf(sa, khfile, Buffer.from(khLine + '\n'));
       // Setup failures also pass through the exact-directory cleanup below.
       await connA.exec(`ssh-keygen -t ed25519 -N '' -f ${key} -q`);
       const pubRaw = (await connA.exec(`cat ${key}.pub`)).stdout.trim();
       const marked = pubRaw.split(' ').slice(0, 2).join(' ') + ' ' + tag; // 用随机 tag 作注释，便于精确删除
+      ownership = await this.directResources.recordPublicKey(ownership, marked);
       // 2) 临时把公钥注入目标 authorized_keys
-      await connB.exec(
-        `mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && ` +
-          `grep -qF ${q(marked)} ~/.ssh/authorized_keys || echo ${q(marked)} >> ~/.ssh/authorized_keys`,
-      );
-      installed = true;
+      const inserted = await connB.exec(keyCommand(`(test -f ~/.ssh/authorized_keys || (umask 077; touch ~/.ssh/authorized_keys)) && (grep -Fxq -- ${q(marked)} ~/.ssh/authorized_keys || printf '%s\\n' ${q(marked)} >> ~/.ssh/authorized_keys)`));
+      if (inserted.code !== 0 || inserted.signal) throw new Error('Cannot install direct-transfer public key');
       const sshOpt = `-i ${key} -p ${port} -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${khfile} -o BatchMode=yes -o ConnectTimeout=8`;
       // 3) 探测源能否免密直连目标（连不通就直接回退，不浪费时间）
       const probe = await connA.exec(`timeout 15 ssh ${sshOpt} ${q(user + '@' + host)} 'echo DIRECT_OK'; echo "__P=$?"`, 20000);
-      if (!/DIRECT_OK/.test(probe.stdout)) throw new Error('源到目标不可直连');
+      if (!/DIRECT_OK/.test(probe.stdout)) throw new Error(lang.t('connectionMissing'));
       t.direct = true; // 确定走直传，运行中即可在界面显示
       // 4) 总大小：单文件用 stat；目录不做阻塞式全量 du（几十万文件要遍历数分钟，会造成“开始前干等/0速度”），
       //    改为后台异步估算，算完再回填，传输本身立即开始
@@ -916,7 +960,9 @@ class TransferManager {
       if (useRsync) {
         // rsync：两端都有时最优，支持增量续传；--out-format 逐文件回传已完成文件名（@@前缀，stdout 实时流出），错误仍进日志
         // 同步模式（ignoreExisting）仅 rsync 支持
-        const flags = '-aW --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '');
+        const bandwidth = Number(this.options.limitBytes);
+        const flags = '-aW --numeric-ids' + (t.ignoreExisting ? ' --ignore-existing' : '')
+          + (Number.isFinite(bandwidth) && bandwidth > 0 ? ' --bwlimit=' + Math.max(1, Math.floor(bandwidth / 1024)) : '');
         modeLines +=
           `if rsync ${flags} --out-format='@@%n' -e ${q(sshVar)} -- ${rsyncSrc} ${rsyncDst} 2>>${logf}; then echo rsync >${modefile}; echo 0 >${rcfile}; exit 0; ` +
           `else echo "rsync:$(tail -c 180 ${logf}|tr '\\n' ' ')" >>${notefile}; fi\n`;
@@ -926,7 +972,7 @@ class TransferManager {
       await wf(sa, script, Buffer.from(body));
       // 取消：杀掉源端本次直传相关进程（命令行含随机 tag）
       const killRemote = () => {
-        connA.exec(`pkill -f ${tag}`).catch(() => {});
+        connA.exec(`pkill -f '[s]${tag.slice(1)}'`).catch(() => {});
       };
       const offAbort = gate.onAbort(killRemote);
       if (gate.canceled) {
@@ -991,25 +1037,14 @@ class TransferManager {
         offAbort();
       }
       if (gate.canceled) throw ABORT;
-      if (!ok) throw new Error('直传失败：' + tail + ' ' + (t.directNote || ''));
+      if (!ok) throw new Error(lang.t('transferFailed', { detail: tail + ' ' + (t.directNote || '') }));
       t.directNote += ' | mode=' + (t.directMode || '?');
       this.emit(t);
-      return true;
     } finally {
-      // 7) 即焚：移除目标端临时公钥、删除源端临时密钥/脚本
-      if (installed) {
-        try {
-          await connB.exec(`sed -i '\\#${tag}#d' ~/.ssh/authorized_keys`);
-        } catch {
-          /* noop */
-        }
-      }
-      try {
-        await connA.exec(`rm -rf ${dir}`);
-      } catch {
-        /* noop */
-      }
+      t.directCleanupPending = !await this.directResources.cleanup(ownership);
     }
+    if (t.directCleanupPending) throw new Error('Direct-transfer cleanup is pending; ownership is retained for reconnect');
+    return true;
   }
 
   // 本机内存中继（直传不可用时的兜底，数据经本机转发）
@@ -1054,7 +1089,7 @@ class TransferManager {
       const bytes = await pump(
         sa.createReadStream(srcAbs, { start: offset, chunkSize: STREAM_CHUNK }),
         sb.createWriteStream(staged, { start: offset, flags: offset ? 'a' : 'w', chunkSize: STREAM_CHUNK }),
-        (d) => onBytes && onBytes(offset + d), gate, (n) => this._limitTake(n),
+        (d) => onBytes && onBytes(offset + d), gate, this._limiter(),
       );
       if (bytes !== size - offset) throw new Error('Relay source length changed');
     } else if (onBytes) onBytes(size);
@@ -1170,7 +1205,7 @@ class TransferManager {
     });
     if (errors.length) {
       const total = errors.length + errorsDropped;
-      throw new Error(`目录内 ${total} 项失败${errorsDropped ? `（仅列出前 ${errors.length} 项）` : ''}，首个：${errors[0]}`);
+      throw new Error(lang.t('treeErrors', { count: total, detail: errors[0] }));
     }
   }
 
@@ -1182,7 +1217,7 @@ class TransferManager {
       [{ key: srcRoot, isDir: true, size: 0, src: srcRoot, dst: dstRoot }],
       async (j) => {
         await connB.mkdirpRemote(j.dst);
-        const listing = await withTimeout(connA.listDir(j.src), DIR_LIST_TIMEOUT, '列举目录 ' + j.src);
+        const listing = await withTimeout(connA.listDir(j.src), DIR_LIST_TIMEOUT, j.src);
         return listing.entries.map((e) => ({
           key: posixJoin(j.src, e.name),
           isDir: e.type === 'dir' || !!e.linkToDir,
@@ -1300,4 +1335,4 @@ function posixDir(p) {
 
 const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 
-module.exports = { TransferManager, MAX_CONCURRENT_TASKS };
+module.exports = { TransferManager, MAX_CONCURRENT_TASKS, pump, makeGate };

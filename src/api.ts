@@ -64,7 +64,7 @@ interface Api {
   webhookSend: (payload: { title: string; body: string }) => Promise<IpcResult<boolean>>;
 
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
-  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit' }>;
+  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit'; language?: string }>;
   setAppLanguage: (lang: string) => Promise<boolean>;
   showMainWindow: () => void;
   checkUpdate: () => Promise<IpcResult<{ latest: string; current: string; isNew: boolean; url: string }>>;

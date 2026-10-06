@@ -6,12 +6,16 @@
 
 [Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
+**0.12.2:** accurate remote command failures, persisted native/app language, validated update checks, durable direct-key cleanup and working bandwidth limits. Real two-server rsync and whole packaged-app crash recovery now pass.
+
+**Windows downloads are unsigned. SmartScreen may show a warning. Compare the download SHA-256 with the release checksum file.**
+
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
 ![Resource workbench with per-card free memory and owners](assets/screenshots/workbench-en.png)
 
-*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.0.md) for platform coverage.*
+*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.2.md) for platform coverage.*
 
 [Detailed usage, transfer decisions, recovery and source map (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -69,7 +73,7 @@ Staging ownership is committed before writes so crashes restore actionable tasks
 - Direct relay requires rsync on both ends and source-to-destination reachability. It uses a temporary SSH key and trusted destination fingerprint. Otherwise it uses staged local SFTP; streaming tar/scp overwrite fallbacks are disabled.
 - Passwords/passphrases use OS encryption when a secure backend is available. Otherwise, including Linux basic_text, new credentials stay **in session memory** and must be entered again after restart. Security settings show the actual backend and migration errors. Private keys stay at their existing paths.
 
-Read [security behavior and limitations](SECURITY.md). Size/mtime checks do not lock a concurrently rewritten source. Real remote rsync has not been validated in this source change.
+Read [security behavior and limitations](SECURITY.md). Size/mtime checks do not lock a concurrently rewritten source. Exact owned direct keys and scratch are journaled before remote mutations and cleaned after reconnect; unknown older resources remain for manual inspection.
 
 ## Development and evidence
 
@@ -85,14 +89,14 @@ npm run test:workflow
 npm run benchmark
 ```
 
-Typecheck covers strict renderer TypeScript and backend checkJs; ESLint/Hooks passed. Current source has 106 regression tests. Loopback SSH/SFTP checks compare final bytes; production renderer checks cover the workbench, file/editor/relay and every locale’s load/switch/reload. One real Linux host with six H100 cards passed 16 MiB upload/download SHA-256, forced transfer-subprocess recovery and owned-stage cleanup. The second host is unreachable; real cross-server rsync remains pending. Platform/native receipts and credential limits are in the validation ledger. Benchmarks are 10/30 synthetic loopback sessions.
+The current source passes 164 regressions, type checking, ESLint/Hooks and two loopback SSH/SFTP byte checks. Production browser checks cover the workbench, file/editor/relay, all ten locales, resource-load failures and keyboard language races. A current packaged Windows build passed 16 native terminal checks and 36 native layout checks at 100/125/150% scaling. Two real Linux hosts passed 16 MiB upload and rsync relay SHA-256 checks after separately forcing the entire Electron main process to terminate; restart restored prefix-verified upload recovery and removed exact old direct keys/scratch. These bounded checks do not establish production fleet or 100 GB performance.
 
-The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.12.0.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.12.2.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
 
 Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The current platform/package results are recorded in the validation ledger. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
 
 ## Languages and contributing
 
-README usage guides have ten substantive language pages with shared navigation. The app’s ten locale files each contain 635 keys with matching interpolation, and older hardcoded business labels have been migrated. Non-English locales load on demand. Other languages include machine-assisted drafts; full native-speaker review remains pending. Remote command output and backend details retain their original language. See [localization status](docs/LOCALIZATION.md).
+README usage guides have ten substantive language pages with shared navigation. The app’s ten locale files each contain 678 keys with matching interpolation, and older hardcoded business labels have been migrated. Non-English locales load on demand. Other languages include machine-assisted drafts; full native-speaker review remains pending. Remote command output and backend details retain their original language. See [localization status](docs/LOCALIZATION.md).
 
 [Contribution guide](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md) · [MIT License](LICENSE)

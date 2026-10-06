@@ -1,3 +1,4 @@
+const lang = require('./lang.cjs');
 // 本地文件系统浏览（双面板左侧、上传源枚举、下载落盘）。主进程可用 node:fs。
 const fs = require('node:fs');
 const fsp = fs.promises;
@@ -34,7 +35,7 @@ function sortEntries(entries) {
 async function list(dir) {
   const abs = path.resolve(dir || homeDir());
   const st = await fsp.stat(abs);
-  if (!st.isDirectory()) throw new Error('不是目录：' + abs);
+  if (!st.isDirectory()) throw new Error(lang.t('notDir', { path: abs }));
   const names = await fsp.readdir(abs);
   const entries = [];
   for (const name of names) {
@@ -75,9 +76,9 @@ async function rename(from, to) {
 async function rmrf(target) {
   // 护栏：拒绝删除盘根目录和用户主目录本身（UI 有确认框，这里是最后一道保险）
   const abs = path.resolve(target);
-  if (abs === path.parse(abs).root) throw new Error('拒绝删除盘根目录：' + abs);
+  if (abs === path.parse(abs).root) throw new Error(lang.t('unsafeDelete', { path: abs }));
   const home = path.resolve(homeDir());
-  if (home && abs === home) throw new Error('拒绝删除用户主目录：' + abs);
+  if (home && abs === home) throw new Error(lang.t('unsafeDelete', { path: abs }));
   await fsp.rm(abs, { recursive: true, force: true });
   return true;
 }

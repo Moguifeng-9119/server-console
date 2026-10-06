@@ -4,21 +4,25 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2：**リモートコマンドの失敗判定、言語の保存、更新応答の検証、直接転送用の鍵の復元・削除を修正。実サーバー2台で rsync、アプリ主プロセスの強制終了後の復元と SHA-256 を確認しました。
+
+**Windows 配布ファイルは未署名です。SmartScreen が警告する場合があります。Release の SHA-256 と照合してください。**
 
 ![GPU リソース画面：模擬データ](assets/screenshots/workbench-en.png)
 
 **0.12.0 の更新**
 
-タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 635 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
+タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 678 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
 
-現在の実測：6 枚の H100 を持つ Linux ホストで SSH/SFTP 復元を確認。2 台目は接続できず、実サーバー間 rsync は未検証です。以下の 0.11.1 の件数は過去の結果です。 [0.12.0](docs/VALIDATION-0.12.0.md).
+0.12.2 は実 Linux サーバー2台で 16 MiB のアップロードと rsync、主プロセスの強制終了後の復元、既存データの検証進捗、所有する鍵と一時ディレクトリの削除を確認しました。以下の 0.11.1 数値は過去の結果です。最新の範囲は [0.12.2](docs/VALIDATION-0.12.2.md)。
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
 <p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
 
-画像は v0.12.0 の模擬データです。v0.12.0 は Windows x64 ポータブル版、Linux x86_64 AppImage、macOS ユニバーサル DMG と SHA-256 ファイルを提供します。パッケージは未署名、macOS は未公証です。[検証記録](docs/VALIDATION-0.12.0.md)に対象範囲を示しています。
+画像は v0.12.0 の模擬データです。v0.12.0 は Windows x64 ポータブル版、Linux x86_64 AppImage、macOS ユニバーサル DMG と SHA-256 ファイルを提供します。パッケージは未署名、macOS は未公証です。[検証記録](docs/VALIDATION-0.12.2.md)に対象範囲を示しています。
 
 [Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -35,7 +39,7 @@ ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向け
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -60,7 +64,7 @@ GPU 1 枚に必要な空き GiB を指定し、モデルや利用者を選んで
 - 直接転送には両側の rsync と送信元から転送先への接続が必要です。一時 SSH 鍵と信頼済み指紋を使い、利用できなければ段階的 SFTP 中継に切り替えます。直接上書きする tar/scp の代替経路は無効です。
 - 安全な OS キーストアが使える場合にパスワードとパスフレーズを暗号化します。利用不可または Linux basic_text の場合、新しい認証情報はセッション内だけに保持し、再起動後に再入力します。安全設定は実際の保存方式を表示し、秘密鍵は元のパスに残します。
 
-[安全性と制限](SECURITY.md)も確認してください。サイズ・更新時刻の検査は変更中の送信元をロックしません。実サーバー間の rsync は未検証です。
+サイズと時刻は同時に書き換わるソースをロックしません。[セキュリティ](SECURITY.md)を参照。実サーバー間 rsync とクラッシュ後の削除は隔離テストで確認済みです。
 
 ## 検証済みの範囲
 

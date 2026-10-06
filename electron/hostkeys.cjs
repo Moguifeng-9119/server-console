@@ -1,3 +1,4 @@
+const lang = require('./lang.cjs');
 // 主机指纹信任库（TOFU：Trust On First Use）。
 // 首次连接记录主机公钥指纹并放行；之后每次连接比对，不一致视为可疑（可能中间人）并拒绝。
 // 指纹库：userData/hostkeys.json；TOFU 开关：userData/security.json。
@@ -100,7 +101,7 @@ function verify(host, port, keyBuf) {
   const known = trust.get(id);
   if (!known) {
     if (!opts.tofu) {
-      throw new Error('尚未信任该主机的指纹，且已关闭「首次连接自动信任」。可在 设置 → 安全 中开启 TOFU 后重连。');
+      throw new Error(lang.t('hostVerify'));
     }
     trust.set(id, { type: keyTypeOf(keyBuf), blob: keyBuf.toString('base64'), fp, firstSeen: Date.now() });
     try { saveTrust(); } catch (error) { trust.delete(id); throw error; }
@@ -108,9 +109,7 @@ function verify(host, port, keyBuf) {
   }
   if (known.fp !== fp) {
     throw new Error(
-      `主机 ${host}:${Number(port) || 22} 的指纹与首次记录不一致，已拒绝连接（可能存在中间人风险）。` +
-        `若确认是服务器重装/换钥，请在 设置 → 安全 中移除该主机指纹后重连。` +
-        `旧 ${known.fp} → 新 ${fp}`,
+      lang.t('hostChanged', { old: known.fp, new: fp }),
     );
   }
   return true;

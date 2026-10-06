@@ -4,15 +4,19 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Télécharger](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [Signaler un problème](https://github.com/Moguifeng-9119/server-console/issues)
+[Télécharger](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [Signaler un problème](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2 :** erreurs distantes fiables, langue persistante, réponses de mise à jour validées et nettoyage durable des clés directes. Deux serveurs réels ont validé rsync, reprise après arrêt forcé du processus principal et SHA-256.
+
+**Les fichiers Windows ne sont pas signés. SmartScreen peut afficher un avertissement. Comparez le SHA-256 au fichier de la version.**
 
 ![Espace GPU : données simulées](assets/screenshots/workbench-en.png)
 
 **Nouveautés de 0.12.0**
 
-Journal persistant pour récupérer et nettoyer les fichiers temporaires de chaque tâche ; progression SHA-256 visible et explication des anciennes tâches. Commandes clavier des fichiers/relais, protection du texte non enregistré et ESLint/Hooks ajoutés. Les dix langues ont 635 clés ; la relecture native de tous les textes assistés par traduction automatique reste à faire.
+Journal persistant pour récupérer et nettoyer les fichiers temporaires de chaque tâche ; progression SHA-256 visible et explication des anciennes tâches. Commandes clavier des fichiers/relais, protection du texte non enregistré et ESLint/Hooks ajoutés. Les dix langues ont 678 clés ; la relecture native de tous les textes assistés par traduction automatique reste à faire.
 
-Preuves actuelles : récupération SSH/SFTP réelle sur un hôte Linux avec six H100. Le second hôte est inaccessible ; rsync réel entre serveurs reste à vérifier. Les chiffres 0.11.1 ci-dessous sont historiques. [0.12.0](docs/VALIDATION-0.12.0.md).
+0.12.2 a validé sur deux serveurs Linux réels un envoi de 16 MiB, rsync, la reprise après arrêt forcé du processus principal, la progression du préfixe et le nettoyage des clés/répertoires appartenant aux tâches. Les chiffres 0.11.1 suivants sont historiques. Portée actuelle : [0.12.2](docs/VALIDATION-0.12.2.md).
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
@@ -60,7 +64,7 @@ Choisissez les GiB libres requis par carte, le modèle ou l'utilisateur. Les par
 - Le direct exige rsync aux deux extrémités et une connexion source–destination, avec clé SSH temporaire et empreinte approuvée ; sinon relais SFTP avec staging. Replis tar/scp écrasant directement désactivés.
 - Un magasin système sûr chiffre mots de passe et phrases secrètes ; absent ou Linux basic_text, les nouveaux secrets restent uniquement en session et doivent être ressaisis après redémarrage. Les paramètres indiquent le mode réel ; les clés privées restent à leur emplacement.
 
-Taille/date ne verrouillent pas une source modifiée en parallèle. Voir la [sécurité](SECURITY.md) ; rsync entre machines réelles reste à valider.
+Taille/date ne verrouillent pas une source modifiée en parallèle. Voir la [sécurité](SECURITY.md) ; rsync réel et nettoyage après interruption ont passé des tests isolés.
 
 ## Validation
 

@@ -4,12 +4,12 @@ import App from './App';
 import { StoreProvider } from './state';
 import { TransferProvider } from './transfers';
 import '@xterm/xterm/css/xterm.css';
-import './i18n';
+import { ready } from './i18n';
 import './styles.css';
 import './workbench.css';
 import './window-layout.css';
 
-createRoot(document.getElementById('root')!).render(
+void ready.then(() => createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Suspense fallback={<div role="status" className="empty">Loading…</div>}>
     <StoreProvider>
@@ -19,4 +19,7 @@ createRoot(document.getElementById('root')!).render(
     </StoreProvider>
     </Suspense>
   </StrictMode>,
-);
+)).catch((error) => {
+  console.error('Application initialization failed', error);
+  document.getElementById('root')!.textContent = 'Unable to load the application. Please restart.';
+});

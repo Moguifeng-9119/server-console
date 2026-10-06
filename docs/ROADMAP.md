@@ -1,10 +1,10 @@
 # Roadmap
 
-Priorities, not release promises. The 0.12.0 recovery journal, prefix progress, file/relay keyboard flows, locale contracts, detailed guides, demonstration and lint are implemented. See the [validation ledger](VALIDATION-0.12.0.md) for exact evidence.
+Priorities, not release promises. Recovery journals, prefix progress, file/relay keyboard flows, shared locale catalogs, detailed guides and lint are implemented. In 0.12.2, whole packaged-main crash recovery and direct rsync passed on two real hosts. See the [validation ledger](VALIDATION-0.12.2.md) for exact evidence.
 
 | Priority | Remaining problem | Completion evidence |
 | --- | --- | --- |
-| 1 | Real cross-server direct relay | Reachable second authorized host; final rsync bytes, connectivity failure, cancellation and tagged-key cleanup after interrupted direct transfer |
+| 1 | Additional real cross-server failure scenarios | Healthy direct rsync, whole-main crash recovery and exact owned-key cleanup passed on two hosts; controlled connectivity loss and broader cancellation/race scenarios remain |
 | 1 | Package confidence beyond automation | Intel macOS, real Keychain/Linux secret-service, signing/notarization, installer/update and complete packaged remote-terminal workflows; real Connection PTY computed output/resize passed |
 | 1 | Physical GPU semantics | Real multi-GPU PID, missing fields, MIG/permissions; six H100 cards detected and three approximate CPU samples matched independent vmstat on one host; exact-window/container-quota comparison remains |
 | 2 | Wording and screen readers | Native-speaker review of machine-assisted drafts and native reader acceptance; locale contract and keyboard regressions already exist |

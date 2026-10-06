@@ -4,21 +4,25 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+
+**0.12.2:** 원격 명령 실패 판정, 언어 저장, 업데이트 응답 검증과 직접 전송 키 복구·정리를 수정했습니다. 실제 서버 두 대에서 rsync, 앱 메인 프로세스 강제 종료 후 복구와 SHA-256을 확인했습니다.
+
+**Windows 배포 파일은 서명되지 않았으며 SmartScreen 경고가 나타날 수 있습니다. Release의 SHA-256 파일과 비교하세요.**
 
 ![GPU 작업 공간: 모의 데이터](assets/screenshots/workbench-en.png)
 
 **0.12.0 변경 사항**
 
-작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 635개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
+작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 678개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
 
-현재 실제 검증: H100 6개가 있는 Linux 호스트에서 SSH/SFTP 복구를 확인했습니다. 두 번째 호스트에 연결할 수 없어 서버 간 실제 rsync는 미검증입니다. 아래 0.11.1 수치는 과거 결과입니다. [0.12.0](docs/VALIDATION-0.12.0.md).
+0.12.2는 실제 Linux 서버 두 대에서 16 MiB 업로드와 rsync, 메인 프로세스 강제 종료 후 복구, 접두부 검증 진행률, 소유한 임시 키와 디렉터리 정리를 확인했습니다. 아래 0.11.1 수치는 과거 결과입니다. 최신 범위는 [0.12.2](docs/VALIDATION-0.12.2.md).
 
 ![27-second simulated workflow](assets/demo/workflow.gif)
 
 <p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
 
-스크린샷은 v0.12.0의 모의 데이터입니다. v0.12.0은 Windows x64 포터블, Linux x86_64 AppImage, macOS 유니버설 DMG와 SHA-256 파일을 제공합니다. 패키지는 서명되지 않았고 macOS 공증도 없습니다. [검증 기록](docs/VALIDATION-0.12.0.md)을 확인하세요.
+스크린샷은 v0.12.0의 모의 데이터입니다. v0.12.0은 Windows x64 포터블, Linux x86_64 AppImage, macOS 유니버설 DMG와 SHA-256 파일을 제공합니다. 패키지는 서명되지 않았고 macOS 공증도 없습니다. [검증 기록](docs/VALIDATION-0.12.2.md)을 확인하세요.
 
 [Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -35,7 +39,7 @@ ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.1)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.2)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -60,7 +64,7 @@ npm run electron:dev
 - 직접 전송에는 양쪽 rsync와 원본에서 대상으로 연결 가능한 네트워크가 필요합니다. 임시 SSH 키와 신뢰한 지문을 사용하며, 불가능하면 단계적 SFTP 중계로 전환합니다. 바로 덮어쓰는 tar/scp 대체 경로는 비활성화되었습니다.
 - 안전한 OS 키 저장소가 있으면 비밀번호와 개인 키 암호를 암호화합니다. 없거나 Linux basic_text이면 새 비밀 정보는 세션 메모리에만 남고 재시작 후 다시 입력해야 합니다. 보안 설정은 실제 방식을 표시하며 개인 키는 기존 경로에 남습니다.
 
-[보안 설명](SECURITY.md)을 참고하세요. 크기/수정 시간 확인은 동시에 변경 중인 원본을 잠그지 않습니다. 실제 원격 서버 간 rsync는 아직 검증하지 않았습니다.
+크기와 수정 시간은 동시에 변경되는 원본을 잠그지 않습니다. [보안](SECURITY.md)을 참고하세요. 실제 서버 간 rsync와 충돌 후 정리는 격리된 테스트를 통과했습니다.
 
 ## 검증한 범위
 

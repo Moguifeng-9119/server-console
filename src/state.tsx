@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { AlertRecord, HistoryPoint, AuditEntry, Server, ServerConfig, SnapshotPayload, Toast } from './types';
 import { api, isElectron } from './api';
-import i18n from './i18n';
+import i18n, { initializationWarning } from './i18n';
 import { appendSample, normalizeHistory } from './history';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -124,6 +124,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback((id: number) => setToasts((prev) => prev.filter((item) => item.id !== id)), []);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const seq = useRef(1);
+  const languageWarningShown = useRef(false);
   const knownAlerts = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -176,6 +177,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => [...prev.slice(-1), { ...t, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500);
   }, []);
+
+  useEffect(() => {
+    if (initializationWarning && !languageWarningShown.current) {
+      languageWarningShown.current = true;
+      pushToast({ level: 'error', title: i18n.t('backend.error'), detail: initializationWarning });
+    }
+  }, [pushToast]);
 
   const refresh = useCallback(async () => {
     if (!api) return;

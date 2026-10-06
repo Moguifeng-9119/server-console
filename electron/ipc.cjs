@@ -108,7 +108,7 @@ function wrap(fn) {
 
 function getCfg(id) {
   const cfg = servers.find((s) => s.id === id);
-  if (!cfg) throw new Error('服务器不存在或已删除');
+  if (!cfg) throw new Error(lang.t('serverMissing'));
   return cfg;
 }
 async function getConn(id) {
@@ -121,10 +121,10 @@ function validateServerCfg(cfg) {
   const username = String(cfg.username || '').trim();
   const port = Math.floor(Number(cfg.port) || 22);
   const authType = cfg.authType === 'key' ? 'key' : 'password';
-  if (!host) throw new Error('主机地址不能为空');
-  if (!username) throw new Error('用户名不能为空');
-  if (port < 1 || port > 65535) throw new Error('端口必须是 1-65535 的整数');
-  if (authType === 'key' && !String(cfg.keyPath || '').trim()) throw new Error('私钥认证需要提供私钥文件路径');
+  if (!host) throw new Error(lang.t('hostRequired'));
+  if (!username) throw new Error(lang.t('userRequired'));
+  if (port < 1 || port > 65535) throw new Error(lang.t('portInvalid'));
+  if (authType === 'key' && !String(cfg.keyPath || '').trim()) throw new Error(lang.t('keyRequired'));
   return { host, username, port, authType };
 }
 
@@ -220,7 +220,7 @@ function registerIpc() {
 
   ipcMain.handle('servers:update', (_e, cfg) => {
     const i = servers.findIndex((s) => s.id === cfg.id);
-    if (i < 0) return { ok: false, error: '服务器不存在' };
+    if (i < 0) return { ok: false, error: lang.t('serverMissing') };
     try {
       const patch = { ...cfg };
       delete patch.id; // id 不可被覆盖
@@ -304,14 +304,14 @@ function registerIpc() {
   });
   ipcMain.handle('dialog:pickKey', async () => {
     const r = await dialog.showOpenDialog({
-      title: '选择私钥文件',
+      title: lang.t('chooseKey'),
       properties: ['openFile'],
-      filters: [{ name: '所有文件', extensions: ['*'] }],
+      filters: [{ name: lang.t('allFiles'), extensions: ['*'] }],
     });
     return r.canceled ? '' : r.filePaths[0];
   });
   ipcMain.handle('dialog:save', async (_e, arg) => {
-    const r = await dialog.showSaveDialog({ defaultPath: arg?.defaultPath, title: arg?.title || '下载到' });
+    const r = await dialog.showSaveDialog({ defaultPath: arg?.defaultPath, title: arg?.title || lang.t('download') });
     return r.canceled ? '' : r.filePath;
   });
 
@@ -351,7 +351,7 @@ function registerIpc() {
       const MAX = 512 * 1024;
       if (tail) {
         const { stdout } = await conn.exec(`tail -n 500 -- ${shq(p)}`, 15000);
-        if (stdout.includes('\x00')) throw new Error('疑似二进制文件，请下载后用本地程序打开');
+        if (stdout.includes('\x00')) throw new Error(lang.t('binary'));
         return { text: stdout, truncated: true, mode: 'tail' };
       }
       const st = await conn.statRemote(p);
@@ -362,7 +362,7 @@ function registerIpc() {
         stream.on('data', (d) => (buf += d.toString('utf8')));
         stream.on('end', () => {
           // 含 NUL 字节通常是二进制文件，不做文本预览
-          if (buf.includes('\x00')) return reject(new Error('疑似二进制文件，请下载后用本地程序打开'));
+          if (buf.includes('\x00')) return reject(new Error(lang.t('binary')));
           resolve(buf);
         });
         stream.on('error', reject);
@@ -425,7 +425,7 @@ function registerIpc() {
       else if (/\.zip$/i.test(p)) cmd = `cd ${shq(cwd)} && (unzip -o -- ${shq(p)} || (echo 'NO_UNZIP' && exit 1))`;
       else cmd = `cd ${shq(cwd)} && tar -xf ${shq(p)}`;
       const { stderr, stdout } = await conn.exec(cmd, 120000);
-      if (/NO_UNZIP/i.test(stderr + stdout)) throw new Error('远程未安装 unzip，无法解压 zip（tar.gz 可用）');
+      if (/NO_UNZIP/i.test(stderr + stdout)) throw new Error(lang.t('noUnzip'));
       if (stderr && /permission denied/i.test(stderr)) throw new Error(stderr);
       return { ok: true };
     }),
@@ -438,7 +438,7 @@ function registerIpc() {
       const conn = await getConn(id);
       const sftp = await conn.sftp();
       const numMode = typeof mode === 'number' ? mode : parseInt(String(mode), 8);
-      if (Number.isNaN(numMode)) throw new Error('无效的八进制权限格式（如 755 或 644）');
+      if (Number.isNaN(numMode)) throw new Error(lang.t('invalidConfig', { detail: 'Unix mode (755 / 644)' }));
       return new Promise((resolve, reject) => {
         sftp.chmod(p, numMode, (err) => {
           if (err) reject(err);
@@ -455,8 +455,8 @@ function registerIpc() {
     wrap(async ({ ids, cmd }) => {
       const runId = `pc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const command = String(cmd || '').trim();
-      if (!command) throw new Error('命令不能为空');
-      if (!ids.length) throw new Error('请至少选择一台服务器');
+      if (!command) throw new Error(lang.t('commandEmpty'));
+      if (!ids.length) throw new Error(lang.t('serverSelect'));
       const buf = new Map(); // serverId -> 待发送文本
       let remaining = ids.length;
       const flush = setInterval(() => {
@@ -493,7 +493,7 @@ function registerIpc() {
             if (res.stderr) buf.set(id, (buf.get(id) || '') + res.stderr);
             finishOne(id);
           } catch (e) {
-            buf.set(id, (buf.get(id) || '') + `[错误] ${e.message}\n`);
+            buf.set(id, (buf.get(id) || '') + `[${lang.t('error')}] ${e.message}\n`);
             finishOne(id);
           }
         })();
@@ -555,7 +555,7 @@ function registerIpc() {
       return { ok: true };
     }
     if (!url) return { ok: true };
-    const text = `【${payload?.title || '告警'}】${payload?.body || ''}`;
+    const text = `【${payload?.title || lang.t('alarm')}】${payload?.body || ''}`;
     let body;
     if (/qyapi\.weixin/.test(url)) body = { msgtype: 'text', text: { content: text } };
     else if (/oapi\.dingtalk/.test(url)) body = { msgtype: 'text', text: { content: text } };
@@ -669,7 +669,7 @@ function registerIpc() {
 
   // ============ 配置导出/导入（AES-256-GCM 口令加密） ============
   ipcMain.handle('config:export', wrap(async ({ passphrase }) => {
-    const r = await dialog.showSaveDialog({ title: '导出配置', defaultPath: 'serverconsole-config.json' });
+    const r = await dialog.showSaveDialog({ title: lang.t('export'), defaultPath: 'serverconsole-config.json' });
     if (r.canceled || !r.filePath) return '';
     const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
     const iv = nodeCrypto.randomBytes(12);
@@ -679,10 +679,10 @@ function registerIpc() {
     return r.filePath;
   }));
   ipcMain.handle('config:import', wrap(async ({ passphrase }) => {
-    const r = await dialog.showOpenDialog({ title: '导入配置', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
+    const r = await dialog.showOpenDialog({ title: lang.t('import'), properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (r.canceled || !r.filePaths[0]) return -1;
     const j = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
-    if (j.sc_export !== 1) throw new Error('不是 ServerConsole 导出文件');
+    if (j.sc_export !== 1) throw new Error(lang.t('invalidConfig', { detail: 'ServerConsole JSON' }));
     const key = nodeCrypto.createHash('sha256').update(String(passphrase || '')).digest();
     const iv = Buffer.from(j.iv, 'base64');
     const buf = Buffer.from(j.data, 'base64');
@@ -734,7 +734,7 @@ function registerIpc() {
   ipcMain.handle('forwardings:remove', wrap((id) => forwardings.remove(id)));
   ipcMain.handle('forwardings:start', wrap(async (id) => {
     const rule = forwardingList().find((r) => r.id === id);
-    if (!rule) throw new Error('转发规则不存在');
+    if (!rule) throw new Error(lang.t('serverMissing'));
     await forwardings.start(rule);
     return true;
   }));
@@ -875,13 +875,13 @@ function resolveJump(cfg) {
 const pendingInteractive = new Map();
 function handleInteractive({ name, prompts }) {
   const reqId = `ki_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-  broadcast('ssh:keyboard-interactive', { reqId, title: name || '服务器身份验证', prompts });
+  broadcast('ssh:keyboard-interactive', { reqId, title: name || lang.t('auth'), prompts });
   return new Promise((resolve, reject) => {
     pendingInteractive.set(reqId, { resolve });
     setTimeout(() => {
       if (pendingInteractive.has(reqId)) {
         pendingInteractive.delete(reqId);
-        reject(new Error('交互式认证等待超时'));
+        reject(new Error(lang.t('authTimeout')));
       }
     }, 120000);
   });

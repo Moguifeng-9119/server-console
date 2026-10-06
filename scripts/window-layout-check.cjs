@@ -111,6 +111,7 @@ async function nativeChecks() {
   const checks = [];
   const files = fs.readdirSync(path.join(root, 'electron')).filter((n) => n.endsWith('.cjs')).map((n) => 'electron/' + n);
   files.push('dist/index.html', ...fs.readdirSync(path.join(root, 'dist/assets')).map((n) => 'dist/assets/' + n));
+  files.push(...fs.readdirSync(path.join(root, 'src/i18n/locales')).map((n) => 'src/i18n/locales/' + n));
   const expected = files.map((file) => ({ file, sha256: crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex') }));
   const version = require('../package.json').version;
   try {
