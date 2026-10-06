@@ -1,0 +1,57 @@
+{
+  "version": "0.12.2",
+  "sourceAndAssetSHA256": "passed",
+  "scope": "Current packaged app, isolated data; real native window chrome; no remote server connections",
+  "checks": [
+    {
+      "label": "darwin en scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin en scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin de scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin de scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin fr scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin fr scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin ru scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin ru scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin pt-BR scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin pt-BR scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin zh-CN scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "darwin zh-CN scale=1 maximized=true",
+      "titlebarHeight": 0
+    }
+  ],
+  "packageRun": 37464929231,
+  "appCommit": "de46e81cd7e908bbcb5cf27da5b5716a3fdbee7a"
+}

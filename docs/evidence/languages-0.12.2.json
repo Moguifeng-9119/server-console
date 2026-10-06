@@ -1,0 +1,12 @@
+{
+  "version": "0.12.2",
+  "scope": "simulated IPC; production assets; controlled network failures",
+  "checks": [
+    "first start uses system language",
+    "main persisted language restores without local preference",
+    "invalid local preference does not erase valid main language",
+    "failed language switch retains current preference and shows error",
+    "startup locale failure keeps usable English and preserves saved preference",
+    "delayed language request cannot override a later English selection"
+  ]
+}

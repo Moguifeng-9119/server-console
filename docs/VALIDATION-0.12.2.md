@@ -11,10 +11,10 @@ This ledger separates local regression automation, real authorized servers and c
 | Two loopback SSH/SFTP smoke | Passed | Upload/download/tree/local relay exact bytes and queue/failure behavior; simulated server metrics |
 | Browser workbench | 22 checks | Production renderer with simulated IPC |
 | Browser workflow | 23 checks | Files, editor, relay and all locale switches; simulated IPC |
-| Locale loading failures and keyboard races | 6 passed | System/persisted preferences, failed lazy imports, preserved settings, visible fallback and real Home/Enter cancellation of a delayed request |
+| Locale loading failures and keyboard races | 6 passed | System/persisted preferences, failed lazy imports, preserved settings, visible fallback and native keyboard typeahead/Enter cancellation of a delayed request; [receipt](evidence/languages-0.12.2.json) |
 | Browser translated layout | 60 checks | Ten locales at three viewport sizes, drawers and dialogs |
-| Packaged native terminal | 16 checks | Current package/source/assets/catalog hashes; isolated loopback SSH, forwarding, restart, host trust, history and real Windows DPAPI |
-| Packaged Windows layout | 36 checks | Six representative locales, native controls, maximized windows and 100/125/150% display scaling |
+| Packaged native terminal | 16 passed | Current package/source/assets/catalog hashes; isolated loopback SSH, forwarding, restart, host trust, history and real Windows DPAPI; [receipt](evidence/native-0.12.2-windows-local.json) |
+| Packaged Windows layout | 36 passed | Six representative locales, native controls, maximized windows and 100/125/150% display scaling; [receipt](evidence/layout-0.12.2-windows-local.json) |
 
 ## Real server acceptance
 
@@ -26,9 +26,19 @@ A direct relay was then interrupted by forcing the entire main process to termin
 
 The live script verifies the inspected main executable and isolated userData before terminating its PID; on Windows the inspected main PID differed from Playwright's launcher PID. This was a whole-main-process test, distinct from the older transfer-subprocess test. It covers a bounded 16 MiB payload and two healthy trusted hosts, not every network failure or large-file scenario.
 
+Read-only production GPU collection also succeeded on both hosts: six and eight H100 PCIe cards, valid memory/utilization and CPU counters. Neither sample contained a naturally occurring multi-GPU PID; synthetic tests cover that mapping, but these samples do not validate it on real workloads. Local Windows NVIDIA output for an RTX 5070 Ti Laptop GPU passed the GPU CSV parser, including preserving unavailable fan readings as null. This local check does not validate Linux system collection on Windows. [Sanitized GPU receipt](evidence/gpu-0.12.2.json). No workloads were started.
+
 ## Cross-platform release
 
-Source and package workflow results, tested commits and public download digests are added after CI completes. Build scripts alone do not establish a published package.
+All three platforms passed [source CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37464925855) and [package/native CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37464929231), both at application commit `de46e81cd7e908bbcb5cf27da5b5716a3fdbee7a`. [Source receipt](evidence/source-ci-0.12.2.json) and [package receipt](evidence/packages-ci-0.12.2.json) record each job and completed checks.
+
+| Platform | Source | Packaged native checks | Credential scope |
+| --- | --- | --- | --- |
+| Windows x64 | 164 tests, lint/types, SFTP smoke, 22 workbench, 23 workflow, 60 layout and 6 language checks | 16 terminal/IPC + 36 layout; [receipt](evidence/native-0.12.2-windows-ci.json) | Real Windows DPAPI |
+| Linux x64 | Same source checks passed | 16 terminal/IPC + 12 native layout under Xvfb; [receipt](evidence/native-0.12.2-linux-ci.json) | Session-only when secure storage is unavailable; real secret-service unverified |
+| macOS arm64 | Same source checks passed, including native keyboard typeahead cancellation | Universal DMG built; 16 terminal/IPC + 12 native layout on arm64; [receipt](evidence/native-0.12.2-macos-ci.json) | Playwright MockKeychain, not real Keychain |
+
+These native packages compare backend sources, production assets and all ten catalogs with the runner's current source hashes. A later documentation-only release commit may contain these receipts; it does not change the tested application. Public asset and download verification is recorded after publication.
 
 ## Remaining limits
 

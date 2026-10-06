@@ -1,0 +1,70 @@
+{
+  "conclusion": "success",
+  "databaseId": 37464929231,
+  "headSha": "de46e81cd7e908bbcb5cf27da5b5716a3fdbee7a",
+  "jobs": [
+    {
+      "name": "package (ubuntu-latest, dist:linux)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Run npm test",
+        "Run npm run smoke",
+        "Run npm run dist:linux",
+        "Install Linux native runtime dependencies",
+        "Native package checks (Linux with virtual display)",
+        "Run actions/upload-artifact@v4",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "package (macos-latest, dist:mac)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Run npm test",
+        "Run npm run smoke",
+        "Run npm run dist:mac",
+        "Native package checks (Windows/macOS)",
+        "Run actions/upload-artifact@v4",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "package (windows-latest, dist:win:lite)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Run npm test",
+        "Run npm run smoke",
+        "Run npm run dist:win:lite",
+        "Native package checks (Windows/macOS)",
+        "Run actions/upload-artifact@v4",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/Moguifeng-9119/server-console/actions/runs/37464929231"
+}

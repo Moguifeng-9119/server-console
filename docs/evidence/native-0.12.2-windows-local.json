@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-06T12:29:06.254Z",
+  "platform": "win32",
+  "arch": "x64",
+  "version": "0.12.2",
+  "storage": {
+    "encryptionAvailable": true,
+    "backend": "os",
+    "mode": "encrypted",
+    "migrationError": ""
+  },
+  "encryptionEvidence": "native Windows DPAPI",
+  "historyTimersPaused": true,
+  "scope": "Native Electron package + real IPC + authenticated loopback SSH + local shell/forwarding, storage policy and restart; simulated GPU metrics.",
+  "checks": [
+    "current packaged version launches",
+    "packaged code and assets match source SHA-256",
+    "sandboxed preload bridge available",
+    "Windows DPAPI encryption round-trip and encrypted credential record",
+    "failed config writes preserve the in-memory server list",
+    "SSH shell opens through native IPC",
+    "typed command executes and returns computed output",
+    "terminal content survives tab switch",
+    "two native SSH sessions coexist",
+    "terminal resize reaches the SSH server",
+    "native local forwarding carries exact bytes through SSH",
+    "stop closes active forwarding and remove clears the rule",
+    "native history persistence retains steady samples and gaps",
+    "restart restores configurations and credential policy with authenticated SSH",
+    "restart preserves host trust, TOFU settings and timestamped history",
+    "no uncaught renderer errors"
+  ]
+}

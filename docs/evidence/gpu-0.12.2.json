@@ -1,0 +1,31 @@
+{
+  "version": "0.12.2",
+  "at": "2026-10-06T12:34:44.273Z",
+  "scope": "Read-only production collector on two trusted Linux hosts; real local Windows NVIDIA CSV through GPU parser only, no Windows system metrics or workloads",
+  "local": [
+    {
+      "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+      "memTotalMiB": 12227,
+      "unavailableFanPreserved": true
+    }
+  ],
+  "remote": [
+    {
+      "cards": 6,
+      "models": [
+        "NVIDIA H100 PCIe"
+      ],
+      "multiGpuPids": 0,
+      "cpuCountersParsed": true
+    },
+    {
+      "cards": 8,
+      "models": [
+        "NVIDIA H100 PCIe"
+      ],
+      "multiGpuPids": 0,
+      "cpuCountersParsed": true
+    }
+  ],
+  "result": "passed"
+}

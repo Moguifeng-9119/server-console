@@ -1,0 +1,57 @@
+{
+  "version": "0.12.2",
+  "sourceAndAssetSHA256": "passed",
+  "scope": "Current packaged app, isolated data; real native window chrome; no remote server connections",
+  "checks": [
+    {
+      "label": "linux en scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux en scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux de scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux de scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux fr scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux fr scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux ru scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux ru scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux pt-BR scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux pt-BR scale=1 maximized=true",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux zh-CN scale=1 maximized=false",
+      "titlebarHeight": 0
+    },
+    {
+      "label": "linux zh-CN scale=1 maximized=true",
+      "titlebarHeight": 0
+    }
+  ],
+  "packageRun": 37464929231,
+  "appCommit": "de46e81cd7e908bbcb5cf27da5b5716a3fdbee7a"
+}
