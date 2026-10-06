@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-06T07:31:27.134Z",
+  "scope": "Read-only real Linux SSH collector CPU comparison and SSH PTY; no workload or remote files created",
+  "pty": {
+    "computedShellOutput": "passed",
+    "resizeRows": 32,
+    "resizeCols": 96,
+    "sttySize": "32 96",
+    "scope": "Application Connection/ssh2 shell transport, same PTY options as terminal IPC; not a packaged UI test"
+  },
+  "cpu": {
+    "appPercent": [
+      1,
+      1,
+      1
+    ],
+    "vmstatBusyPercentExcludingIowait": [
+      1,
+      1,
+      1
+    ],
+    "meanDifferencePercentagePoints": 0,
+    "tolerancePercentagePoints": 3,
+    "result": "passed",
+    "scope": "Three nearby one-second samples, approximate window alignment and rounded whole-machine CPU; not container quota validation or an exact same-timestamp comparison"
+  }
+}

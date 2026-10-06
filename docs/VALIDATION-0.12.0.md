@@ -23,7 +23,7 @@ The final automated workflow additionally checks all ten languages on initial lo
 
 User-authorized existing SSH alias, existing OpenSSH known_hosts fingerprint, and a newly generated dedicated test directory. No passwords, key contents, endpoints or home paths are published. [Sanitized receipt](evidence/remote-acceptance-0.12.0.json).
 
-- The application SSH collector detected six NVIDIA H100 PCIe GPUs. Two samples also returned a finite CPU percentage; comparison against independent Linux tooling remains pending.
+- The application SSH collector detected six NVIDIA H100 PCIe GPUs. A follow-up read-only check compared three nearby one-second collector CPU samples with independent `LC_ALL=C vmstat 1 4` samples: both reported `[1, 1, 1]` percent. This is approximate window alignment for rounded whole-machine CPU, not exact same-timestamp or container-quota validation.
 - A random 16 MiB upload and subsequent download matched final SHA-256 digests.
 - A child transfer process was forcibly terminated. A new manager recovered the task and actual 2 MiB remote stage, showed full-prefix verification progress, resumed and matched the original SHA-256.
 - A committed cleanup intent survived manager restart and removed the actual owned remote stage. No staging files remained in the dedicated directory; generated test files and directory were cleaned up.
@@ -33,6 +33,8 @@ This kills the transfer subprocess, not the entire packaged Electron process. It
 The second authorized Docker alias closed all three connection attempts. Cross-server real rsync, source-to-destination connectivity failure and remote temporary-key cleanup under an interrupted direct transfer remain unverified. The local SFTP relay fallback has byte-level protocol regressions.
 
 The user’s RTX 5070 Ti Laptop GPU was confirmed with local nvidia-smi. This read-only observation does not establish Windows local GPU collection by the app: the shipped collector targets Linux hosts over SSH. No GPU workload was started.
+
+The same read-only check opened a real SSH PTY through the application's `Connection` client with the terminal IPC's `xterm-256color` options. A harmless arithmetic command returned the computed result `323`; after `setWindow`, remote `stty size` returned `32 96`. The shell exited and the connection was closed. This verifies real shell transport and resizing, not the entire packaged terminal UI. No remote files or GPU workload were created. [CPU/PTY receipt](evidence/remote-readonly-0.12.0.json).
 
 ## Native packages and publication
 
@@ -50,7 +52,7 @@ The downloaded Windows CI portable executable also passed an [actual wrapper sta
 
 [v0.12.0 is published](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) and marked latest. The [manual draft publisher](https://github.com/Moguifeng-9119/server-console/actions/runs/37429136498) passed workflow/source/tag guards and uploaded the verified binaries. Windows asset naming was normalized before final publication so checksum entries match public filenames. All three packages and SHA256SUMS.txt were then downloaded in full from public links without a GitHub authentication header; recomputed SHA-256, byte counts and manifest names matched the CI files and GitHub asset digests. [Download receipt](evidence/release-downloads-0.12.0.json). [0.11.1 evidence](VALIDATION-0.11.1.md) remains historical.
 
-All packages remain unsigned. Playwright macOS automation uses MockKeychain; a passing result does not validate real Keychain. Universal packaging does not validate Intel macOS execution. Signing/notarization, installer/update, real Linux secret-service, remote PTY/MIG/NCCL and production fleet/network performance remain separate checks.
+All packages remain unsigned. Playwright macOS automation uses MockKeychain; a passing result does not validate real Keychain. Universal packaging does not validate Intel macOS execution. Signing/notarization, installer/update, real Linux secret-service, complete packaged remote-terminal workflows, MIG/NCCL and production fleet/network performance remain separate checks.
 
 ## Recovery boundaries
 
