@@ -67,7 +67,8 @@ jobs:
           gh run download "$PACKAGE_RUN" --pattern 'unsigned-desktop-*' --dir packages
           mapfile -t FILES < <(find packages -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) | sort)
           test "${#FILES[@]}" -eq 3
-          for FILE in "${FILES[@]}"; do cp "$FILE" upload/; done
+          # GitHub rewrites spaces in asset names; checksum names must match downloads.
+          for FILE in "${FILES[@]}"; do cp "$FILE" "upload/$(basename "$FILE" | tr ' ' '-')"; done
           cd upload
           test "$(find . -type f | wc -l)" -eq 3
           sha256sum *.exe *.dmg *.AppImage > SHA256SUMS.txt

@@ -40,7 +40,7 @@
 
 新增独立 stage-journal、transfer-staging、resume-verifier 模块，拆出归属、清理恢复与校验流。ESLint/Hooks 已配置并通过，恢复与语言契约新增回归，三系统 CI 增加文件/编辑/互传/语言工作流并保存回执。后端仍为 checkJs，没有声称全面 strict TypeScript 或全面拆分 IPC。
 
-一台授权 Docker 六张 H100 已实测采集；16 MiB 上传/下载 SHA-256、强杀恢复和真实 stage 清理通过。另一台 Docker 两次远端关闭连接，跨机 rsync、断网临时 SSH 密钥清理、真实网络吞吐待验。笔记本 5070 Ti Laptop 只读 nvidia-smi 确认；未新增 Windows 本机 GPU 监控。
+一台授权 Docker 六张 H100 已实测采集；16 MiB 上传/下载 SHA-256、强杀恢复和真实 stage 清理通过。另一台 Docker 三次远端关闭连接，跨机 rsync、断网临时 SSH 密钥清理、真实网络吞吐待验。笔记本 5070 Ti Laptop 只读 nvidia-smi 确认；未新增 Windows 本机 GPU 监控。
 
 发布/平台以 [验证记录](VALIDATION-0.12.0.md) 为准。未签名/未公证、Intel macOS 执行、真实 macOS/Linux 密钥库、安装器/更新器、远程 PTY、实际 10/30 主机性能仍有独立验收边界。
 

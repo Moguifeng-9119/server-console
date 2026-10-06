@@ -48,7 +48,7 @@ The local Windows unpacked build also passed [16 native checks](evidence/native-
 
 The downloaded Windows CI portable executable also passed an [actual wrapper startup check](evidence/portable-launch-0.12.0.json): isolated data, loopback CDP, working IPC bridge and visible v0.12.0. This is narrower than the 16 unpacked native checks.
 
-Published files and download verification are added after asset publication. [0.11.1 evidence](VALIDATION-0.11.1.md) remains historical.
+[v0.12.0 is published](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) and marked latest. The [manual draft publisher](https://github.com/Moguifeng-9119/server-console/actions/runs/37429136498) passed workflow/source/tag guards and uploaded the verified binaries. Windows asset naming was normalized before final publication so checksum entries match public filenames. All three packages and SHA256SUMS.txt were then downloaded in full from public links without a GitHub authentication header; recomputed SHA-256, byte counts and manifest names matched the CI files and GitHub asset digests. [Download receipt](evidence/release-downloads-0.12.0.json). [0.11.1 evidence](VALIDATION-0.11.1.md) remains historical.
 
 All packages remain unsigned. Playwright macOS automation uses MockKeychain; a passing result does not validate real Keychain. Universal packaging does not validate Intel macOS execution. Signing/notarization, installer/update, real Linux secret-service, remote PTY/MIG/NCCL and production fleet/network performance remain separate checks.
 

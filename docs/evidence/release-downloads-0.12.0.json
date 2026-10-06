@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-06T07:26:59.1000260Z",
+  "version": "0.12.0",
+  "releaseUrl": "https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0",
+  "publishedAt": "2026-10-06T07:23:52Z",
+  "releaseCommit": "b9cf287fd9f475830be40d2e54b62ef1252c0393",
+  "testedApplicationCommit": "6ff6603e6e3db2f972ff83ec40f3eb1835d80d8b",
+  "publisherRun": "https://github.com/Moguifeng-9119/server-console/actions/runs/37429136498",
+  "scope": "Full anonymous public Release downloads with curl; recomputed SHA-256, byte counts and manifest filenames checked against verified CI binaries and GitHub asset digests",
+  "assets": [
+    {
+      "name": "ServerConsole-0.12.0-universal.dmg",
+      "bytes": 233101229,
+      "sha256": "a687939389689361b0fbacc3a3a1fe0a631b6a50fc98380d3fdea58b24d7f808",
+      "url": "https://github.com/Moguifeng-9119/server-console/releases/download/v0.12.0/ServerConsole-0.12.0-universal.dmg",
+      "anonymousFullDownload": "passed",
+      "githubDigestMatches": true
+    },
+    {
+      "name": "ServerConsole-0.12.0.AppImage",
+      "bytes": 130959082,
+      "sha256": "7045d7aac8b3e1f7804979e451ca591ae664ea7923a42d3451b1559304c4bb7e",
+      "url": "https://github.com/Moguifeng-9119/server-console/releases/download/v0.12.0/ServerConsole-0.12.0.AppImage",
+      "anonymousFullDownload": "passed",
+      "githubDigestMatches": true
+    },
+    {
+      "name": "ServerConsole-0.12.0.exe",
+      "bytes": 106142918,
+      "sha256": "01127ed374a31b2f92758f75bd8c16fb6e3f24f0dad9046fb32ff437fd5ebf4a",
+      "url": "https://github.com/Moguifeng-9119/server-console/releases/download/v0.12.0/ServerConsole-0.12.0.exe",
+      "anonymousFullDownload": "passed",
+      "githubDigestMatches": true
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 288,
+      "sha256": "ffdbb8c077a603cb93547005ccd61accfdfd1ebe5b654afbaf02f78a37c84989",
+      "url": "https://github.com/Moguifeng-9119/server-console/releases/download/v0.12.0/SHA256SUMS.txt",
+      "anonymousFullDownload": "passed",
+      "githubDigestMatches": true
+    }
+  ]
+}

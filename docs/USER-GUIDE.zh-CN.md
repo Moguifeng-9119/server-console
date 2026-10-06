@@ -113,4 +113,4 @@ server-console/
 参阅 [架构](ARCHITECTURE.md)、[原问题逐项状态](ASSESSMENT-STATUS.zh-CN.md)、[安全边界](../SECURITY.md) 与 [发布验证](VALIDATION-0.12.0.md)。
 
 
-发布：手动 publish-artifacts 工作流接收同一应用提交的成功源码与打包 run ID，确认应用内容未变，只允许后续发布文档/媒体/工作流修改。它取回已验证附件、计算 SHA-256 并创建草稿，不覆盖现有 Release，也不自动转正式发布。触发前为对应标签准备 docs/RELEASE-v版本.md。
+发布：手动 `publish-artifacts` 工作流接收同一应用提交的成功源码与打包 run ID，确认应用内容未变，只允许后续发布文档/媒体/工作流修改。它取回已验证附件、统一附件文件名、计算 SHA-256 并创建草稿，不覆盖现有 Release，也不自动转正式发布。触发前为对应标签准备 `docs/RELEASE-v版本.md`。
