@@ -34,7 +34,7 @@ The second authorized Docker alias closed all three connection attempts. Cross-s
 
 The user’s RTX 5070 Ti Laptop GPU was confirmed with local nvidia-smi. This read-only observation does not establish Windows local GPU collection by the app: the shipped collector targets Linux hosts over SSH. No GPU workload was started.
 
-The same read-only check opened a real SSH PTY through the application's `Connection` client with the terminal IPC's `xterm-256color` options. A harmless arithmetic command returned the computed result `323`; after `setWindow`, remote `stty size` returned `32 96`. The shell exited and the connection was closed. This verifies real shell transport and resizing, not the entire packaged terminal UI. No remote files or GPU workload were created. [CPU/PTY receipt](evidence/remote-readonly-0.12.0.json).
+The same check opened a real SSH PTY through the application's `Connection` client with the terminal IPC's `xterm-256color` options. A harmless arithmetic command returned the computed result `323`; after `setWindow`, remote `stty size` returned `32 96`. The shell exited and the connection was closed. This verifies real shell transport and resizing, not the entire packaged terminal UI. Verification commands did not explicitly create/modify remote files or start a GPU workload; automatic system logging or shell-history writes were not checked. Both CPU implementations ultimately read `/proc/stat`, so vmstat is an independent tool cross-check rather than an independent ground truth. [CPU/PTY receipt](evidence/remote-readonly-0.12.0.json).
 
 ## Native packages and publication
 

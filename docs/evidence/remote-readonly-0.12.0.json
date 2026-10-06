@@ -1,6 +1,6 @@
 {
   "at": "2026-10-06T07:31:27.134Z",
-  "scope": "Read-only real Linux SSH collector CPU comparison and SSH PTY; no workload or remote files created",
+  "scope": "Real Linux SSH collector CPU tool cross-check and SSH PTY; verification commands did not explicitly create/modify remote files or start a GPU workload",
   "pty": {
     "computedShellOutput": "passed",
     "resizeRows": 32,
