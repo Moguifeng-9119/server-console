@@ -54,7 +54,11 @@ async function main() {
         await selector.selectOption('de');
         if (scenario.delayed) {
           assert.equal(await selector.inputValue(), 'de');
-          await selector.focus(); await selector.press('Home'); await selector.press('Enter');
+          await selector.focus();
+          const steps = await selector.evaluate((select) => Array.from(select.options).findIndex((option) => option.value === 'de'));
+          for (let step = 0; step < steps; step++) await selector.press('ArrowUp');
+          await selector.press('Enter');
+          assert.equal(await selector.inputValue(), 'en');
           await page.waitForTimeout(1800);
           assert.equal(await selector.inputValue(), 'en');
         }
