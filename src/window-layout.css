@@ -1,0 +1,76 @@
+/* The overlay height is zero in browsers and on platforms with a native title bar. */
+:root { --window-titlebar-height: env(titlebar-area-height, 0px); }
+.desktop-titlebar {
+  height: var(--window-titlebar-height);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-size: 12px;
+  -webkit-app-region: drag;
+}
+.desktop-titlebar span {
+  margin-left: env(titlebar-area-x, 0px);
+  padding-inline: 12px;
+  max-width: env(titlebar-area-width, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app { height: calc(100% - var(--window-titlebar-height)); }
+.mask, .td-root, .drawer { top: var(--window-titlebar-height); }
+.dialog { max-height: calc(100dvh - var(--window-titlebar-height) - 32px); }
+
+/* Flexible controls keep long translations inside their panel without hiding actions. */
+.topbar {
+  height: auto;
+  min-height: 50px;
+  flex-wrap: wrap;
+  padding: 8px var(--pad-page);
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+.topbar .title { min-width: 0; overflow-wrap: anywhere; }
+.topbar-search { flex: 1 1 160px; min-width: 40px; margin-inline: 0; }
+.topbar-search span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-search kbd { flex: none; }
+.topbar .btn, .transfer-entry, .demo-banner { max-width: 100%; overflow-wrap: anywhere; }
+.btn { max-width: 100%; overflow-wrap: anywhere; }
+.sidebar-foot .btn { flex: 1 1 auto; overflow-wrap: normal; }
+.seg { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.seg button { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.dialog h3, .dialog .body, .field, .settings-pane, .credential-status { min-width: 0; overflow-wrap: anywhere; }
+.dialog .foot { flex-wrap: wrap; }
+.field input:not([type=checkbox]):not([type=radio]), .field select { min-width: 0; max-width: 100%; }
+.help-list .e { flex-wrap: wrap; overflow-wrap: anywhere; }
+.help-list .e b { width: auto; max-width: 100%; }
+.threshold-label { min-width: 34px; }
+.tabs, .cfg-banner, .import-bar, .fm-toolbar, .fm-pane-head, .relay-col-head { flex-wrap: wrap; }
+.fm-toolbar input.mini { min-width: 0; flex-basis: 180px; }
+.fm-pane-wrap { min-width: 0; }
+.fm-pane-head .btn { flex: none; }
+.relay-tag { max-width: 100%; overflow-wrap: anywhere; }
+.resource-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.resource-actions button { min-width: 0; }
+.resource-kpis > div, .summary-cell, .summary-cell > div { min-width: 0; overflow-wrap: anywhere; }
+.workbench-heading > div { min-width: 0; }
+.mode-badge { max-width: 100%; white-space: normal; }
+.resource-footer { flex-wrap: wrap; }
+.td-drawer { width: min(100vw, max(65vw, 600px)); min-width: 0; }
+.td-header, .td-head-speed, .td-settings-line, .td-task-head, .td-row-actions { flex-wrap: wrap; }
+.td-title { min-width: 0; overflow-wrap: anywhere; }
+.td-head-btns { margin-left: auto; flex: none; }
+.td-seg { max-width: 100%; flex-wrap: wrap; }
+.td-seg button { min-width: 0; overflow-wrap: anywhere; }
+.td-conc, .td-chk { max-width: 100%; flex-wrap: wrap; }
+.td-detail-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.td-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.td-stats > div, .td-meter-top { flex-wrap: wrap; }
+.td-note, .td-stats b { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 1050px) {
+  .topbar-search { flex: 0 1 auto; }
+  .topbar-search kbd { display: none; }
+  .topbar-search { padding: 7px 10px; }
+}

@@ -219,6 +219,8 @@ export default function App() {
   };
 
   return (
+    <>
+    <div className="desktop-titlebar" aria-hidden="true"><span>ServerConsole</span></div>
     <div className="app" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <aside className="sidebar">
         <div className="brand">
@@ -251,13 +253,13 @@ export default function App() {
             : servers.map(renderServerItem)}
         </nav>
         <div className="sidebar-foot">
-          <button className="btn" style={{ flex: 1, paddingInline: 4 }} onClick={() => setImportOpen(true)}>
+          <button className="btn" style={{ paddingInline: 4 }} onClick={() => setImportOpen(true)}>
             {t('nav.import')}
           </button>
-          <button className="btn" style={{ flex: 1 }} onClick={() => setManagerOpen(true)}>
+          <button className="btn" onClick={() => setManagerOpen(true)}>
             {t('nav.servers')}
           </button>
-          <button className="btn" style={{ flex: 1 }} onClick={() => setSettingsOpen(true)}>
+          <button className="btn" onClick={() => setSettingsOpen(true)}>
             {t('nav.settings')}
           </button>
         </div>
@@ -427,5 +429,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </>
   );
 }

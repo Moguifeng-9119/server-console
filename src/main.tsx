@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import './i18n';
 import './styles.css';
 import './workbench.css';
+import './window-layout.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

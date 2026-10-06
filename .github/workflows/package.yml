@@ -43,7 +43,9 @@ jobs:
         if: always()
         with:
           name: native-validation-${{ matrix.os }}
-          path: test-artifacts/terminal
+          path: |
+            test-artifacts/terminal
+            test-artifacts/window-layout
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

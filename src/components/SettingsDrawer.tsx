@@ -152,7 +152,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
             {t('settings.thresholds', {...thresholds})}
           </label>
           <div className="row">
-            <span className="mono" style={{ width: 34, color: 'var(--warn)' }}>
+            <span className="mono threshold-label" style={{ color: 'var(--warn)' }}>
               {t('settings.yellow')}
             </span>
             <input
@@ -164,7 +164,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
             />
           </div>
           <div className="row">
-            <span className="mono" style={{ width: 34, color: 'var(--high)' }}>
+            <span className="mono threshold-label" style={{ color: 'var(--high)' }}>
               {t('settings.orange')}
             </span>
             <input
@@ -176,7 +176,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
             />
           </div>
           <div className="row">
-            <span className="mono" style={{ width: 34, color: 'var(--crit)' }}>
+            <span className="mono threshold-label" style={{ color: 'var(--crit)' }}>
               {t('settings.red')}
             </span>
             <input
@@ -440,7 +440,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           <label>{t('settings.about')}</label>
           <div className="body" style={{ color: 'var(--text-dim)' }}>
             <b>ServerConsole</b> <span className="num">v{__APP_VERSION__}</span> · {t('settings.aboutDesc')}
-            <div style={{ marginTop: 6, display: 'flex', gap: 12 }}>
+            <div className="row" style={{ marginTop: 6, gap: 12 }}>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console" target="_blank" rel="noreferrer">{t('workbench.repository')}</a>
               <a className="link" href="https://github.com/Moguifeng-9119/server-console/issues" target="_blank" rel="noreferrer">{t('workbench.feedback')}</a>
               <button
@@ -458,7 +458,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
                 {t('settings.checkUpdate')}
               </button>
             </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div className="row" style={{ marginTop: 8, gap: 6 }}>
               <input
                 className="mini"
                 style={{ flex: 1 }}

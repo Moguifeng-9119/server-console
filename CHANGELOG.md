@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1
+
+- Reserve a separate Windows title-bar band for native window controls, including settings, transfers and dialog overlays.
+- Adapt toolbars, segmented controls, settings rows and dialog actions to long translations and narrow windows.
+- Add geometry regressions for all ten languages and packaged native window checks, including Windows display scaling and maximized windows.
+
 ## 0.12.0 — 2026-10-06
 
 - Commit staging ownership before writes and cleanup intent before deletion; restore crash-orphaned tasks and retry exact owned cleanup on server reconnect. Preserve unknown legacy stages, corrupt journals and failed writes.
