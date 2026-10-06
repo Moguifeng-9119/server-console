@@ -158,6 +158,10 @@ export interface TransferItem {
   verification?: 'not-requested' | 'verified' | 'unavailable' | 'failed';
   resumable?: boolean;
   persistenceError?: string;
+  recoveryReason?: 'legacy-missing-inputs';
+  resumeCheck?: { bytes: number; total: number; files: number };
+  stagedCount?: number;
+  legacyStaging?: boolean;
 }
 
 export interface SshKeyCandidate {

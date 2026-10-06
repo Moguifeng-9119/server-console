@@ -2,6 +2,7 @@
 const EXECUTION_FIELDS = [
   'serverId', 'peerId', 'srcLocal', 'dstLocal', 'srcRemote', 'dstRemote',
   'direction', 'ignoreExisting', 'sourceVersion', 'stagedUploads', 'stagedDownloads',
+  'recoveryReason',
 ];
 
 function serializeTask(task, publicView) {
@@ -12,10 +13,24 @@ function serializeTask(task, publicView) {
 }
 
 function canResume(task) {
+  if (task.recoveryReason || task._wantCancel || task.status === 'canceled') return false;
   if (!task.serverId) return false;
   if (task.kind === 'upload') return !!(task.srcLocal && task.dstRemote);
   if (task.kind === 'download') return !!(task.srcRemote && task.dstLocal);
   return !!(task.peerId && task.srcRemote && task.dstRemote);
 }
 
-module.exports = { serializeTask, canResume };
+function migrateTask(task) {
+  const next = { ...task, speed: 0 };
+  if (['running', 'queued'].includes(next.status)) next.status = 'paused';
+  if (!canResume(next) && !['done', 'canceled'].includes(next.status)) {
+    next.recoveryReason = 'legacy-missing-inputs';
+    if (next.error === 'This older task has no recovery inputs. Start a new transfer from the file manager.') {
+      next.status = 'paused';
+      next.error = '';
+    }
+  }
+  return next;
+}
+
+module.exports = { serializeTask, canResume, migrateTask };

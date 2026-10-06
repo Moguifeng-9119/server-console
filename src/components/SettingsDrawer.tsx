@@ -135,7 +135,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         </section>}
-        {section === 'monitoring' && <section className="settings-pane" id="settings-monitoring" role="tabpanel" aria-labelledby="settings-tab-monitoring">
+        {section === 'monitoring' && <section className="settings-pane" id="settings-monitoring" aria-labelledby="settings-tab-monitoring">
         <div className="field">
           <label>{t('settings.refresh', { s: refreshMs / 1000 })}</label>
           <select className="mini" aria-label={t('settings.refresh')} value={refreshMs} onChange={(e) => setRefreshMs(Number(e.target.value))}>
@@ -242,7 +242,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         </section>}
-        {section === 'security' && <section className="settings-pane" id="settings-security" role="tabpanel" aria-labelledby="settings-tab-security">
+        {section === 'security' && <section className="settings-pane" id="settings-security" aria-labelledby="settings-tab-security">
         <div className="field">
           <label>{t('settings.security')}</label><CredentialStatus />
           <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -291,7 +291,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         </section>}
-        {section === 'workflow' && <section className="settings-pane" id="settings-workflow" role="tabpanel" aria-labelledby="settings-tab-workflow">
+        {section === 'workflow' && <section className="settings-pane" id="settings-workflow" aria-labelledby="settings-tab-workflow">
         <div className="field">
           <label>{t('settings.snippets')}</label>
           {snippets.map((sn, i) => (
@@ -411,7 +411,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         </section>}
-        {section === 'activity' && <section className="settings-pane" id="settings-activity" role="tabpanel" aria-labelledby="settings-tab-activity">
+        {section === 'activity' && <section className="settings-pane" id="settings-activity" aria-labelledby="settings-tab-activity">
         <div className="field">
           <label>{t('settings.audit')}</label>
           <div className="audit">

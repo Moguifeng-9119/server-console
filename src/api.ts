@@ -129,6 +129,7 @@ interface Api {
   transferResume: (id: string) => Promise<unknown>;
   transferRetry: (id: string) => Promise<unknown>;
   transferRemove: (id: string) => Promise<unknown>;
+  transferForgetLegacy: (id: string) => Promise<boolean>;
   transferClear: () => Promise<unknown>;
   transferPauseAll: () => Promise<unknown>;
   transferResumeAll: () => Promise<unknown>;

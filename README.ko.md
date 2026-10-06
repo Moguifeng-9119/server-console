@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU 작업 공간: 모의 데이터](assets/screenshots/workbench-en.png)
 
-스크린샷은 v0.11.0의 모의 데이터입니다. v0.11.1은 Windows x64 포터블, Linux x86_64 AppImage, macOS 유니버설 DMG와 SHA-256 파일을 제공합니다. 패키지는 서명되지 않았고 macOS 공증도 없습니다. [검증 기록](docs/VALIDATION-0.11.1.md)을 확인하세요.
+**0.12.0 변경 사항**
+
+작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 635개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
+
+현재 실제 검증: H100 6개가 있는 Linux 호스트에서 SSH/SFTP 복구를 확인했습니다. 두 번째 호스트에 연결할 수 없어 서버 간 실제 rsync는 미검증입니다. 아래 0.11.1 수치는 과거 결과입니다. [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+스크린샷은 v0.12.0의 모의 데이터입니다. v0.12.0은 Windows x64 포터블, Linux x86_64 AppImage, macOS 유니버설 DMG와 SHA-256 파일을 제공합니다. 패키지는 서명되지 않았고 macOS 공증도 없습니다. [검증 기록](docs/VALIDATION-0.12.0.md)을 확인하세요.
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## 어떤 작업을 위한 도구인가요?
 
@@ -23,7 +35,7 @@ ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -61,19 +73,21 @@ v0.11.1은 Windows, Linux, macOS 각각에서 타입 검사, 회귀 테스트 84
 React, TypeScript, Electron, Vite, ssh2의 정확한 버전은 [package.json](package.json)과 잠금 파일에 있습니다. 검사 명령:
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-SC_ELECTRON_PATH를 현재 압축 해제된 앱 실행 파일로 지정한 뒤 npm run e2e:terminal을 실행합니다. dist:win:lite, dist:win:nsis, dist:linux, dist:mac은 자동 공개를 끕니다. [패키지 CI](.github/workflows/package.yml)는 네이티브 검사 후 서명되지 않은 결과물을 업로드합니다. ESLint/Hooks lint는 설정하지 않았습니다.
+SC_ELECTRON_PATH를 현재 압축 해제된 앱 실행 파일로 지정한 뒤 npm run e2e:terminal을 실행합니다. dist:win:lite, dist:win:nsis, dist:linux, dist:mac은 자동 공개를 끕니다. [패키지 CI](.github/workflows/package.yml)는 네이티브 검사 후 서명되지 않은 결과물을 업로드합니다. ESLint 및 React-Hooks가 설정되어 있으며 CI에서 npm run lint를 실행합니다.
 
 ## 언어와 기여
 
-README 사용 설명은 10개 언어로 제공됩니다. 앱 UI 번역은 별도이며 아직 완성되지 않았습니다. 새 작업 공간은 영어와 중국어 간체를 우선 유지하고, 누락된 새 문자열은 영어로 표시하며 이전 화면에는 고정 중국어 문구가 남습니다. [번역 상태](docs/LOCALIZATION.md)를 확인하세요.
+README와 UI 리소스는 10개 언어를 지원하며 필요한 언어만 불러옵니다. 모든 문구의 원어민 검토는 아직 완료되지 않았습니다. [LOCALIZATION](docs/LOCALIZATION.md).
 
 [구조](docs/ARCHITECTURE.md) · [기여 안내](CONTRIBUTING.md) · [로드맵](docs/ROADMAP.md) · [변경 기록](CHANGELOG.md) · [MIT 라이선스](LICENSE)

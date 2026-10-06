@@ -155,7 +155,7 @@
     "backToList": "Back to list",
     "found": "{{n}} found (max 200)",
     "newRemoteDir": "New remote folder",
-    "relayBtn": "Server relay ⇄",
+    "relayBtn": "Server relay",
     "selectUploadWarn": "Select files/folders in the left local list first",
     "selectDownloadWarn": "Select files/folders in the right remote list first",
     "selectRelayWarn": "Select files/folders in the right remote list first",
@@ -194,7 +194,22 @@
     "cancel": "Cancel",
     "dragHint": "Drop to upload to {{dir}}",
     "termHint": "Double-click to enter · right-click for actions · drag files here to upload",
-    "procHint": "Right-click any process row for actions"
+    "procHint": "Right-click any process row for actions",
+    "sftpUnavailable": "Cannot connect to SFTP",
+    "readFail": "Read failed",
+    "uploadQueued": "{{n}} uploads queued",
+    "downloadQueued": "{{n}} downloads queued",
+    "searchFail": "Search failed",
+    "chmod": "Change permissions (chmod)",
+    "chmodTitle": "Permissions · {{name}}",
+    "chmodLabel": "Octal permissions (e.g. 755 or 644)",
+    "invalidMode": "Invalid permissions",
+    "invalidModeDetail": "Permissions must be octal digits (e.g. 755 or 644)",
+    "textUnavailable": "Cannot display as text; download to open locally",
+    "splitHint": "Resize panes with arrow keys or drag; Home resets to equal widths",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "nameLabel": "Name"
   },
   "transfer": {
     "center": "Transfer Center",
@@ -239,7 +254,7 @@
     "copied": "Copied",
     "recentFiles": "Recent files ({{done}}{{sep}}{{total}})",
     "recentFilesFilter": "Filter this task's recent files…",
-    "noPerFile": "No per-file records (rsync direct & local relay stream them live; scp fallback shows byte progress only)",
+    "noPerFile": "No per-file records for this task; see byte progress above.",
     "empty": "No transfer tasks",
     "foldFinished": "{{n}} done/canceled",
     "loadMore": "Load more ({{n}} left)",
@@ -263,7 +278,15 @@
     "moveDown": "Move down",
     "pickTip": "Select this task",
     "expand": "Expand task details",
-    "collapse": "Collapse task details"
+    "collapse": "Collapse task details",
+    "checkingPrefix": "Verifying saved prefix…",
+    "prefixProgress": "Verified {{checked}} / {{total}} · {{n}} files. You can pause or cancel.",
+    "legacyRecovery": "This task was saved by an older version without the inputs needed for safe recovery. Start a new transfer from the file manager.",
+    "stagingRetained": "{{n}} temporary files retained for resume. Remove the task to discard them.",
+    "cleanupPending": "{{n}} temporary files await cleanup. Cleanup retries when the original server reconnects.",
+    "removeStaged": "Remove this task and its temporary files",
+    "forgetLegacy": "Forget old record only",
+    "forgetLegacyConfirm": "Remove only this old task record? Unknown temporary files on the original server will be kept. Inspect and remove them manually if no longer needed."
   },
   "state": {
     "tempAlert": "GPU temperature high ({{name}})",
@@ -350,7 +373,8 @@
     "importing": "Importing…",
     "importDone": "Import finished: {{ok}} added{{fail}}",
     "importFailSuffix": ", {{n}} failed",
-    "chooseKey": "Choose key"
+    "chooseKey": "Choose key",
+    "ownIdentityFile": "Use each host’s IdentityFile"
   },
   "cfgBanner": {
     "added": "~/.ssh/config added {{n}} hosts",
@@ -454,7 +478,7 @@
   },
   "relay": {
     "title": "Server relay (pick source content on the left, target directory on the right)",
-    "body": "Data is relayed through this machine's memory, never written to disk here; both servers must be online. Click to select, double-click to enter.",
+    "body": "Attempts a direct server-to-server transfer, then falls back to an in-memory relay through this machine. The task shows the actual method.",
     "src": "Source",
     "dst": "Target",
     "selected": "{{n}} selected",
@@ -482,11 +506,15 @@
     "adding": "Queuing…",
     "cancel": "Cancel",
     "syncMode": "Skip existing target files (sync mode)",
-    "syncModeTitle": "rsync direct only; ignored for local relay or tar/scp",
+    "syncModeTitle": "rsync direct only; ignored for SFTP relay",
     "queuedToast": "Relay queued: → {{dst}}",
     "queuedDetail": "{{n}} items → {{dir}}",
     "relayFail": "Relay failed",
-    "addFail": "Failed to queue"
+    "addFail": "Failed to queue",
+    "readFail": "Could not read directory",
+    "enterAddress": "Press Enter to open this path",
+    "newFolderName": "New folder",
+    "selectSourceWarn": "Select source files or folders on the left first"
   },
   "parallel": {
     "targets": "Targets ({{a}}/{{b}} online):",
@@ -497,12 +525,13 @@
     "needServers": "Select at least one online server first",
     "needCmd": "Enter a command to execute",
     "cmdPh": "Command to run on all selected servers, e.g.: nvidia-smi --query-gpu=index,utilization.gpu --format=csv",
-    "emptyHint": "Enter a command and run; output is streamed per server in columns. Right-click can kill remote processes — be careful with destructive commands.",
+    "emptyHint": "Enter a command and run; output is streamed per server in columns.",
     "running": "Running",
     "done": "Finished",
     "copyOut": "Copy output",
     "noOut": "(no output)",
-    "ended": "Parallel command finished"
+    "ended": "Parallel command finished",
+    "startFail": "Failed to start command"
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -553,7 +582,9 @@
     "savedToast": "Saved to server",
     "saveFail": "Save failed",
     "copyAll": "Copy all",
-    "close": "Close"
+    "close": "Close",
+    "unsavedNote": "Save your changes or reload to discard them before closing.",
+    "discardConfirm": "Discard unsaved changes and reload?"
   },
   "main": {
     "transferDone": "Transfer finished: {{name}}",

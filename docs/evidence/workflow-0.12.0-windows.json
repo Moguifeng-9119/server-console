@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-06T06:58:20.223Z",
+  "version": "0.12.0",
+  "scope": "production renderer with explicitly simulated IPC",
+  "checks": [
+    "English file manager labels",
+    "dirty draft blocks keyboard and direct navigation",
+    "dirty close and Escape retain draft",
+    "declining reload preserves text",
+    "save locks editing, reload and navigation",
+    "saved text closes normally",
+    "file selection with keyboard",
+    "external modal prevents background file deletion",
+    "relay traps focus",
+    "folder input handles local Escape",
+    "pane resize with keyboard",
+    "prefix progress visible in collapsed task",
+    "workflow renderer has no uncaught errors",
+    "en loads, switches, persists after reload and translates files",
+    "zh-CN loads, switches, persists after reload and translates files",
+    "zh-TW loads, switches, persists after reload and translates files",
+    "ja loads, switches, persists after reload and translates files",
+    "ko loads, switches, persists after reload and translates files",
+    "es loads, switches, persists after reload and translates files",
+    "fr loads, switches, persists after reload and translates files",
+    "de loads, switches, persists after reload and translates files",
+    "ru loads, switches, persists after reload and translates files",
+    "pt-BR loads, switches, persists after reload and translates files"
+  ],
+  "errors": []
+}

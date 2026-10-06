@@ -11,7 +11,15 @@
 
 ![Resource workbench with per-card free memory and owners](assets/screenshots/workbench-en.png)
 
-*Screenshots show v0.11.0 with explicitly simulated metrics. [v0.11.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.11.1.md) for platform coverage.*
+*Screenshots show v0.12.0 with explicitly simulated metrics. [v0.12.0](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) provides Windows x64 portable, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.12.0.md) for platform coverage.*
+
+[Detailed usage, transfer decisions, recovery and source map (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
+
+**New in 0.12.0:** durable staging recovery/cleanup, visible SHA-256 prefix progress, legacy task explanations, keyboard file/relay controls, draft protection and complete ten-language key resources.
+
+![27-second workflow with explicitly simulated data](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated prefix verification progress" width="49%"></p>
 
 ## Why use it?
 
@@ -53,6 +61,8 @@ Set the minimum **free GiB per card**, choose a model or search an owner, then u
 
 ## Transfer integrity and credentials
 
+Staging ownership is committed before writes so crashes restore actionable tasks. Cleanup intent persists before unlink and retries after reconnect; unknown legacy stages are kept for manual inspection. Full SHA-256 prefix checking has separate progress but still reads both complete prefixes.
+
 - An arbitrary existing destination is never used as a resume prefix. Uploads, downloads and local relays use task-owned staging; complete SHA-256 prefix comparisons decide whether staged bytes can be resumed.
 - SFTP transfers check byte counts and source size/mtime before replacing the destination. Overlapping target paths are queued. Failures retain staging for retry; cancel/remove clean tracked staging. Cleanup failures retain the recovery record and report an error.
 - Optional MD5 verification runs **before replacement** for single-file uploads/downloads. The UI distinguishes verified, failed, unavailable and not requested. Directory/relay tasks do not claim MD5 verification.
@@ -64,23 +74,25 @@ Read [security behavior and limitations](SECURITY.md). Size/mtime checks do not 
 ## Development and evidence
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium  # if no supported local Chrome is available
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-Typecheck covers strict renderer TypeScript and Electron checkJs. Smoke tests use two loopback fake SSH servers with real SFTP transport. UI checks use the production renderer with simulated metrics. v0.11.1 passed source CI on Windows/Linux/macOS with 84 regression tests and 22 browser checks per platform. The package workflow passed 16 native checks per platform, including IPC, local SSH shell, resize, forwarding and authenticated restart; set SC_ELECTRON_PATH to the current unpacked app executable and run npm run e2e:terminal. Benchmarks use 10/30 synthetic loopback SSH sessions; they make no real-cluster performance or percentage-savings promise.
+Typecheck covers strict renderer TypeScript and backend checkJs; ESLint/Hooks passed. Current source has 106 regression tests. Loopback SSH/SFTP checks compare final bytes; production renderer checks cover the workbench, file/editor/relay and every locale’s load/switch/reload. One real Linux host with six H100 cards passed 16 MiB upload/download SHA-256, forced transfer-subprocess recovery and owned-stage cleanup. The second host is unreachable; real cross-server rsync remains pending. Platform/native receipts and credential limits are in the validation ledger. Benchmarks are 10/30 synthetic loopback sessions.
 
-The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.11.1.md) and [benchmark methodology](docs/BENCHMARKS.md). There is no current ESLint/Hooks lint result.
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.12.0.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
 
-Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The v0.11.1 three-platform builds and native checks passed. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
+Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The current platform/package results are recorded in the validation ledger. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
 
 ## Languages and contributing
 
-README usage guides are available in ten languages using the navigation at the top of each page. Application localization is separate. The selector retains English, 简体中文, 繁體中文, 日本語, 한국어, Español, Français, Deutsch, Русский and Português (Brasil). The redesigned workbench is maintained in English and Simplified Chinese; untranslated new strings fall back to English. Older screens still need translation work. See [localization status](docs/LOCALIZATION.md) and the [original assessment follow-up (Chinese)](docs/ASSESSMENT-STATUS.zh-CN.md).
+README usage guides have ten substantive language pages with shared navigation. The app’s ten locale files each contain 635 keys with matching interpolation, and older hardcoded business labels have been migrated. Non-English locales load on demand. Other languages include machine-assisted drafts; full native-speaker review remains pending. Remote command output and backend details retain their original language. See [localization status](docs/LOCALIZATION.md) and the [assessment follow-up](docs/ASSESSMENT-STATUS.zh-CN.md).
 
 [Contribution guide](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Roadmap](docs/ROADMAP.md) · [MIT License](LICENSE)

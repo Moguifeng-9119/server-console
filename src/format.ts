@@ -37,7 +37,7 @@ export function joinPosix(dir: string, name: string): string {
 
 export function fmtTime(ts: number | undefined): string {
   if (!ts) return '';
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+  return new Date(ts).toLocaleTimeString(activeLocale(), { hour12: false });
 }
 
 export function fmtDate(ts: number | undefined): string {
@@ -48,13 +48,18 @@ export function fmtDate(ts: number | undefined): string {
 }
 
 // 秒数 → 人类可读时长（1分20秒 / 1时03分 / 45秒）
-export function formatDuration(sec: number | undefined | null): string {
+function activeLocale(): string {
+  return typeof document !== 'undefined' ? document.documentElement.lang || 'en' : 'en';
+}
+
+export function formatDuration(sec: number | undefined | null, locale = activeLocale()): string {
   const s = Math.max(0, Math.floor(Number(sec) || 0));
-  if (s < 60) return `${s}秒`;
+  const unit = (n: number, name: string) => new Intl.NumberFormat(locale, { style: 'unit', unit: name, unitDisplay: 'narrow' }).format(n);
+  if (s < 60) return unit(s, 'second');
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}分${String(s % 60).padStart(2, '0')}秒`;
+  if (m < 60) return unit(m, 'minute') + ' ' + unit(s % 60, 'second');
   const h = Math.floor(m / 60);
-  return `${h}时${String(m % 60).padStart(2, '0')}分`;
+  return unit(h, 'hour') + ' ' + unit(m % 60, 'minute');
 }
 
 // 剩余时间：剩余字节 / 瞬时速度；总量未知返回 null（界面显示“总量统计中”）

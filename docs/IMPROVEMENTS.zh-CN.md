@@ -1,6 +1,6 @@
 # 0.11.0 项目改进记录
 
-这是历史记录。v0.11.1 已完成三系统打包与原生检查；截至 2026-10-06 的已修、部分完成和待验证项见[原评估逐项状态](ASSESSMENT-STATUS.zh-CN.md)，最新回执见[0.11.1 验证](VALIDATION-0.11.1.md)。
+这是历史记录。v0.11.1 已完成三系统打包与原生检查；截至 2026-10-06 的已修、部分完成和待验证项见[原评估逐项状态](ASSESSMENT-STATUS.zh-CN.md)，最新回执见[0.12.0 验证](VALIDATION-0.12.0.md)。
 
 这一轮围绕“找到合适 GPU 后直接开始 SSH 工作”调整产品体验，并修复会误导监控判断或损坏传输目标的具体问题。本记录对应 v0.11.0 源码与 Windows 便携版；发布入口见 [GitHub Release](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.0)。
 

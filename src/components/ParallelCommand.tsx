@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Square, Copy } from 'lucide-react';
 import { api } from '../api';
@@ -5,6 +6,7 @@ import { useStore } from '../state';
 
 // 多服务器并行命令：勾选 N 台 → 同一命令同时执行 → 分栏实时输出
 export function ParallelCommand() {
+  const { t } = useTranslation();
   const { servers, pushToast } = useStore();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [cmd, setCmd] = useState('nvidia-smi');
@@ -25,13 +27,13 @@ export function ParallelCommand() {
     });
     const offDone = api.onParallelDone(() => {
       setRunning(false);
-      pushToast({ level: 'info', title: '并行命令已结束' });
+      pushToast({ level: 'info', title: t('parallel.ended') });
     });
     return () => {
       offData();
       offDone();
     };
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   const online = useMemo(() => servers.filter((s) => s.status === 'online'), [servers]);
   const pickedOnline = useMemo(() => [...picked].filter((id) => online.some((s) => s.id === id)), [picked, online]);
@@ -47,18 +49,18 @@ export function ParallelCommand() {
   const run = async () => {
     if (!api) return;
     if (!pickedOnline.length) {
-      pushToast({ level: 'warn', title: '请先勾选至少一台在线服务器' });
+      pushToast({ level: 'warn', title: t('parallel.needServers') });
       return;
     }
     if (!cmd.trim()) {
-      pushToast({ level: 'warn', title: '请输入要执行的命令' });
+      pushToast({ level: 'warn', title: t('parallel.needCmd') });
       return;
     }
     outRef.current = {};
     setOut({});
     const r = await api.parallelRun(pickedOnline, cmd.trim());
     if (!r.ok) {
-      pushToast({ level: 'error', title: '启动失败', detail: r.error });
+      pushToast({ level: 'error', title: t('parallel.startFail'), detail: r.error });
       return;
     }
     setRunId(r.data || '');
@@ -76,21 +78,21 @@ export function ParallelCommand() {
   return (
     <div className="pc">
       <div className="pc-toolbar">
-        <span className="pc-label">目标（{pickedOnline.length}/{online.length} 在线）：</span>
+        <span className="pc-label">{t('parallel.targets', { a: pickedOnline.length, b: online.length })}</span>
         <button className="btn mini" onClick={() => setPicked(new Set(online.map((s) => s.id)))}>
-          全选在线
+          {t('parallel.selectAllOnline')}
         </button>
         <button className="btn mini" onClick={() => setPicked(new Set())}>
-          清空
+          {t('parallel.clear')}
         </button>
         <span style={{ flex: 1 }} />
         {running ? (
           <button className="btn danger" onClick={stop}>
-            <Square size={13} /> 停止
+            <Square size={13} /> {t('parallel.stop')}
           </button>
         ) : (
           <button className="btn primary" onClick={run} disabled={!api}>
-            <Play size={13} /> 运行
+            <Play size={13} /> {t('parallel.run')}
           </button>
         )}
       </div>
@@ -110,11 +112,11 @@ export function ParallelCommand() {
           value={cmd}
           onChange={(e) => setCmd(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && run()}
-          placeholder="在所有选中服务器上执行的命令，如：nvidia-smi --query-gpu=index,utilization.gpu --format=csv"
+          placeholder={t('parallel.cmdPh')}
         />
       </div>
       {entries.length === 0 ? (
-        <div className="pc-empty">输入命令并运行，输出会按服务器分栏实时显示。右键可结束远端进程——请谨慎执行破坏性命令。</div>
+        <div className="pc-empty">{t('parallel.emptyHint')}</div>
       ) : (
         <div className="pc-outputs" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
           {entries.map(([serverId, v]) => {
@@ -123,16 +125,16 @@ export function ParallelCommand() {
               <div key={serverId} className="pc-out">
                 <div className="pc-out-head">
                   <span>{s?.name || serverId}</span>
-                  <span className="pc-out-status">{v.done ? '已结束' : '运行中'}</span>
+                  <span className="pc-out-status">{v.done ? t('parallel.done') : t('parallel.running')}</span>
                   <button
                     className="btn mini"
-                    title="复制输出"
+                    title={t('parallel.copyOut')}
                     onClick={() => navigator.clipboard?.writeText(v.text)}
                   >
                     <Copy size={12} />
                   </button>
                 </div>
-                <pre className="pc-out-body mono">{v.text || '（无输出）'}</pre>
+                <pre className="pc-out-body mono">{v.text || t('parallel.noOut')}</pre>
               </div>
             );
           })}

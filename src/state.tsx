@@ -366,7 +366,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!api) return { ok: false, error: i18n.t('state.desktopOnly') };
     try {
       const res = await api.addServer(cfg);
-      if (!res?.ok) return { ok: false, error: res?.error || '主进程返回空结果' };
+      if (!res?.ok) return { ok: false, error: res?.error || i18n.t('workbench.noOutput') };
       setConfigs(await api.listServers());
       setDemo(false);
       return { ok: true, created: res.server };
@@ -382,7 +382,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const testServer = useCallback(async (cfg: NewServer) => {
-    if (!api) return { ok: false, error: '仅在桌面端可用' };
+    if (!api) return { ok: false, error: i18n.t('state.desktopOnly') };
     return api.testServer(cfg);
   }, []);
 
@@ -419,7 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         { id: seq.current++, time: nowTime(), server: s.name, action, target: `${pid} ${target.command.slice(0, 40)}`, result: 'ok' as const },
         ...prev,
       ].slice(0, 50));
-      pushToast({ level: 'info', title: `已发送 SIG${signal} → ${pid}`, detail: `${s.name} · ${target.user}` });
+      pushToast({ level: 'info', title: i18n.t('state.sigSent', { signal, pid }), detail: `${s.name} · ${target.user}` });
     },
     [servers, demo, pushToast, logAudit],
   );

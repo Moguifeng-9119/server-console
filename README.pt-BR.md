@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
+[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![Recursos GPU: dados simulados](assets/screenshots/workbench-en.png)
 
-As imagens mostram a v0.11.0 com dados simulados. A v0.11.1 oferece Windows x64 portátil, AppImage Linux x86_64 e DMG universal macOS com somas SHA-256. Os pacotes não são assinados; o macOS não tem notarização.
+**Novidades da 0.12.0**
+
+Registro persistente para recuperar e limpar arquivos temporários da tarefa; progresso SHA-256 visível e explicação de tarefas antigas. Foram adicionados controles de arquivos/retransmissão por teclado, proteção do texto não salvo e ESLint/Hooks. Os dez idiomas têm 635 chaves; falta a revisão nativa de todos os rascunhos auxiliados por tradução automática.
+
+Evidência atual: recuperação SSH/SFTP real em um servidor Linux com seis H100. O segundo servidor está inacessível; rsync real entre servidores continua pendente. Os números da 0.11.1 abaixo são históricos. [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+As imagens mostram a v0.12.0 com dados simulados. A v0.12.0 oferece Windows x64 portátil, AppImage Linux x86_64 e DMG universal macOS com somas SHA-256. Os pacotes não são assinados; o macOS não tem notarização.
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## Funcionalidades
 
@@ -61,19 +73,21 @@ Windows DPAPI foi testado de fato. macOS usa MockKeychain, sem validar Keychain 
 React, TypeScript, Electron, Vite e ssh2; versões exatas em [package.json](package.json) e no lockfile. Verificações:
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-Defina SC_ELECTRON_PATH com o executável atual desempacotado e rode npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux e dist:mac desativam publicação automática. O [CI de pacotes](.github/workflows/package.yml) valida antes do envio. ESLint/Hooks lint não está configurado.
+Defina SC_ELECTRON_PATH com o executável atual desempacotado e rode npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux e dist:mac desativam publicação automática. O [CI de pacotes](.github/workflows/package.yml) valida antes do envio. ESLint e React-Hooks estão configurados; npm run lint é executado na CI.
 
 ## Idiomas e contribuição
 
-Os guias README estão em dez idiomas. A interface ainda não está totalmente traduzida: o novo painel é mantido em inglês/chinês simplificado, textos novos sem tradução usam inglês e telas antigas contêm chinês fixo. Veja o [estado da tradução](docs/LOCALIZATION.md).
+README em dez idiomas; a interface tem dez arquivos completos de chaves, carregados sob demanda. A revisão nativa de todos os textos continua pendente. [LOCALIZATION](docs/LOCALIZATION.md).
 
 [Evidências](docs/VALIDATION-0.11.1.md) · [Metodologia](docs/BENCHMARKS.md) · [Arquitetura](docs/ARCHITECTURE.md) · [Contribuir](CONTRIBUTING.md) · [Roteiro](docs/ROADMAP.md) · [Alterações](CHANGELOG.md) · [Licença MIT](LICENSE)

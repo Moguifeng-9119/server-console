@@ -24,7 +24,7 @@ flowchart LR
 - `electron/ssh.cjs`: SSH handshake/retry, SFTP channel reuse, command collection and parsing. CPU busy uses `/proc/stat` deltas; process GPU associations retain arrays rather than overwriting a PID with its last card.
 - `electron/ipc.cjs`: app handlers, sampling dispatch and background-server cadence. Polling clears the in-progress flag in `finally`. It forwards collection timestamps even when percentages are unchanged.
 - `src/state.tsx`, `src/history.ts`, `src/resources.ts`: timestamped history, anomaly records, credential-free display state and single-card resource predicates. Demo IDs are separate from real history IDs; demo samples are not persisted as real observations.
-- `electron/transfer.cjs`, `safe-files.cjs`, `task-store.cjs`: queue/target locks, stream backpressure/cancellation, verified resume prefixes and recovery records. Public display fields and executable recovery inputs are serialized independently.
+- `electron/transfer.cjs`, `safe-files.cjs`, `task-store.cjs`: queue/target locks, cancellation, safe replacement and execution records. `stage-journal.cjs` commits ownership/cleanup intent before mutation; `transfer-staging.cjs` restores and cleans exact owned paths on reconnect; `resume-verifier.cjs` compares complete prefixes with slower-stream progress and cancellable readers. Display and execution inputs are serialized independently.
 - `electron/store.cjs`, `hostkeys.cjs`: OS-encrypted/session credential policy, validated migration, host trust and atomic security preferences.
 - `src/hooks/useDialogFocus.ts`: one modal stack drives visual layers and keyboard focus. `workbench.css` shares existing theme tokens and respects reduced motion.
 

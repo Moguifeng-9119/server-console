@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
@@ -195,11 +195,11 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
   const [active, setActive] = useState('');
   const autoCreated = useRef(false);
 
-  const refresh = () =>
+  const refresh = useCallback(() =>
     api?.terminalList().then((list) => {
       setSessions(list.filter((s) => s.serverId === serverId));
       setLoaded(true);
-    });
+    }), [serverId]);
 
   useEffect(() => {
     if (!api) return;
@@ -213,7 +213,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
       offSessions();
       offClosed();
     };
-  }, [serverId]);
+  }, [refresh]);
 
   const create = () => {
     if (!api) return;
@@ -253,16 +253,16 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
     <div className="term" style={{ display: visible ? 'flex' : 'none' }}>
       <div className="term-chips">
         {sessions.map((s, i) => (
-          <span
+          <div
             key={s.termId}
             className={`term-chip ${s.termId === active ? 'on' : ''}`}
-            onClick={() => setActive(s.termId)}
             title={t('terminal.switchHint')}
           >
-            {t('terminal.termN', { n: i + 1 })}
+            <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => setActive(s.termId)}>{t('terminal.termN', { n: i + 1 })}</button>
             <button
               className="term-chip-x"
               title={t('terminal.closeSession')}
+              aria-label={`${t('terminal.closeSession')} · ${t('terminal.termN', { n: i + 1 })}`}
               onClick={(e) => {
                 e.stopPropagation();
                 closeSession(s.termId);
@@ -270,7 +270,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             >
               <X size={11} />
             </button>
-          </span>
+          </div>
         ))}
         <button className="term-chip add" title={t('terminal.newSession')} onClick={create}>
           <Plus size={13} />

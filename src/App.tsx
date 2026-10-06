@@ -18,6 +18,7 @@ import { ParallelCommand } from './components/ParallelCommand';
 import { HistoryDialog } from './components/HistoryDialog';
 import { CommandPalette, type PaletteAction } from './components/CommandPalette';
 import { useTransfers } from './transfers';
+import type { SetStateAction } from 'react';
 
 type ServerTab = 'gpu' | 'proc' | 'files' | 'term';
 
@@ -45,7 +46,14 @@ export default function App() {
   const tClose = t('settings.close');
   const tf = useTransfers();
   const activeTransferCount = tf.runningCount + tf.queuedCount;
-  const [view, setView] = useState<{ kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab }>(loadView);
+  const [view, updateView] = useState<ReturnType<typeof loadView>>(loadView);
+  const setView = useCallback((next: SetStateAction<ReturnType<typeof loadView>>) => {
+    if (document.querySelector('[data-unsaved="true"]')) {
+      window.dispatchEvent(new Event('sc:blocked-navigation'));
+      return;
+    }
+    updateView(next);
+  }, []);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
@@ -66,7 +74,7 @@ export default function App() {
     if (serversReady && view.kind === 'server' && !servers.find((s) => s.id === view.id)) {
       setView({ kind: 'overview' });
     }
-  }, [serversReady, servers, view]);
+  }, [serversReady, servers, view, setView]);
 
   // 主进程在有活跃传输时拦截了关窗，这里弹确认框
   useEffect(() => {
@@ -93,6 +101,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        if (document.querySelector('[data-unsaved="true"]')) { window.dispatchEvent(new Event('sc:blocked-navigation')); return; }
         setPaletteOpen((v) => !v);
       }
     };
@@ -105,7 +114,7 @@ export default function App() {
       kind: 'server',
       id,
       tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : 'gpu'),
-    })), []);
+    })), [setView]);
 
   const quitRef = useRef<HTMLDivElement>(null);
   const kiRef = useRef<HTMLDivElement>(null);
@@ -122,7 +131,7 @@ export default function App() {
       { id: 'manager', label: t('palette.manageServers'), run: () => setManagerOpen(true) },
       { id: 'theme', label: t('palette.toggleTheme'), run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
     ],
-    [servers, openServer, setTheme, theme, t]
+    [servers, openServer, setView, setTheme, theme, t]
   );
 
   const current = view.kind === 'server' ? servers.find((s) => s.id === view.id) : undefined;

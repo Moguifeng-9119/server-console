@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../state';
@@ -9,6 +10,7 @@ type RemovedItem = ConfigChange['removed'][number];
 
 // 监听 ~/.ssh/config：新增给入口去导入；同名主机端口/密钥变更可一键更新；被移除只提醒、不自动删
 export function ConfigWatchBanner() {
+  const { t } = useTranslation();
   const { configs, refresh, pushToast } = useStore();
   const [added, setAdded] = useState<SshHostEntry[]>([]);
   const [changed, setChanged] = useState<ChangeItem[]>([]);
@@ -51,11 +53,11 @@ export function ConfigWatchBanner() {
       ...(item.keyPath ? { keyPath: item.keyPath } : {}), // config 未写密钥则保留原密钥
     });
     if (r?.ok) {
-      pushToast({ level: 'info', title: `已更新 ${cfg.name} 的连接信息` });
+      pushToast({ level: 'info', title: t('cfgBanner.updated', { name: cfg.name }) });
       setChanged((prev) => prev.filter((x) => x.alias !== item.alias));
       refresh();
     } else {
-      pushToast({ level: 'error', title: `更新 ${cfg.name} 失败`, detail: r?.error });
+      pushToast({ level: 'error', title: t('cfgBanner.updateFail', { name: cfg.name }), detail: r?.error });
     }
   };
 
@@ -70,29 +72,29 @@ export function ConfigWatchBanner() {
       <div className="cfg-banner">
         {added.length > 0 && (
           <span>
-            <b>~/.ssh/config</b> 新增 {added.length} 台主机
+            {t('cfgBanner.added', { n: added.length })}
           </span>
         )}
-        {changed.length > 0 && <span>{added.length > 0 ? '，' : ''}{changed.length} 台连接配置变更</span>}
+        {changed.length > 0 && <span>{added.length > 0 ? ' · ' : ''}{t('cfgBanner.changed', { n: changed.length })}</span>}
         {removed.length > 0 && (
-          <span title="不会自动删除程序里的服务器">
-            {added.length + changed.length > 0 ? '，' : ''}
-            {removed.length} 台已从 config 移除（本地保留）
+          <span title={t('cfgBanner.removedTip')}>
+            {added.length + changed.length > 0 ? ' · ' : ''}
+            {t('cfgBanner.removed', { n: removed.length })}
           </span>
         )}
         <span style={{ flex: 1 }} />
         {changed.map((c) => (
-          <button key={c.alias} className="btn mini" title={`端口 ${c.fromPort}→${c.toPort}`} onClick={() => applyChanged(c)}>
-            更新 {c.alias}
+          <button key={c.alias} className="btn mini" title={t('cfgBanner.portTip', { from: c.fromPort, to: c.toPort })} onClick={() => applyChanged(c)}>
+            {t('cfgBanner.update', { alias: c.alias })}
           </button>
         ))}
         {added.length > 0 && (
           <button className="btn primary mini" onClick={() => setShowImport(true)}>
-            去导入
+            {t('cfgBanner.goImport')}
           </button>
         )}
         <button className="btn mini" onClick={dismissAll}>
-          忽略
+          {t('cfgBanner.ignore')}
         </button>
       </div>
       {showImport && <ImportSshConfig preferAliases={added.map((a) => a.alias)} onClose={() => setShowImport(false)} />}

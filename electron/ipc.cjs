@@ -20,7 +20,6 @@ let ticking = false;
 let transfers = null;
 let forwardings = null;
 let configWatchPath = '';
-let lastConfigMtime = 0;
 let knownAliases = null; // 上次 config 的别名集合（null=尚未建立基线，首次不报删除）
 
 function broadcast(channel, payload) {
@@ -69,6 +68,7 @@ async function tick() {
 
       try {
         const snap = await conn.collect();
+        void transfers?.collectStaging({ serverId: cfg.id });
         const json = JSON.stringify(snap);
         if (lastSnapJson.get(cfg.id) === json) return; // 无变化不重发
         lastSnapJson.set(cfg.id, json);
@@ -173,7 +173,6 @@ function watchDefaultConfig() {
   const info = sshconfig.defaultInfo();
   if (!info.configExists) return;
   configWatchPath = info.configPath;
-  lastConfigMtime = 0;
   fs.watchFile(configWatchPath, { interval: 1000 }, () => inspectConfig(configWatchPath));
 }
 
@@ -583,11 +582,6 @@ function registerIpc() {
     if (t && t.attached) broadcast('terminal:data', { termId, data: s });
     else if (t) t.buf = (t.buf + s).slice(-TERMINAL_BUF_CAP);
   };
-  const termSessionsOf = (serverId) =>
-    [...terminals.entries()]
-      .filter(([, t]) => t.serverId === serverId)
-      .map(([termId, t]) => ({ termId, serverId, createdAt: t.createdAt }))
-      .sort((a, b) => a.createdAt - b.createdAt);
   const broadcastSessions = () => broadcast('terminal:sessions', [...terminals.entries()].map(([termId, t]) => ({ termId, serverId: t.serverId, createdAt: t.createdAt })));
 
   ipcMain.handle('terminal:open', wrap(async ({ id, cols, rows }) => {
@@ -712,6 +706,7 @@ function registerIpc() {
   // ============ 传输队列 ============
   transfers = new TransferManager({
     getConn,
+    endpointIdentity: (id, connection) => { const cfg = connection?.cfg || getCfg(id); return nodeCrypto.createHash('sha256').update(JSON.stringify([cfg.host, cfg.port || 22, cfg.username, cfg.proxyJump || ''])).digest('hex'); },
     storeFile: path.join(app.getPath('userData'), 'transfers.json'),
     knownHostsLine: hostkeys.knownHostsLine,
     notify: (t, isFail) => {
@@ -751,6 +746,7 @@ function registerIpc() {
   ipcMain.handle('transfer:resume', (_e, id) => transfers.resume(id, false));
   ipcMain.handle('transfer:retry', (_e, id) => transfers.resume(id, false)); // 重试=从断点续传，不删目标端文件
   ipcMain.handle('transfer:remove', (_e, id) => transfers.remove(id));
+  ipcMain.handle('transfer:forget-legacy', (_e, id) => transfers.forgetLegacy(id));
   ipcMain.handle('transfer:clear', () => transfers.clearFinished());
   ipcMain.handle('transfer:pause-all', () => transfers.pauseAll());
   ipcMain.handle('transfer:resume-all', () => transfers.resumeAll());

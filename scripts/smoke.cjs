@@ -42,17 +42,6 @@ function waitTask(tm, id, timeoutMs = 120000) {
 }
 let currentListener = null;
 
-// 对运行中任务的 pause/cancel 是异步中止（ABORT 需要传播），用轮询等状态收敛
-async function waitStatus(tm, id, statuses, timeoutMs = 15000) {
-  const start = Date.now();
-  for (;;) {
-    const t = tm.tasks.get(id);
-    if (t && statuses.includes(t.status)) return t;
-    if (Date.now() - start > timeoutMs) throw new Error(`任务 ${id} 未进入状态 ${statuses}（当前 ${t ? t.status : '缺失'}）`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
-
 async function readTree(root) {
   const out = {};
   const visit = async (dir) => {

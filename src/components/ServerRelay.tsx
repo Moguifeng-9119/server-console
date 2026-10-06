@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { ArrowRight, ArrowUp, CheckSquare, File as FileIcon, Folder, FolderPlus, Home, RefreshCw, Square } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
+import { ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { useStore } from '../state';
 import { useTransfers } from '../transfers';
@@ -37,6 +39,7 @@ function RemoteBrowser({
   onToggle: (e: FileEntry, abs: string) => void;
   onCwdChange: (cwd: string) => void;
 }) {
+  const { t } = useTranslation();
   const { pushToast } = useStore();
   const [cwd, setCwd] = useState('');
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -58,7 +61,7 @@ function RemoteBrowser({
       setEntries(sortEntries(r.data.entries));
       if (mode === 'dest') onCwdChange(r.data.path);
     } else {
-      setErr(r.error || '读取目录失败');
+      setErr(r.error || t('relay.readFail'));
     }
   };
 
@@ -96,27 +99,27 @@ function RemoteBrowser({
       setMkName('');
       load();
     } else {
-      pushToast({ level: 'error', title: '新建文件夹失败', detail: r.error });
+      pushToast({ level: 'error', title: t('relay.mkdirFail'), detail: r.error });
     }
   };
 
   if (!serverId) {
-    return <div className="rb-empty">请先在右侧选择目标服务器</div>;
+    return <div className="rb-empty">{t('relay.offline')}</div>;
   }
 
   return (
     <div className="rb">
       <div className="rb-bar">
-        <button className="btn mini" title="家目录" onClick={goHome}><Home size={13} /></button>
-        <button className="btn mini" title="上一级" onClick={goUp}><ArrowUp size={13} /></button>
-        <button className="btn mini" title="刷新" onClick={() => load()}><RefreshCw size={13} /></button>
-        <button className="btn mini" title="在当前目录新建文件夹" onClick={() => setMkName((v) => (v ? '' : '新建文件夹'))}><FolderPlus size={13} /></button>
+        <button className="btn mini" title={t('relay.goHome')} onClick={goHome}><Home size={13} /></button>
+        <button className="btn mini" title={t('relay.goUp')} onClick={goUp}><ArrowUp size={13} /></button>
+        <button className="btn mini" title={t('relay.reload')} onClick={() => load()}><RefreshCw size={13} /></button>
+        <button className="btn mini" title={t('relay.mkdirHere')} onClick={() => setMkName((v) => (v ? '' : t('relay.newFolderName')))}><FolderPlus size={13} /></button>
         <input
           className="mini mono rb-addr"
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && load(addr)}
-          title="回车跳转"
+          title={t('relay.enterAddress')}
         />
       </div>
       {mkName && (
@@ -125,21 +128,22 @@ function RemoteBrowser({
             className="mini mono"
             autoFocus
             value={mkName}
+            data-escape-local
             onChange={(e) => setMkName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') doMkdir();
-              if (e.key === 'Escape') setMkName('');
+              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMkName(''); }
             }}
-            placeholder="新文件夹名，回车确认"
+            placeholder={t('relay.mkPh')}
           />
-          <button className="btn mini primary" onClick={doMkdir}>确定</button>
-          <button className="btn mini" onClick={() => setMkName('')}>取消</button>
+          <button className="btn mini primary" onClick={doMkdir}>{t('relay.ok')}</button>
+          <button className="btn mini" onClick={() => setMkName('')}>{t('relay.cancelMk')}</button>
         </div>
       )}
       <div className="rb-list">
-        {loading && <div className="empty">加载中…</div>}
+        {loading && <div className="empty">{t('relay.dstLoading')}</div>}
         {!loading && err && <div className="empty" style={{ color: 'var(--crit)' }}>{err}</div>}
-        {!loading && !err && entries.length === 0 && <div className="empty">（空目录）</div>}
+        {!loading && !err && entries.length === 0 && <div className="empty">{t('relay.emptyDir')}</div>}
         {!loading &&
           !err &&
           entries.map((e) => {
@@ -155,17 +159,15 @@ function RemoteBrowser({
                   else enter(e);
                 }}
                 onDoubleClick={() => enter(e)}
-                title={dir ? '双击进入目录' : mode === 'source' ? '勾选以传输' : '目标为当前所在目录'}
+                title={dir ? t('relay.dblEnter') : mode === 'source' ? t('relay.clickSelect') : t('relay.dstIsTarget')}
               >
                 {mode === 'source' && (
-                  <span className="rb-check">
-                    {isSel ? <CheckSquare size={13} strokeWidth={1.8} /> : <Square size={13} strokeWidth={1.8} />}
-                  </span>
+                  <input type="checkbox" checked={isSel} aria-label={e.name} onClick={(event) => event.stopPropagation()} onChange={() => onToggle(e, abs)} />
                 )}
                 <span className={`rb-ic ${dir ? 'dir' : 'file'}`}>
                   {dir ? <Folder size={14} strokeWidth={1.8} /> : <FileIcon size={14} strokeWidth={1.8} />}
                 </span>
-                <span className="rb-name">{e.name}</span>
+                <button className="rb-name fm-inline" onClick={(event) => { event.stopPropagation(); if (dir) enter(e); else if (mode === 'source') onToggle(e, abs); }} disabled={!dir && mode === 'dest'}>{e.name}</button>
                 <span className="rb-size">{dir ? '—' : formatBytes(e.size)}</span>
                 <span className="rb-time mono">{fmtDate(e.mtime)}</span>
               </div>
@@ -189,6 +191,9 @@ export function RelayDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, ref, onClose);
   const { configs, servers, pushToast } = useStore();
   const tf = useTransfers();
   const statusOf = (id: string) => servers.find((s) => s.id === id)?.status ?? 'offline';
@@ -217,45 +222,45 @@ export function RelayDialog({
 
   const start = async () => {
     if (!items.length) {
-      pushToast({ level: 'warn', title: '请先在左侧勾选要传输的文件/文件夹' });
+      pushToast({ level: 'warn', title: t('relay.selectSourceWarn') });
       return;
     }
     if (!dstId) {
-      pushToast({ level: 'warn', title: '请选择目标服务器' });
+      pushToast({ level: 'warn', title: t('relay.needDst') });
       return;
     }
     if (dstOffline) {
-      pushToast({ level: 'warn', title: `目标「${dst?.name}」当前不在线` });
+      pushToast({ level: 'warn', title: t('relay.dstOffline', { name: dst?.name }) });
       return;
     }
     if (!dstCwd) {
-      pushToast({ level: 'warn', title: '目标目录尚未加载完成，请稍候' });
+      pushToast({ level: 'warn', title: t('relay.dstNotLoaded') });
       return;
     }
     setBusy(true);
     try {
       await tf.relay(selfId, dstId, items, dstCwd, selfName, dst?.name, ignoreExisting);
-      pushToast({ level: 'info', title: `已加入互传队列：→ ${dst?.name}`, detail: `${items.length} 项 → ${dstCwd}` });
+      pushToast({ level: 'info', title: t('relay.queuedToast', { dst: dst?.name }), detail: t('relay.queuedDetail', { n: items.length, dir: dstCwd }) });
       onDone();
     } catch (e) {
-      pushToast({ level: 'error', title: '互传失败', detail: e instanceof Error ? e.message : String(e) });
+      pushToast({ level: 'error', title: t('relay.relayFail'), detail: e instanceof Error ? e.message : String(e) });
       setBusy(false);
     }
   };
 
   return (
     <div className="mask" onClick={onClose}>
-      <div className="dialog relay-dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>服务器互传（左侧勾选内容，右侧选择落到哪个目录）</h3>
+      <div className="dialog relay-dialog" ref={ref} role="dialog" aria-modal="true" aria-label={t('relay.title')} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3>{t('relay.title')}</h3>
         <div className="body dim" style={{ marginBottom: 8, fontSize: 12 }}>
-          数据经本机内存中继、不在本机落盘；两台服务器都需在线。单击勾选/选择，双击目录进入。
+          {t('relay.body')}
         </div>
         <div className="relay-dual">
           <div className="relay-col">
             <div className="relay-col-head">
-              <span className="relay-tag">源</span>
+              <span className="relay-tag">{t('relay.src')}</span>
               <b>{selfName}</b>
-              <span className="relay-count">已选 {items.length} 项</span>
+              <span className="relay-count">{t('relay.selected', { n: items.length })}</span>
             </div>
             <RemoteBrowser
               serverId={selfId}
@@ -269,7 +274,7 @@ export function RelayDialog({
           <div className="relay-mid"><ArrowRight size={18} strokeWidth={2} /></div>
           <div className="relay-col">
             <div className="relay-col-head">
-              <span className="relay-tag">目标</span>
+              <span className="relay-tag">{t('relay.dst')}</span>
               <select
                 className="mini"
                 value={dstId}
@@ -280,7 +285,7 @@ export function RelayDialog({
               >
                 {targets.map((c) => (
                   <option key={c.id} value={c.id} disabled={statusOf(c.id) !== 'online'}>
-                    {c.name}（{c.username}@{c.host}）{statusOf(c.id) === 'online' ? '' : '· 离线'}
+                    {c.name}（{c.username}@{c.host}）{statusOf(c.id) === 'online' ? '' : ' · ' + t('overview.offline')}
                   </option>
                 ))}
               </select>
@@ -293,22 +298,22 @@ export function RelayDialog({
               onToggle={() => {}}
               onCwdChange={setDstCwd}
             />
-            <div className="relay-dest">将传到：<b className="mono">{dstCwd || '加载中…'}</b></div>
+            <div className="relay-dest">{t('relay.destIs')}<b className="mono">{dstCwd || t('relay.dstLoading')}</b></div>
           </div>
         </div>
         <div className="foot">
-          <label className="td-chk" style={{ marginRight: 'auto' }} title="仅 rsync 直传支持；经本机中继或 tar/scp 时忽略此项">
+          <label className="td-chk" style={{ marginRight: 'auto' }} title={t('relay.syncModeTitle')}>
             <input type="checkbox" checked={ignoreExisting} onChange={(e) => setIgnoreExisting(e.target.checked)} />
-            跳过目标已有文件（同步模式）
+            {t('relay.syncMode')}
           </label>
           <button
             className="btn primary"
             disabled={busy || !dstId || dstOffline || items.length === 0 || !dstCwd}
             onClick={start}
           >
-            {busy ? '加入中…' : `开始互传（${items.length} 项）`}
+            {busy ? t('relay.adding') : t('relay.start', { n: items.length })}
           </button>
-          <button className="btn" onClick={onClose}>取消</button>
+          <button className="btn" onClick={onClose}>{t('relay.cancelMk')}</button>
         </div>
       </div>
     </div>

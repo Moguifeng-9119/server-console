@@ -22,7 +22,10 @@ export function useDialogFocus(open: boolean, ref: RefObject<HTMLElement>, onClo
     (controls()[0] || node).focus();
     const keydown = (event: KeyboardEvent) => {
       if (stack[stack.length - 1] !== node) return;
-      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close.current(); return; }
+      if (event.key === 'Escape') {
+        if (event.target instanceof HTMLElement && event.target.closest('[data-escape-local]')) return;
+        event.preventDefault(); event.stopImmediatePropagation(); close.current(); return;
+      }
       if (event.key !== 'Tab') return;
       const items = controls();
       const first = items[0], last = items[items.length - 1];

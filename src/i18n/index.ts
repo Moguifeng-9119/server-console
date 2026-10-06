@@ -2,15 +2,7 @@ import i18n from 'i18next';
 import { api } from '../api';
 import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
-import zhCN from './locales/zh-CN.json';
-import zhTW from './locales/zh-TW.json';
-import ja from './locales/ja.json';
-import ko from './locales/ko.json';
-import es from './locales/es.json';
-import fr from './locales/fr.json';
-import de from './locales/de.json';
-import ru from './locales/ru.json';
-import ptBR from './locales/pt-BR.json';
+import type { BackendModule, ResourceKey } from 'i18next';
 
 // 支持的语言（name 用各语言的母语写法，供下拉选择）
 export const LANGUAGES: Array<{ code: string; name: string }> = [
@@ -57,24 +49,24 @@ export function saveLanguage(code: string) {
   void api?.setAppLanguage(code);
 }
 
-const resources = {
-  en: { translation: en },
-  'zh-CN': { translation: zhCN },
-  'zh-TW': { translation: zhTW },
-  ja: { translation: ja },
-  ko: { translation: ko },
-  es: { translation: es },
-  fr: { translation: fr },
-  de: { translation: de },
-  ru: { translation: ru },
-  'pt-BR': { translation: ptBR },
+const localeImports = import.meta.glob<ResourceKey>(['./locales/*.json', '!./locales/en.json'], { import: 'default' });
+const backend: BackendModule = {
+  type: 'backend',
+  init() {},
+  read(language, _namespace, callback) {
+    const read = localeImports['./locales/' + language + '.json'];
+    if (!read) { callback(new Error('Unknown locale: ' + language), false); return; }
+    read().then((data) => callback(null, data)).catch((error) => callback(error, false));
+  },
 };
 
 const lng = detectLanguage();
 document.documentElement.lang = lng;
 
-i18n.use(initReactI18next).init({
-  resources,
+i18n.use(backend).use(initReactI18next).init({
+  resources: { en: { translation: en } },
+  partialBundledLanguages: true,
+  load: 'currentOnly',
   lng,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },

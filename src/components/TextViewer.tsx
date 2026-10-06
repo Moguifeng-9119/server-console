@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
@@ -29,32 +30,47 @@ export function TextViewer({
   const [err, setErr] = useState('');
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const revision = useRef(0);
+  const requestClose = () => { if (dirty || saving) setErr(t('textViewer.unsavedNote')); else onClose(); };
+  useDialogFocus(true, ref, requestClose);
+  useEffect(() => {
+    const blocked = () => setErr(t('textViewer.unsavedNote'));
+    window.addEventListener('sc:blocked-navigation', blocked);
+    return () => window.removeEventListener('sc:blocked-navigation', blocked);
+  }, [t]);
 
   const editable = !tail && (size ?? 0) <= EDIT_MAX;
 
-  const load = (t: boolean) => {
+  const load = (readTail: boolean) => {
     if (!api) return;
+    const request = ++revision.current;
     setLoading(true);
     setErr('');
     setDirty(false);
-    api.sftpReadText(serverId, rp, t).then((r) => {
+    api.sftpReadText(serverId, rp, readTail).then((r) => {
+      if (request !== revision.current) return;
       setLoading(false);
       if (r.ok && r.data) {
         setText(r.data.text);
         setSaved(r.data.text);
-      } else setErr(r.error || '读取失败');
+      } else setErr(r.error || t('textViewer.readFail'));
     });
   };
 
   useEffect(() => {
+    const requests = revision;
     load(false);
+    return () => { requests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rp]);
+  }, [rp, serverId]);
 
   const save = async () => {
     if (!api) return;
+    const request = revision.current;
     setSaving(true);
     const r = await api.sftpWriteText(serverId, rp, text);
+    if (request !== revision.current) return;
     setSaving(false);
     if (r.ok) {
       setSaved(text);
@@ -66,18 +82,18 @@ export function TextViewer({
   };
 
   return (
-    <div className="mask" onClick={() => (dirty ? setErr('内容已修改，请先保存或刷新放弃') : onClose())}>
-      <div className="dialog viewer-dlg" style={{ width: 820 }} onClick={(e) => e.stopPropagation()}>
+    <div className="mask" onClick={requestClose}>
+      <div className="dialog viewer-dlg" ref={ref} data-unsaved={dirty || saving ? 'true' : undefined} role="dialog" aria-modal="true" aria-label={name} tabIndex={-1} style={{ width: 820 }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
           {size != null && <span className="tag">{formatBytes(size)}</span>}
-          {dirty && <span className="tag" style={{ color: 'var(--warn)' }}>未保存</span>}
+          {dirty && <span className="tag" style={{ color: 'var(--warn)' }}>{t('textViewer.unsaved')}</span>}
           <span style={{ flex: 1 }} />
           <div className="seg">
-            <button className={!tail ? 'on' : ''} onClick={() => { setTail(false); load(false); }}>
+            <button className={!tail ? 'on' : ''} disabled={saving} onClick={() => { if (dirty && !window.confirm(t('textViewer.discardConfirm'))) return; setTail(false); load(false); }}>
               {t('textViewer.head')}
             </button>
-            <button className={tail ? 'on' : ''} onClick={() => { setTail(true); load(true); }}>
+            <button className={tail ? 'on' : ''} disabled={saving} onClick={() => { if (dirty && !window.confirm(t('textViewer.discardConfirm'))) return; setTail(true); load(true); }}>
               {t('textViewer.last500')}
             </button>
           </div>
@@ -85,12 +101,14 @@ export function TextViewer({
         <div className="viewer-body">
           {loading ? (
             <div className="empty">{t('textViewer.reading')}</div>
-          ) : err ? (
+          ) : err && !dirty ? (
             <div className="empty" style={{ color: 'var(--crit)' }}>{err}</div>
           ) : editable ? (
             <textarea
               className="mono viewer-edit"
+              aria-label={name}
               value={text}
+              readOnly={saving}
               onChange={(e) => {
                 setText(e.target.value);
                 setDirty(e.target.value !== saved);
@@ -101,6 +119,7 @@ export function TextViewer({
             <pre className="mono">{text}</pre>
           )}
         </div>
+        {err && dirty && <div role="alert" className="body" style={{ color: 'var(--warn)' }}>{err}</div>}
         <div className="foot">
           {editable && (
             <button className="btn primary" disabled={!dirty || saving} onClick={save}>
@@ -110,7 +129,7 @@ export function TextViewer({
           <button className="btn" onClick={() => navigator.clipboard?.writeText(text)}>
             {t('textViewer.copyAll')}
           </button>
-          <button className="btn" onClick={onClose}>
+          <button className="btn" onClick={requestClose}>
             {t('textViewer.close')}
           </button>
         </div>

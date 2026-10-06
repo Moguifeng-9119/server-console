@@ -1,3 +1,4 @@
+import i18n from './i18n';
 import {
   createContext,
   useCallback,
@@ -146,7 +147,7 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     async (serverId: string, localPaths: string[], remoteDir: string, serverName?: string) => {
       if (!api) return 0;
       const r = await api.transferUpload(serverId, localPaths, remoteDir, serverName);
-      if (!r.ok) throw new Error(r.error || '加入上传队列失败');
+      if (!r.ok) throw new Error(r.error || i18n.t('files.uploadFail'));
       // 新任务由 transfer:update 增量广播加入，不再全量拉取列表
       return r.data?.length ?? 0;
     },
@@ -157,7 +158,7 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     async (serverId: string, sel: FileEntry[], localDir: string, serverName?: string) => {
       if (!api) return 0;
       const r = await api.transferDownload(serverId, sel, localDir, serverName);
-      if (!r.ok) throw new Error(r.error || '加入下载队列失败');
+      if (!r.ok) throw new Error(r.error || i18n.t('files.downloadFail'));
       return r.data?.length ?? 0;
     },
     [],
@@ -167,7 +168,7 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     async (srcId: string, dstId: string, sel: FileEntry[], dstDir: string, srcName?: string, dstName?: string, ignoreExisting?: boolean) => {
       if (!api) return 0;
       const r = await api.transferRelay(srcId, dstId, sel, dstDir, srcName, dstName, ignoreExisting);
-      if (!r.ok) throw new Error(r.error || '加入服务器互传队列失败');
+      if (!r.ok) throw new Error(r.error || i18n.t('transfer.error'));
       return r.data?.length ?? 0;
     },
     [],

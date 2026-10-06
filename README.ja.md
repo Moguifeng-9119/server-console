@@ -4,11 +4,23 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
 
 ![GPU リソース画面：模擬データ](assets/screenshots/workbench-en.png)
 
-画像は v0.11.0 の模擬データです。v0.11.1 は Windows x64 ポータブル版、Linux x86_64 AppImage、macOS ユニバーサル DMG と SHA-256 ファイルを提供します。パッケージは未署名、macOS は未公証です。[検証記録](docs/VALIDATION-0.11.1.md)に対象範囲を示しています。
+**0.12.0 の更新**
+
+タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 635 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
+
+現在の実測：6 枚の H100 を持つ Linux ホストで SSH/SFTP 復元を確認。2 台目は接続できず、実サーバー間 rsync は未検証です。以下の 0.11.1 の件数は過去の結果です。 [0.12.0](docs/VALIDATION-0.12.0.md).
+
+![27-second simulated workflow](assets/demo/workflow.gif)
+
+<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+
+画像は v0.12.0 の模擬データです。v0.12.0 は Windows x64 ポータブル版、Linux x86_64 AppImage、macOS ユニバーサル DMG と SHA-256 ファイルを提供します。パッケージは未署名、macOS は未公証です。[検証記録](docs/VALIDATION-0.12.0.md)に対象範囲を示しています。
+
+[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
 ## できること
 
@@ -23,7 +35,7 @@ ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向け
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.11.1)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.0)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -61,19 +73,21 @@ v0.11.1 は Windows・Linux・macOS でそれぞれ型検査、84 件の回帰�
 React、TypeScript、Electron、Vite、ssh2 の正確な版は [package.json](package.json)とロックファイルに記載しています。検査コマンド：
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run smoke
 npm run build
 npx playwright-core install chromium
 npm run test:ui
+npm run test:workflow
 npm run benchmark
 ```
 
-SC_ELECTRON_PATH に現在の展開済み実行ファイルを指定し、npm run e2e:terminal で検査できます。dist:win:lite、dist:win:nsis、dist:linux、dist:mac は自動公開を無効にしています。[パッケージ CI](.github/workflows/package.yml)はネイティブ検査後に未署名の成果物をアップロードします。ESLint/Hooks lint は未設定です。
+SC_ELECTRON_PATH に現在の展開済み実行ファイルを指定し、npm run e2e:terminal で検査できます。dist:win:lite、dist:win:nsis、dist:linux、dist:mac は自動公開を無効にしています。[パッケージ CI](.github/workflows/package.yml)はネイティブ検査後に未署名の成果物をアップロードします。ESLint と React-Hooks を設定済みです。CI で npm run lint を実行します。
 
 ## 言語と貢献
 
-README の利用ガイドは 10 言語に対応しています。アプリ画面の翻訳は別で、新画面は英語と簡体字中国語を中心に保守しています。未翻訳の新しい文言は英語にフォールバックし、古い画面には中国語の固定文字列が残ります。[翻訳状況](docs/LOCALIZATION.md)を参照してください。
+README は 10 言語。画面も 10 言語のキーを揃え、必要な言語だけ読み込みます。すべての文章の母語話者による確認は未完了です。 [LOCALIZATION](docs/LOCALIZATION.md).
 
 [構成](docs/ARCHITECTURE.md) · [貢献ガイド](CONTRIBUTING.md) · [ロードマップ](docs/ROADMAP.md) · [変更履歴](CHANGELOG.md) · [MIT ライセンス](LICENSE)

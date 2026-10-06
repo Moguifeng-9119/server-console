@@ -31,6 +31,9 @@ jobs:
       - name: 单元测试
         run: npm test
 
+      - name: ESLint and Hooks checks
+        run: npm run lint
+
       - name: e2e 冒烟（双假服务器，真实 SFTP）
         run: npm run smoke
 
@@ -43,9 +46,14 @@ jobs:
       - name: Production renderer smoke (simulated metrics)
         run: npm run test:ui
 
+      - name: File, editor, relay and resume workflow checks
+        run: npm run test:workflow
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: renderer-checks-${{ matrix.os }}
-          path: test-artifacts/ui
+          path: |
+            test-artifacts/ui
+            test-artifacts/workflow
           if-no-files-found: ignore
