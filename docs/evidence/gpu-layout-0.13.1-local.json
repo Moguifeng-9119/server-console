@@ -1,6 +1,6 @@
 {
   "version": "0.13.1",
-  "scope": "Production browser renderer with explicitly simulated GPU snapshots; 1/2/3/4/8 GPUs, three widths, light/dark",
+  "scope": "Production browser renderer with explicitly simulated GPU snapshots; 1/2/3/4/8 GPUs, four widths, light/dark",
   "checks": [
     {
       "gpuCount": 1,
@@ -22,6 +22,24 @@
     },
     {
       "gpuCount": 1,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
       "width": 1280,
       "theme": "light",
       "columns": [
@@ -72,6 +90,24 @@
       "columns": [
         2,
         2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
       ]
     },
     {
@@ -126,6 +162,24 @@
       "columns": [
         2,
         2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
       ]
     },
     {
@@ -180,6 +234,24 @@
       "columns": [
         2,
         2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
       ]
     },
     {
@@ -234,6 +306,24 @@
       "columns": [
         2,
         2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
       ]
     },
     {

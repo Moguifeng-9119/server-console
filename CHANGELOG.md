@@ -4,7 +4,7 @@
 
 - Use two GPU gauge columns by default and four in sufficiently wide server cards; never auto-fit odd column counts.
 - Remove large filled GPU tiles, normalize ring sizes and improve metric text spacing.
-- Validate 30 simulated GPU-count/window/theme combinations and existing monitoring interactions.
+- Validate 40 simulated GPU-count/window/theme combinations and existing monitoring interactions.
 
 Evidence: [0.13.1 validation ledger](docs/VALIDATION-0.13.1.md).
 
