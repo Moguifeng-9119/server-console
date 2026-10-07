@@ -6,6 +6,8 @@
 
 [下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
 
+**0.13.2 源码／本地安装包更新：**主页 GPU 固定每行 4 张，窄卡片缩小圆环和间距，仍保持四列。[本地验证](docs/VALIDATION-0.13.2.md)。
+
 **0.13.1：**主页逐卡圆形 GPU 仪表默认每行 2 个，宽卡片每行 4 个；切换服务器先显示缓存、后台独立刷新，保留已打开的文件面板。总览卡片和服务器页均有“历史监控”入口，可选 30 分钟、1 小时、半天、1 天、1 周。SQLite 自动清理超过 24 小时的原始采样和超过 30 天的分钟汇总；应用运行时持续采集。安装 `ServerConsole-Setup-0.13.1.exe`。[验证与存储实测](docs/VALIDATION-0.13.1.md)
 
 **Windows 下载包未签名，SmartScreen 可能显示警告。请使用 Release 附带的 SHA-256 文件核对下载内容。**

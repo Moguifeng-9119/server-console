@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.2 — 2026-10-07
+
+- Fix overview GPU grids to four columns at all supported widths.
+- Widen the preferred server card size; narrow cards shrink gauges and text spacing while retaining four columns.
+- Verify 40 browser layout cases and the local Windows installer payload.
+
+Local evidence: [0.13.2 validation ledger](docs/VALIDATION-0.13.2.md).
+
+
 ## 0.13.1 — 2026-10-07
 
 - Use two GPU gauge columns by default and four in sufficiently wide server cards; never auto-fit odd column counts.

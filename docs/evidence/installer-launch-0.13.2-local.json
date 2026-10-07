@@ -1,0 +1,12 @@
+{
+  "version": "0.13.2",
+  "gpuColumnRule": "Fixed 4 columns passed in local packaged window",
+  "historyWorkerQuery": "passed",
+  "scope": "Local build NSIS embedded payload extracted to owned temporary directory; executable, version and preload checked. No registry install or user upgrade performed.",
+  "installerBytes": 118730133,
+  "installerSha256": "da8a3a247c2646cb3192b1593221235e74c4cdded283119f8784670b78de87f5",
+  "payloadAsarSha256": "ef5fa1a5943fb87df37913b9cfc61788ccfc095794d8919af28415c66c4cc33b",
+  "startupToNavigationMs": [
+    2792
+  ]
+}

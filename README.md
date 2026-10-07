@@ -6,6 +6,8 @@
 
 [Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
+**0.13.2 source/local update:** Overview GPU grids now use four columns, including narrow cards. [Local validation](docs/VALIDATION-0.13.2.md).
+
 **0.13.1:** Circular per-GPU gauges, immediate cached server panels, retained file panes and visible history ranges: 30 minutes, 1 hour, 12 hours, 1 day and 1 week. SQLite automatically expires raw samples after 24 hours and minute summaries after 30 days. Monitoring runs while the desktop app is open. Install `ServerConsole-Setup-0.13.1.exe`. [Validation and storage measurement](docs/VALIDATION-0.13.1.md)
 
 **Windows downloads are unsigned. SmartScreen may show a warning. Compare the download SHA-256 with the release checksum file.**

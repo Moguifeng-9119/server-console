@@ -1,0 +1,367 @@
+{
+  "version": "0.13.2",
+  "scope": "Production browser renderer with explicitly simulated GPU snapshots; 1/2/3/4/8 GPUs, four widths, light/dark",
+  "checks": [
+    {
+      "gpuCount": 1,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 920,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 920,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        4,
+        4
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        4,
+        4
+      ]
+    }
+  ],
+  "errors": []
+}
