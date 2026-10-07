@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.3:** Windows 설치 프로그램을 제공합니다. 서버 전환 지연을 수정하고 터미널·서버·개요 간 전환에서도 세션, 기록, 백그라운드 출력을 유지합니다. `ServerConsole-Setup-0.12.3.exe`를 설치한 후 바탕 화면이나 시작 메뉴에서 실행하세요. [0.12.3](docs/VALIDATION-0.12.3.md)
+**0.13.0:** GPU별 원형 게이지, 캐시를 이용한 즉시 서버 전환, 유지되는 파일 화면과 쉽게 찾을 수 있는 모니터링 기록을 추가했습니다. 30분·1시간·12시간·1일·1주를 선택할 수 있습니다. SQLite는 원시 데이터를 24시간, 분 단위 요약을 30일 후 자동 정리합니다. 앱이 실행되는 동안 수집합니다. `ServerConsole-Setup-0.13.0.exe`를 설치하세요. [검증과 용량](docs/VALIDATION-0.13.0.md)
 
 **Windows 배포 파일은 서명되지 않았으며 SmartScreen 경고가 나타날 수 있습니다. Release의 SHA-256 파일과 비교하세요.**
 
@@ -14,7 +14,7 @@
 
 **0.12.0 변경 사항**
 
-작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 678개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
+작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 702개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
 
 0.12.2는 실제 Linux 서버 두 대에서 16 MiB 업로드와 rsync, 메인 프로세스 강제 종료 후 복구, 접두부 검증 진행률, 소유한 임시 키와 디렉터리 정리를 확인했습니다. 아래 0.11.1 수치는 과거 결과입니다. 최신 범위는 [0.12.2](docs/VALIDATION-0.12.2.md).
 
@@ -39,7 +39,7 @@ ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

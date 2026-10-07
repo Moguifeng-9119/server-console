@@ -1,0 +1,95 @@
+{
+  "scope": "Synthetic final retained seven-day state; production schema, indexes and retention. Process memory belongs to this standalone batch utility, not the entire desktop app.",
+  "measurements": [
+    {
+      "mode": "gpu",
+      "runtime": {
+        "node": "24.21.0",
+        "electron": "44.5.1",
+        "sqlite": "3.53.4"
+      },
+      "inputSamplesPerGpu": 302400,
+      "intervalMs": 2000,
+      "durationDays": 7,
+      "rawHours": 24,
+      "summaryRetentionDays": 30,
+      "metricsPerSample": 6,
+      "rawRows": 259200,
+      "minuteRows": 60480,
+      "pageSize": 4096,
+      "pages": 2895,
+      "freePages": 0,
+      "files": [
+        {
+          "kind": "database",
+          "bytes": 11857920
+        },
+        {
+          "kind": "-wal",
+          "bytes": 0
+        },
+        {
+          "kind": "-shm",
+          "bytes": 32768
+        }
+      ],
+      "diskBytes": 11890688,
+      "weekQueryPoints": 673,
+      "weekResponseBytes": 64656,
+      "memory": {
+        "baselineRss": 40087552,
+        "rssBeforeQuery": 146575360,
+        "rssAfterQuery": 148168704,
+        "retainedHeapDelta": 137424,
+        "queryHeapDelta": 3400108,
+        "peakBatchHeap": 57791308
+      },
+      "seconds": 23
+    },
+    {
+      "mode": "gpu-and-server",
+      "runtime": {
+        "node": "24.21.0",
+        "electron": "44.5.1",
+        "sqlite": "3.53.4"
+      },
+      "inputSamplesPerGpu": 302400,
+      "intervalMs": 2000,
+      "durationDays": 7,
+      "rawHours": 24,
+      "summaryRetentionDays": 30,
+      "metricsPerSample": 9,
+      "rawRows": 388800,
+      "minuteRows": 90720,
+      "pageSize": 4096,
+      "pages": 4260,
+      "freePages": 0,
+      "files": [
+        {
+          "kind": "database",
+          "bytes": 17448960
+        },
+        {
+          "kind": "-wal",
+          "bytes": 0
+        },
+        {
+          "kind": "-shm",
+          "bytes": 32768
+        }
+      ],
+      "diskBytes": 17481728,
+      "weekQueryPoints": 673,
+      "weekResponseBytes": 64813,
+      "memory": {
+        "baselineRss": 142450688,
+        "rssBeforeQuery": 147812352,
+        "rssAfterQuery": 148570112,
+        "retainedHeapDelta": 15448,
+        "queryHeapDelta": 3530752,
+        "peakBatchHeap": 76506512
+      },
+      "seconds": 40
+    }
+  ]
+}

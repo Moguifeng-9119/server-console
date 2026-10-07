@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0 — 2026-10-07
+
+- Independent per-host polling and immediate cached panels prevent a slow host from blocking navigation.
+- Retain visited file panes and reduce unrelated monitoring rerenders.
+- Replace overview GPU widgets with circular utilization gauges that open and highlight the selected GPU.
+- Expose history monitoring with five ranges from 30 minutes to one week, device/metric selectors, real timestamps and gaps.
+- Persist samples in a SQLite worker, automatically expire 24-hour raw data and 30-day minute summaries, reclaim pages and import legacy JSON once.
+- Add 15 backend regressions and eight monitoring UI checks; measure seven-day disk capacity using the production schema.
+
+Evidence: [0.13.0 validation ledger](docs/VALIDATION-0.13.0.md).
+
 ## 0.12.3 — 2026-10-07
 
 - Publish an assisted Windows NSIS installer as the primary Windows release download.

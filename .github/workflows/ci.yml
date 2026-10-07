@@ -57,6 +57,8 @@ jobs:
 
       - name: Responsive navigation and persistent terminal checks
         run: npm run test:navigation
+      - name: Monitoring history, rings and cached navigation checks
+        run: npm run test:monitor
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -68,4 +70,5 @@ jobs:
             test-artifacts/window-layout
             test-artifacts/languages
             test-artifacts/navigation
+            test-artifacts/monitor
           if-no-files-found: ignore

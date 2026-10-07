@@ -11,12 +11,13 @@ const audit = require('./audit.cjs');
 const hostkeys = require('./hostkeys.cjs');
 const { ForwardingManager } = require('./forwardings.cjs');
 const { TransferManager } = require('./transfer.cjs');
+const { HistoryStore } = require('./history-store.cjs');
+const { PollScheduler } = require('./poll-scheduler.cjs');
 
 const pool = new Pool();
 let servers = [];
-let timer = null;
 let intervalMs = 2000;
-let ticking = false;
+let historyStore = null;
 let transfers = null;
 let forwardings = null;
 let configWatchPath = '';
@@ -42,52 +43,35 @@ function logError(tag, e) {
 }
 
 const lastSnapJson = new Map(); // serverId -> 上次快照 JSON（增量广播：内容无变化不重发）
-const lastCollectTime = new Map(); // serverId -> 上次采集时间戳（用于后台节点降频调度）
-let activeServerId = null; // 当前前端聚焦的服务器 ID（null=在总览或其它页面，全量采集）
-
-async function tick() {
-  if (ticking) return;
-  ticking = true;
+async function collectServer(cfg) {
+  const conn = pool.get(cfg);
+  if (conn.isBackedOff()) return;
   try {
-  // 采集错峰：把各服务器的采集起点按索引摊开，避免同刻打满本机与对端
-  const stagger = Math.min(250, Math.floor((intervalMs * 0.8) / Math.max(1, servers.length)));
-  const now = Date.now();
-  const bgInterval = Math.max(intervalMs * 4, 8000);
-  await Promise.all(
-    servers.map(async (cfg, i) => {
-      await new Promise((r) => setTimeout(r, i * stagger));
-      const conn = pool.get(cfg);
-      if (conn.isBackedOff()) return; // 退避窗口内不重试也不重复广播
-
-      // 差异化调度：当前聚焦节点每轮必采；未聚焦的后台节点降频至 bgInterval（≥8s）探活，大幅降低机群网络与主进程负载
-      const isFocused = !activeServerId || cfg.id === activeServerId;
-      if (!isFocused && now - (lastCollectTime.get(cfg.id) || 0) < bgInterval) {
-        return;
-      }
-      lastCollectTime.set(cfg.id, now);
-
-      try {
-        const snap = await conn.collect();
-        void transfers?.collectStaging({ serverId: cfg.id });
-        const json = JSON.stringify(snap);
-        if (lastSnapJson.get(cfg.id) === json) return; // 无变化不重发
-        lastSnapJson.set(cfg.id, json);
-        broadcast('ssh:snapshot', { id: cfg.id, status: 'online', error: '', ...snap });
-      } catch (e) {
-        console.error('[tick-error]', cfg.host + ':' + cfg.port, statusOfError(e), e.message);
-        broadcast('ssh:status', { id: cfg.id, status: statusOfError(e), error: e.message });
-      }
-    }),
-  );
-  } finally { ticking = false; }
+    const snap = await conn.collect();
+    if (!servers.includes(cfg)) return;
+    const payload = { id: cfg.id, status: 'online', error: '', ...snap };
+    void historyStore?.request('snapshot', payload).catch((e) => historyError(e));
+    void transfers?.collectStaging({ serverId: cfg.id });
+    const json = JSON.stringify(snap);
+    if (lastSnapJson.get(cfg.id) === json) return;
+    lastSnapJson.set(cfg.id, json);
+    broadcast('ssh:snapshot', payload);
+  } catch (e) {
+    if (!servers.includes(cfg)) return;
+    void historyStore?.request('gap', { server: cfg.id, at: Date.now() }).catch((error) => historyError(error));
+    broadcast('ssh:status', { id: cfg.id, status: statusOfError(e), error: e.message });
+  }
 }
-
-function start() {
-  if (timer) clearInterval(timer);
-  if (!servers.length) return;
-  timer = setInterval(tick, intervalMs);
-  tick();
+let lastHistoryError = 0;
+function historyError(error) {
+  logError('history', error);
+  if (Date.now() - lastHistoryError > 60000) {
+    lastHistoryError = Date.now(); broadcast('history:error', { error: String(error) });
+  }
 }
+const scheduler = new PollScheduler({ configs: () => servers, collect: collectServer, interval: () => intervalMs, onError: (e) => logError('poll', e) });
+function tick() { scheduler.tick(); }
+function start() { scheduler.start(); }
 
 function persist(next = servers) {
   store.save(next);
@@ -266,7 +250,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('ssh:set-focused', (_e, id) => {
-    activeServerId = typeof id === 'string' && id ? id : null;
+    scheduler.focus(typeof id === 'string' && servers.some((s) => s.id === id) ? id : null);
     return true;
   });
 
@@ -669,22 +653,11 @@ function registerIpc() {
   });
   ipcMain.handle('terminal:list', () => [...terminals.entries()].map(([termId, t]) => ({ termId, serverId: t.serverId, createdAt: t.createdAt })));
 
-    // ============ GPU 历史持久化 ============
-  const historyFile = () => path.join(app.getPath('userData'), 'history.json');
-  ipcMain.handle('history:load', () => {
-    try {
-      return JSON.parse(fs.readFileSync(historyFile(), 'utf8'));
-    } catch {
-      return {};
-    }
-  });
-  ipcMain.handle('history:save', (_e, map) => {
-    fs.mkdirSync(path.dirname(historyFile()), { recursive: true });
-    const temp = historyFile() + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(map || {}), { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(temp, historyFile());
-    return true;
-  });
+  // Compatibility reads/imports are backed by SQLite; the renderer no longer
+  // owns persistence. Range queries only return bounded chart data.
+  ipcMain.handle('history:load', () => historyStore.request('load'));
+  ipcMain.handle('history:save', (_e, map) => historyStore.request('save', map));
+  ipcMain.handle('history:query', (_e, query) => historyStore.request('query', query));
 
   // ============ 配置导出/导入（AES-256-GCM 口令加密） ============
   ipcMain.handle('config:export', wrap(async ({ passphrase }) => {
@@ -908,6 +881,7 @@ function handleInteractive({ name, prompts }) {
 
 function init() {
   const userData = app.getPath('userData');
+  historyStore = new HistoryStore(userData, historyError);
   store.init({ dataDir: userData, safeStorage });
   audit.init(userData);
   hostkeys.init(userData);
@@ -922,4 +896,5 @@ function init() {
   forwardings.startAll().catch((e) => logError('forwardings startAll', e));
 }
 
-module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false) };
+module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
+  shutdown: async () => { scheduler.stop(); await historyStore?.close(); } };

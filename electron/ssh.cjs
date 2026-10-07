@@ -76,6 +76,7 @@ function parseSnapshot(out, previousCpu = null) {
     uuidToIndex.set(f[1], index);
     gpus.push({
       index,
+      uuid: f[1],
       name: f[2] || 'GPU',
       util: Math.round(num(f[3])),
       memUsed: Math.round(num(f[4])),

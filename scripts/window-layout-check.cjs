@@ -95,6 +95,10 @@ async function browserChecks() {
           await page.locator('.sidebar-foot .btn').nth(1).click(); await page.waitForSelector('[aria-labelledby=manager-title]');
           await checkOverflow(page, '[aria-labelledby=manager-title]', label + ' servers');
           await page.keyboard.press('Escape');
+          await page.locator('.tabs button').last().click(); await page.waitForSelector('.monitor-chart');
+          await checkOverflow(page, '.monitor-panel,.monitor-toolbar,.monitor-stats', label + ' history');
+          await page.locator('.monitor-ranges button').last().click(); await page.waitForSelector('.monitor-chart');
+          await checkOverflow(page, '.monitor-panel,.monitor-toolbar,.monitor-stats', label + ' week history');
           checks.push(label); console.log('PASS ' + label);
           if (language === 'de' && size.width === 900 && sidebar === 224) await page.screenshot({ path: path.join(out, 'browser-de-900.png') });
         }

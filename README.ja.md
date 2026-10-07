@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.3：**Windows インストーラーを提供。サーバー切り替えの遅延を修正し、端末・サーバー・概要の切り替え中もセッション、履歴、バックグラウンド出力を保持します。`ServerConsole-Setup-0.12.3.exe` を一度インストールし、デスクトップまたはスタートメニューから起動してください。 [0.12.3](docs/VALIDATION-0.12.3.md)
+**0.13.0：**GPU ごとの円形メーター、キャッシュを使った即時切り替え、保持されるファイル画面、見つけやすい履歴画面を追加。30 分・1 時間・12 時間・1 日・1 週間を選べます。SQLite は生データを 24 時間、分単位の集計を 30 日で自動削除します。収集はアプリ起動中に行います。`ServerConsole-Setup-0.13.0.exe` をインストールしてください。[検証と容量](docs/VALIDATION-0.13.0.md)
 
 **Windows 配布ファイルは未署名です。SmartScreen が警告する場合があります。Release の SHA-256 と照合してください。**
 
@@ -14,7 +14,7 @@
 
 **0.12.0 の更新**
 
-タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 678 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
+タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 702 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
 
 0.12.2 は実 Linux サーバー2台で 16 MiB のアップロードと rsync、主プロセスの強制終了後の復元、既存データの検証進捗、所有する鍵と一時ディレクトリの削除を確認しました。以下の 0.11.1 数値は過去の結果です。最新の範囲は [0.12.2](docs/VALIDATION-0.12.2.md)。
 
@@ -39,7 +39,7 @@ ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向け
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

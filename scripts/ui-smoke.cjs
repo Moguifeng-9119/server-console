@@ -53,8 +53,8 @@ async function main() {
 
     await page.locator('.resource-toolbar input[type=number]').fill('40');
     assert(await page.locator('.resource-card').count() > 0);
-    const free = await page.locator('.resource-gpu.matches strong').allTextContents();
-    assert(free.every((text) => parseFloat(text) >= 40)); pass('40 GiB filter uses individual cards');
+    const free = await page.locator('.resource-gpu.matches').evaluateAll((cards) => cards.map((card) => Number(card.dataset.freeGib)));
+    assert(free.length > 0 && free.every((value) => value >= 40)); pass('40 GiB filter uses individual cards');
     await page.locator('.resource-toolbar input[type=number]').fill('10000');
     await page.waitForSelector('.resource-empty');
     await page.locator('.resource-empty button').click();

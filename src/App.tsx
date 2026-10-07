@@ -10,6 +10,7 @@ import { useDialogFocus } from './hooks/useDialogFocus';
 import { Overview } from './components/Overview';
 import { ServerPanel } from './components/ServerPanel';
 import { TerminalWorkspace } from './components/TerminalPane';
+import { FileWorkspace } from './components/FileManager';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { ServerManager } from './components/ServerManager';
 import { ImportSshConfig } from './components/ImportSshConfig';
@@ -21,7 +22,7 @@ import { CommandPalette, type PaletteAction } from './components/CommandPalette'
 import { useTransfers } from './transfers';
 import type { SetStateAction } from 'react';
 
-type ServerTab = 'gpu' | 'proc' | 'files' | 'term';
+type ServerTab = 'gpu' | 'proc' | 'files' | 'term' | 'history';
 
 const LS_VIEW = 'sc.view';
 
@@ -32,7 +33,7 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'serv
     if (raw && raw.kind === 'parallel') {
       return { kind: 'parallel' };
     }
-    if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files', 'term'].includes(raw.tab)) {
+    if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files', 'term', 'history'].includes(raw.tab)) {
       return { kind: 'server', id: raw.id, tab: raw.tab };
     }
   } catch {
@@ -49,6 +50,7 @@ export default function App() {
   const activeTransferCount = tf.runningCount + tf.queuedCount;
   const [view, updateView] = useState<ReturnType<typeof loadView>>(loadView);
   const serverTabs = useRef<Record<string, ServerTab>>({});
+  const [gpuFocus, setGpuFocus] = useState<{ serverId: string; index: number } | null>(null);
   const setView = useCallback((next: SetStateAction<ReturnType<typeof loadView>>) => {
     if (document.querySelector('[data-unsaved="true"]')) {
       window.dispatchEvent(new Event('sc:blocked-navigation'));
@@ -113,12 +115,17 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   // Each server remembers its selected tab for this app window.
-  const openServer = useCallback((id: string, tab?: ServerTab) =>
+  const openServer = useCallback((id: string, tab?: ServerTab, gpuIndex?: number) => {
+    setGpuFocus(gpuIndex == null ? null : { serverId: id, index: gpuIndex });
     setView((v) => ({
       kind: 'server',
       id,
       tab: tab ?? (v.kind === 'server' && v.id === id ? v.tab : serverTabs.current[id] || 'gpu'),
-    })), [setView]);
+    }));
+  }, [setView]);
+  const openOverview = useCallback(() => setView({ kind: 'overview' }), [setView]);
+  const selectTab = useCallback((tab: ServerTab) => setView((v) => v.kind === 'server' ? { ...v, tab } : v), [setView]);
+  const serverIds = useMemo(() => configs.length && !demo ? configs.map((s) => s.id) : servers.map((s) => s.id), [configs, demo, servers]);
 
   const quitRef = useRef<HTMLDivElement>(null);
   const kiRef = useRef<HTMLDivElement>(null);
@@ -203,7 +210,7 @@ export default function App() {
         key={s.id}
         className={`nav-item ${view.kind === 'server' && view.id === s.id ? 'active' : ''}`}
         style={{ cursor: 'pointer' }}
-
+        onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) openServer(s.id); }}
       >
         <i className={`dot ${s.status}`} />
         <button className="nav-server" onClick={() => openServer(s.id)} onDoubleClick={() => openServer(s.id, 'files')} aria-current={view.kind === 'server' && view.id === s.id ? 'page' : undefined}>{s.name}</button>
@@ -326,13 +333,16 @@ export default function App() {
               key={current.id}
               s={current}
               tab={view.tab}
-              onTab={(tab) => setView((v) => (v.kind === 'server' ? { ...v, tab } : v))}
-              onBack={() => setView({ kind: 'overview' })}
+              onTab={selectTab}
+              onBack={openOverview}
+              sampleNow={sampleNow}
+              focusGpuIndex={gpuFocus?.serverId === current.id ? gpuFocus.index : undefined}
             />
           ) : (
             <div className="empty">{t('overview.serverNotFound', '未找到该服务器')}</div>
           )}
-          <TerminalWorkspace serverIds={servers.map((s) => s.id)} activeServerId={view.kind === 'server' && view.tab === 'term' ? view.id : null} />
+          <FileWorkspace serverIds={serverIds} activeServerId={view.kind === 'server' && view.tab === 'files' ? view.id : null} />
+          <TerminalWorkspace serverIds={serverIds} activeServerId={view.kind === 'server' && view.tab === 'term' ? view.id : null} />
         </div>
       </main>
 

@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Descargar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [Informar de un problema](https://github.com/Moguifeng-9119/server-console/issues)
+[Descargar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [Informar de un problema](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.3:** instalador de Windows, cambio de servidor ágil y sesiones, historial y salida en segundo plano conservados al cambiar de terminal, servidor o vista general. Instala `ServerConsole-Setup-0.12.3.exe` una vez y abre desde el escritorio o el menú Inicio. [0.12.3](docs/VALIDATION-0.12.3.md)
+**0.13.0:** indicadores circulares por GPU, cambio inmediato con datos en caché, paneles de archivos conservados e historial visible de 30 minutos, 1 hora, 12 horas, 1 día y 1 semana. SQLite elimina automáticamente muestras originales a las 24 horas y resúmenes por minuto a los 30 días. La aplicación debe estar abierta para recopilar datos. Instala `ServerConsole-Setup-0.13.0.exe`. [Validación y capacidad](docs/VALIDATION-0.13.0.md)
 
 **Los archivos Windows no están firmados. SmartScreen puede advertir. Compare el SHA-256 con el archivo de la versión.**
 
@@ -14,7 +14,7 @@
 
 **Novedades de 0.12.0**
 
-Registro persistente para recuperar y limpiar archivos temporales propios; progreso visible de SHA-256 y explicación de tareas antiguas. Se añadieron controles de archivos y retransmisión por teclado, protección del texto sin guardar y ESLint/Hooks. Los diez idiomas tienen 678 claves; aún falta la revisión nativa de todos los borradores asistidos por traducción automática.
+Registro persistente para recuperar y limpiar archivos temporales propios; progreso visible de SHA-256 y explicación de tareas antiguas. Se añadieron controles de archivos y retransmisión por teclado, protección del texto sin guardar y ESLint/Hooks. Los diez idiomas tienen 702 claves; aún falta la revisión nativa de todos los borradores asistidos por traducción automática.
 
 0.12.2 validó cargas de 16 MiB y rsync en dos servidores Linux reales, recuperación tras terminar todo el proceso principal, progreso del prefijo y limpieza de claves/directorios propios. Las cifras 0.11.1 siguientes son históricas. Alcance actual: [0.12.2](docs/VALIDATION-0.12.2.md).
 

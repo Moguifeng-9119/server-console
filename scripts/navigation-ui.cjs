@@ -52,8 +52,8 @@ async function main() {
     });
     await page.goto(`http://127.0.0.1:${server.address().port}`); await emitSamples(page);
     await page.locator('.nav-files').first().click();
-    await page.waitForFunction(() => [...document.querySelectorAll('.fm-pane')].every((pane) => pane.querySelectorAll('tbody tr:not(.fm-more)').length === 500) && document.querySelectorAll('.fm-pane').length === 2);
-    assert.deepEqual(await page.locator('.fm-pane').evaluateAll((panes) => panes.map((pane) => pane.querySelectorAll('tbody tr:not(.fm-more)').length)), [500, 500]);
+    await page.waitForFunction(() => { const panes = [...document.querySelectorAll('.fm-pane')].filter((p) => p.offsetParent !== null); return panes.length === 2 && panes.every((pane) => pane.querySelectorAll('tbody tr:not(.fm-more)').length === 500); });
+    assert.deepEqual(await page.locator('.fm-pane:visible').evaluateAll((panes) => panes.map((pane) => pane.querySelectorAll('tbody tr:not(.fm-more)').length)), [500, 500]);
     pass('12000-file directories render with bounded initial rows');
     await page.waitForFunction(() => typeof window.__fixture.callbacks.onTransferUpdate === 'function');
     const timings = [];
@@ -80,7 +80,7 @@ async function main() {
       await page.evaluate(() => { window.__navigation.holdRemote = true; });
       await page.locator('.nav-files').nth(1).click();
       await page.waitForFunction(() => window.__navigation.remoteResolvers.length > 0);
-      await page.waitForFunction(() => document.querySelectorAll('.fm-pane:first-child tbody tr').length >= 500);
+      await page.waitForFunction(() => [...document.querySelectorAll('.fm-pane:first-child')].some((p) => p.offsetParent !== null && p.querySelectorAll('tbody tr').length >= 500));
       await page.locator('.nav-server').first().click();
       assert.equal(await page.locator('.topbar .title').innerText(), 'Demo training');
       await page.evaluate(() => { window.__navigation.remoteResolvers.splice(0).forEach((resolve) => resolve({ok: true, data: '/home/demo'})); window.__navigation.holdRemote = false; });

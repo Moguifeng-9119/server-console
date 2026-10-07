@@ -6,7 +6,7 @@ import type { Server } from '../types';
 import { freeGiB, gpuOwners, matchingGpus, isFreshSample } from '../resources';
 import { Sparkline } from './Sparkline';
 
-type OpenServer = (id: string, tab?: 'gpu' | 'files' | 'term') => void;
+type OpenServer = (id: string, tab?: 'gpu' | 'files' | 'term', gpuIndex?: number) => void;
 
 export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory: (s: Server) => void }) {
   const { servers, demo, refreshMs, sampleNow, colorOf } = useStore();
@@ -65,8 +65,13 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
           <div className="resource-host mono">{s.host}</div><div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
           <div className="resource-kpis"><div><strong className="num">{online && fresh ? Math.max(0, ...s.gpus.map(freeGiB)).toFixed(1) : '—'}<small> GiB</small></strong><span>{t('workbench.largest')}</span></div><div><strong className="num" style={{ color: online ? colorOf(avg) : undefined }}>{online && fresh ? Math.round(avg) + '%' : '—'}</strong><span>{t('overview.avgUtil')}</span></div><div><strong className="num">{matches.length}</strong><span>{t('workbench.matches')}</span></div></div>
           <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
-          <div className="resource-gpus">{s.gpus.map((g) => <button key={g.index} className={`resource-gpu ${matches.some((m) => m.index === g.index) ? 'matches' : ''}`} onClick={() => onOpen(s.id, 'gpu')} disabled={!online || !fresh} title={gpuOwners(s, g).join(', ') || t('workbench.noProcesses')}><span className="mono">GPU {g.index}</span><strong className="num">{online && fresh ? freeGiB(g).toFixed(1) : '—'}<small> GiB</small></strong><span className="resource-owner">{fresh && online ? gpuOwners(s, g).join(', ') || t('workbench.noProcesses') : '—'}</span></button>)}</div>
-          <div className="resource-footer"><span>{demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}{online && !fresh && !demo && ` · ${t('workbench.stale')}`}</span><button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}><History size={13} />{t('workbench.history')}</button></div>
+          <div className="resource-gpus">{s.gpus.map((g) => <button key={g.uuid || g.index} className={`resource-gpu ${matches.some((m) => m.index === g.index) ? 'matches' : ''}`} data-free-gib={online && fresh ? freeGiB(g) : undefined} onClick={() => onOpen(s.id, 'gpu', g.index)} disabled={!online || !fresh} title={gpuOwners(s, g).join(', ') || t('workbench.noProcesses')} aria-label={`GPU ${g.index} · ${t('monitor.util')} ${online && fresh ? g.util + '%' : '—'}`}>
+            <span className="gpu-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="42" className="gpu-ring-track" /><circle cx="50" cy="50" r="42" className="gpu-ring-value" pathLength="100" strokeDasharray={`${online && fresh ? Math.max(0, Math.min(100, g.util)) : 0} 100`} style={{ stroke: online && fresh ? colorOf(g.util) : 'var(--text-faint)' }} /></svg><span className="gpu-ring-label"><span>GPU {g.index}</span><strong className="num">{online && fresh ? Math.round(g.util) + '%' : '—'}</strong></span></span>
+            <span className="gpu-ring-memory mono">{online && fresh ? `${(g.memUsed / 1024).toFixed(1)} / ${(g.memTotal / 1024).toFixed(0)}` : '—'} GiB</span>
+            <span className="gpu-ring-temp">{t('monitor.temp')} {online && fresh && g.temp != null ? g.temp + '°C' : '—'}</span>
+            <span className="resource-owner">{fresh && online ? gpuOwners(s, g).join(', ') || t('workbench.noProcesses') : '—'}</span>
+          </button>)}</div>
+          <div className="resource-footer"><span>{demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}{online && !fresh && !demo && ` · ${t('workbench.stale')}`}</span><button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}><History size={13} />{t('monitor.title')}</button></div>
           <div className="resource-actions"><button className="btn primary" onClick={() => onOpen(s.id, 'gpu')}><Activity size={14} />{t('workbench.inspect')}</button><button className="btn" onClick={() => onOpen(s.id, 'term')}><Terminal size={14} />{t('workbench.terminal')}</button><button className="btn" onClick={() => onOpen(s.id, 'files')}><FolderOpen size={14} />{t('nav.files')}</button></div>
         </article>;
       })}

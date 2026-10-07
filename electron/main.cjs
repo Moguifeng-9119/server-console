@@ -227,6 +227,22 @@ if (!gotLock) {
   app.whenReady().then(() => {
     loadAppSettings();
     ipc.init();
+    let historyClosed = false;
+    let closingHistory = false;
+    app.on('before-quit', (event) => {
+      if (historyClosed) return;
+      event.preventDefault();
+      if (closingHistory) return;
+      closingHistory = true;
+      forceQuit = true;
+      const timeout = setTimeout(() => {
+        logCrash('history-shutdown-timeout', 'History flush exceeded five seconds');
+        historyClosed = true; app.quit();
+      }, 5000);
+      ipc.shutdown().catch((error) => logCrash('history-shutdown', String(error))).finally(() => {
+        clearTimeout(timeout); historyClosed = true; app.quit();
+      });
+    });
     createWindow();
     try {
       createTray();

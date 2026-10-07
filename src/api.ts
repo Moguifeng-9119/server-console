@@ -2,6 +2,8 @@ import type {
   AuditEntry,
   CredentialInfo,
   HistoryPoint,
+  HistoryQuery,
+  HistoryResult,
   ConfigChange,
   DirListing,
   FileEntry,
@@ -84,6 +86,8 @@ interface Api {
 
     historyLoad: () => Promise<Record<string, HistoryPoint[]>>;
   historySave: (map: Record<string, HistoryPoint[]>) => Promise<boolean>;
+  historyQuery: (query: HistoryQuery) => Promise<HistoryResult>;
+  onHistoryError: (cb: (data: { error: string }) => void) => () => void;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
   onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
 

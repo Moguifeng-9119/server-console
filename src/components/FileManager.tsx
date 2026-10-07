@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../hooks/useDialogFocus';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, File as FileIcon, Folder, FolderPlus, Home, RefreshCw } from 'lucide-react';
 import { api } from '../api';
-import { useStore } from '../state';
-import { useTransfers } from '../transfers';
+import { useStoreControls } from '../state';
+import { useTransferCommands } from '../transfers';
 import { fmtDate, formatBytes, joinPosix, parentPosix } from '../format';
 import type { DirListing, FileEntry, IpcResult } from '../types';
 import { ContextMenu } from './ContextMenu';
@@ -25,10 +25,10 @@ const isDirLike = (e: FileEntry) => e.type === 'dir' || e.linkToDir;
 type SortKey = 'name' | 'size' | 'mtime';
 const fileNames = new Intl.Collator('zh-Hans-CN', { numeric: true });
 
-export function FileManager({ serverId }: { serverId: string }) {
+function FileManagerImpl({ serverId, active = true }: { serverId: string; active?: boolean }) {
   const { t } = useTranslation();
-  const { configs, pushToast } = useStore();
-  const tf = useTransfers();
+  const { configs, pushToast } = useStoreControls();
+  const tf = useTransferCommands();
   const cfg = configs.find((c) => c.id === serverId);
 
   const [local, setLocal] = useState<PaneState>(emptyPane());
@@ -84,8 +84,8 @@ export function FileManager({ serverId }: { serverId: string }) {
   const [confirm, setConfirm] = useState<{ title: string; body: string; onOk: () => void } | null>(null);
   const askRef = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(!!ask, askRef, () => setAsk(null));
-  useDialogFocus(!!confirm, confirmRef, () => setConfirm(null));
+  useDialogFocus(active && !!ask, askRef, () => setAsk(null));
+  useDialogFocus(active && !!confirm, confirmRef, () => setConfirm(null));
 
   const [searchKw, setSearchKw] = useState('');
   const [results, setResults] = useState<string[] | null>(null);
@@ -334,6 +334,7 @@ export function FileManager({ serverId }: { serverId: string }) {
 
   // 全局文件面板快捷键：Ctrl+A 全选、Esc 清空、Delete 删除、F2 重命名、F5 刷新
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (results || ask || confirm || viewer || relay || menu) return;
       if (!(e.target instanceof HTMLElement) || !e.target.closest('.fm') || e.target.closest('[role="dialog"], [aria-modal="true"]')) return;
@@ -542,7 +543,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       )}
 
       {/* 右键菜单 */}
-      {menu && (
+      {active && menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
           {menu.side === 'remote' ? (
             <>
@@ -581,7 +582,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       )}
 
       {/* 输入对话框 */}
-      {ask && (
+      {active && ask && (
         <div className="mask" onClick={() => setAsk(null)}>
           <div className="dialog" ref={askRef} role="dialog" aria-modal="true" aria-labelledby="fm-ask-title" tabIndex={-1} style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
             <h3 id="fm-ask-title">{ask.title}</h3>
@@ -610,7 +611,7 @@ export function FileManager({ serverId }: { serverId: string }) {
       )}
 
       {/* 确认对话框 */}
-      {confirm && (
+      {active && confirm && (
         <div className="mask" onClick={() => setConfirm(null)}>
           <div className="dialog" ref={confirmRef} role="dialog" aria-modal="true" aria-labelledby="fm-confirm-title" tabIndex={-1} style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
             <h3 id="fm-confirm-title" style={{ color: 'var(--warn)' }}>{confirm.title}</h3>
@@ -633,14 +634,30 @@ export function FileManager({ serverId }: { serverId: string }) {
         </div>
       )}
 
-      {viewer && <TextViewer serverId={serverId} path={viewer.path} name={viewer.name} size={viewer.size} onClose={() => setViewer(null)} />}
+      {active && viewer && <TextViewer serverId={serverId} path={viewer.path} name={viewer.name} size={viewer.size} onClose={() => setViewer(null)} />}
 
-      {relay && <RelayDialog selfId={serverId} selfName={cfg?.name || ''} sel={relay.sel} onClose={() => setRelay(null)} onDone={() => { setRelay(null); showTransfers(); }} />}
+      {active && relay && <RelayDialog selfId={serverId} selfName={cfg?.name || ''} sel={relay.sel} onClose={() => setRelay(null)} onDone={() => { setRelay(null); showTransfers(); }} />}
     </div>
   );
 }
 
 // ---------- 单个面板 ----------
+export const FileManager = memo(FileManagerImpl);
+
+// Retain visited file panes and directory state across server/tab navigation.
+export function FileWorkspace({ serverIds, activeServerId }: { serverIds: string[]; activeServerId: string | null }) {
+  const [visited, setVisited] = useState<string[]>([]);
+  useEffect(() => {
+    setVisited((previous) => {
+      const next = previous.filter((id) => serverIds.includes(id));
+      if (activeServerId && serverIds.includes(activeServerId) && !next.includes(activeServerId)) next.push(activeServerId);
+      return next.length === previous.length && next.every((id, i) => id === previous[i]) ? previous : next;
+    });
+  }, [serverIds, activeServerId]);
+  const mounted = activeServerId && !visited.includes(activeServerId) ? [...visited, activeServerId] : visited;
+  return <>{mounted.filter((id) => serverIds.includes(id)).map((id) => <div key={id} hidden={id !== activeServerId}><FileManager serverId={id} active={id === activeServerId} /></div>)}</>;
+}
+
 function FilePane({
   title, state, sorted, sort, setSort, onUp, onHome, onReload, onAddress, onOpen, onToggle, onMenu, onMkdir, remote: isRemote,
 }: {

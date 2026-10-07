@@ -85,6 +85,8 @@ interface Store {
 }
 
 const Ctx = createContext<Store | null>(null);
+type Controls = Pick<Store, 'configs' | 'pushToast' | 'demo' | 'refreshMs' | 'colorOf' | 'kill' | 'restartService'>;
+const ControlsCtx = createContext<Controls | null>(null);
 
 function nowTime() {
   return new Date().toLocaleTimeString('zh-CN', { hour12: false });
@@ -251,9 +253,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [demo]);
 
-  // 历史曲线持久化：启动恢复 + 每 30 秒落盘（无变化不写）
-  const historiesRef = useRef(histories);
-  historiesRef.current = histories;
+  // Only the small recent overview sparkline is restored here. Persistent
+  // monitoring is collected and written independently by the main worker.
   useEffect(() => {
     if (!api || demo) return;
     const a = api;
@@ -264,12 +265,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return next;
       });
     }).catch((error) => pushToast({level: 'error', title: i18n.t('workbench.historySaveFail'), detail: String(error)}));
-    const timer = setInterval(() => {
-      const cur = historiesRef.current;
-      const live = Object.fromEntries(Object.entries(cur).filter(([id]) => !id.startsWith('demo:')));
-      if (Object.keys(live).length) void a.historySave(live).catch((error) => pushToast({ level: 'error', title: i18n.t('workbench.historySaveFail'), detail: String(error) }));
-    }, 30000);
-    return () => clearInterval(timer);
+    return a.onHistoryError?.(({ error }) => pushToast({ level: 'error', title: i18n.t('workbench.historySaveFail'), detail: error }));
   }, [demo, pushToast]);
 
   useEffect(() => {
@@ -295,11 +291,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(timer);
   }, [demo, refreshMs]);
 
+  const serverCache = useRef(new Map<string, { config: ServerConfig; snapshot: SnapshotPayload | undefined; history: HistoryPoint[] | undefined; value: Server }>());
   const servers = useMemo<Server[]>(() => {
     if (demo) return demoServers;
     return configs.map((c) => {
       const s = snaps[c.id];
-      return {
+      const cached = serverCache.current.get(c.id);
+      if (cached?.config === c && cached.snapshot === s && cached.history === histories[c.id]) return cached.value;
+      const value: Server = {
         id: c.id,
         name: c.name,
         host: `${c.username}@${c.host}`,
@@ -317,8 +316,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         swapUsed: s?.swapUsed ?? 0,
         swapTotal: s?.swapTotal ?? 0,
       };
+      serverCache.current.set(c.id, { config: c, snapshot: s, history: histories[c.id], value });
+      return value;
     });
   }, [demo, demoServers, configs, snaps, histories]);
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
 
   useEffect(() => {
     if (!demo) return;
@@ -396,7 +399,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const kill = useCallback(
     (serverId: string, pid: number, signal: 'TERM' | 'KILL') => {
-      const s = servers.find((x) => x.id === serverId);
+      const s = serversRef.current.find((x) => x.id === serverId);
       const target = s?.processes.find((p) => p.pid === pid);
       const action = signal === 'KILL' ? 'kill -9' : 'kill -15';
       if (!demo) {
@@ -429,12 +432,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ].slice(0, 50));
       pushToast({ level: 'info', title: i18n.t('state.sigSent', { signal, pid }), detail: `${s.name} · ${target.user}` });
     },
-    [servers, demo, pushToast, logAudit],
+    [demo, pushToast, logAudit],
   );
 
   const restartService = useCallback(
     (serverId: string, service: string) => {
-      const s = servers.find((x) => x.id === serverId);
+      const s = serversRef.current.find((x) => x.id === serverId);
       const log = (result: 'ok' | 'failed', detail?: string) => {
         logAudit({ server: s?.name ?? serverId, action: 'systemctl restart', target: service, result });
         if (result === 'ok') pushToast({ level: 'info', title: i18n.t('state.restarting', { service }), detail: s?.name });
@@ -447,7 +450,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!s) return;
       log('ok');
     },
-    [servers, demo, pushToast, logAudit],
+    [demo, pushToast, logAudit],
   );
 
   const colorOf = useCallback(
@@ -527,7 +530,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  const controls = useMemo<Controls>(() => ({ configs, pushToast, demo, refreshMs, colorOf, kill, restartService }),
+    [configs, pushToast, demo, refreshMs, colorOf, kill, restartService]);
+  return <Ctx.Provider value={value}><ControlsCtx.Provider value={controls}>{children}</ControlsCtx.Provider></Ctx.Provider>;
+}
+
+export function useStoreControls() {
+  const value = useContext(ControlsCtx);
+  if (!value) throw new Error('useStoreControls must be used inside StoreProvider');
+  return value;
 }
 
 export function useStore() {

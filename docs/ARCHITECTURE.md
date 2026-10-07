@@ -16,13 +16,17 @@ flowchart LR
   TASK --> DIRECT[rsync direct relay]
   MON --> SAMPLE[Timestamped samples]
   SAMPLE --> UI
+  SAMPLE --> HISTORY[Worker SQLite history]
+  HISTORY --> TTL[24h raw / 30d minute retention]
+  API --> HISTORY
 ```
 
 ## Boundaries
 
 - `src/api.ts` and `src/types.ts`: renderer contracts and public state. `electron/preload.cjs` exposes a bounded IPC bridge.
 - `electron/ssh.cjs`: SSH handshake/retry, SFTP channel reuse, command collection and parsing. CPU busy uses `/proc/stat` deltas; process GPU associations retain arrays rather than overwriting a PID with its last card.
-- `electron/ipc.cjs`: app handlers, sampling dispatch and background-server cadence. Polling clears the in-progress flag in `finally`. It forwards collection timestamps even when percentages are unchanged.
+- `electron/ipc.cjs`, `poll-scheduler.cjs`: app handlers and independent per-host sampling. Focus requests immediate polling, slow hosts do not block other hosts, and timestamps persist even when percentages are unchanged.
+- `electron/history-store.cjs`, `history-worker.cjs`, `history-db.cjs`: bounded worker requests, SQLite persistence, one-time JSON import, clipped time-weighted summaries, bounded queries and periodic expiry/page reclamation. Shutdown flushes accepted writes before quitting.
 - `src/state.tsx`, `src/history.ts`, `src/resources.ts`: timestamped history, anomaly records, credential-free display state and single-card resource predicates. Demo IDs are separate from real history IDs; demo samples are not persisted as real observations.
 - `electron/transfer.cjs`, `safe-files.cjs`, `task-store.cjs`: queue/target locks, cancellation, safe replacement and execution records. `stage-journal.cjs` commits ownership/cleanup intent before mutation; `transfer-staging.cjs` restores and cleans exact owned paths on reconnect; `resume-verifier.cjs` compares complete prefixes with slower-stream progress and cancellable readers. Display and execution inputs are serialized independently.
 - `electron/store.cjs`, `hostkeys.cjs`: OS-encrypted/session credential policy, validated migration, host trust and atomic security preferences.
@@ -40,4 +44,4 @@ Direct relay has a separate boundary: rsync on the source writes to the destinat
 
 ## Extending it
 
-Keep monitoring collectors separate from rendering and preserve unknown metrics. Add user-facing capabilities through typed API contracts. Add destination-byte regression cases before changing transfer stages, and stacked-dialog browser cases before changing modal behavior. The current backend uses checkJs rather than complete strict TypeScript conversion. The renderer shares a broad store; a future performance refactor should use profiler evidence and selector boundaries.
+Keep monitoring collectors separate from rendering and preserve unknown metrics. Add user-facing capabilities through typed API contracts. Add destination-byte regression cases before changing transfer stages, and stacked-dialog browser cases before changing modal behavior. The current backend uses checkJs rather than complete strict TypeScript conversion. Controls and transfer commands have stable contexts; visited file/terminal panes are retained, and unaffected server objects preserve their references. Further performance changes should use profiler evidence.

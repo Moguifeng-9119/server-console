@@ -1,5 +1,12 @@
 # Usage and recovery guide
 
+## Monitoring history (0.13.0)
+
+Use **History** on an overview card, or the **History** tab within a server. Choose 30 minutes, 1 hour, 12 hours, 1 day or 1 week, then a GPU/system and metric. Hover the chart for timestamps and values. Missing observations remain gaps. Stale live panels retain cached values with their sample age and disable process actions.
+
+The local `monitoring.sqlite` database keeps 24 hours of raw data and 30 days of minute summaries. It cleans expired records and reclaims pages at startup and every 15 minutes. Sampling requires the desktop app to remain running; quitting leaves a gap until it starts again. The old JSON history imports once. See [storage measurement](VALIDATION-0.13.0.md).
+
+
 This guide expands the README with first-use steps, transfer decisions, staging recovery, keyboard controls and a source map. The [Chinese guide](USER-GUIDE.zh-CN.md) covers the same workflows.
 
 ## Start with a connection

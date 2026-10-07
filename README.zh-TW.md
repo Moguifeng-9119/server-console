@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
+[下載桌面版](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [回報問題](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.3：**提供 Windows 安裝版，修復伺服器切換卡頓；切換終端、伺服器或總覽時保留工作階段、歷史輸出和背景輸出。下載 `ServerConsole-Setup-0.12.3.exe`，安裝後從桌面或開始功能表啟動。 [0.12.3](docs/VALIDATION-0.12.3.md)
+**0.13.0：**逐卡圓形 GPU 儀表、即時快取切換、保留檔案面板，以及可見的歷史監控入口：30 分鐘、1 小時、半天、1 天、1 週。SQLite 自動清理超過 24 小時的原始資料和超過 30 天的分鐘彙總；應用程式開啟時持續採集。安裝 `ServerConsole-Setup-0.13.0.exe`。[驗證與容量](docs/VALIDATION-0.13.0.md)
 
 **Windows 套件尚未簽署，SmartScreen 可能顯示警告。請核對 Release 的 SHA-256 檔案。**
 
@@ -14,7 +14,7 @@
 
 **0.12.0 更新**
 
-新增任務暫存檔持久記錄、崩潰恢復及重新連線清理；SHA-256 前綴驗證有獨立進度，舊任務提供明確說明。補齊檔案與互傳鍵盤操作、未儲存文字保護及 ESLint/Hooks。十語言各 678 個鍵，機器輔助初稿仍需完整母語審校。
+新增任務暫存檔持久記錄、崩潰恢復及重新連線清理；SHA-256 前綴驗證有獨立進度，舊任務提供明確說明。補齊檔案與互傳鍵盤操作、未儲存文字保護及 ESLint/Hooks。十語言各 702 個鍵，機器輔助初稿仍需完整母語審校。
 
 0.12.2 已在兩台真實 Linux 伺服器驗證 16 MiB 上傳與 rsync、整個桌面主程序崩潰恢復、前綴進度及精確金鑰/目錄清理。下列 0.11.1 數字為歷史結果，最新範圍見 [0.12.2](docs/VALIDATION-0.12.2.md)。
 
@@ -39,7 +39,7 @@ ServerConsole 是面向共用 **Linux / NVIDIA GPU 伺服器**的個人桌面工
 
 ## 開始使用
 
-從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
+從[發布頁](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0)下載適用套件。在伺服器管理中測試連線後新增，或匯入 SSH config。GPU 指標需要遠端能執行 nvidia-smi；系統指標讀取 Linux /proc。從原始碼執行需要 Node.js 22 與 npm：
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

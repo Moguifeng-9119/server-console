@@ -117,6 +117,12 @@ contextBridge.exposeInMainWorld('api', {
     // GPU 历史持久化
   historyLoad: () => ipcRenderer.invoke('history:load'),
   historySave: (map) => ipcRenderer.invoke('history:save', map),
+  historyQuery: (query) => ipcRenderer.invoke('history:query', query),
+  onHistoryError: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('history:error', h);
+    return () => ipcRenderer.removeListener('history:error', h);
+  },
   onSnapshot: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('ssh:snapshot', h);

@@ -206,12 +206,14 @@ async function main() {
     assert(removed.ok, removed.error);
     assert(!(await page.evaluate(() => window.api.forwardingsList())).some((rule) => rule.id === forwardingId));
     pass('stop closes active forwarding and remove clears the rule');
-    // Suspend renderer timers while independently testing history IPC persistence.
-    // Its normal 30s save would otherwise overwrite this isolated fixture.
+    // Main-process collection persists independently of renderer timers.
     await page.clock.pauseAt(new Date(Date.now() + 1000));
     const history = {'native-fixture': [{at: Date.now() - 10000, value: 42}, {at: Date.now() - 5000, value: 42}, {at: Date.now(), value: null}]};
     await page.evaluate((map) => window.api.historySave(map), history);
-    assert.deepEqual(await page.evaluate(() => window.api.historyLoad()), history);
+    assert.deepEqual((await page.evaluate(() => window.api.historyLoad()))['native-fixture'], history['native-fixture']);
+    const recorded = await page.evaluate((id) => window.api.historyQuery({serverId: id, device: 'all', metric: 'util', rangeMs: 1800000}), server.id);
+    assert(recorded.points.length <= 1000); assert(recorded.devices.some((d) => d.device === 'all'));
+    pass('main-process SQLite history query records monitored hosts independently');
     pass('native history persistence retains steady samples and gaps');
     await page.evaluate(() => window.api.securitySet({tofu: false}));
     const trusted = await page.evaluate(() => window.api.hostKeysList());
@@ -233,7 +235,7 @@ async function main() {
     pass('restart restores configurations and credential policy with authenticated SSH');
     assert.equal((await page.evaluate(() => window.api.securityGet())).tofu, false);
     assert.deepEqual(await page.evaluate(() => window.api.hostKeysList()), trusted);
-    assert.deepEqual(await page.evaluate(() => window.api.historyLoad()), history);
+    assert.deepEqual((await page.evaluate(() => window.api.historyLoad()))['native-fixture'], history['native-fixture']);
     pass('restart preserves host trust, TOFU settings and timestamped history');
     assert.deepEqual(errors, []); pass('no uncaught renderer errors');
     fs.writeFileSync(path.join(artifacts, 'checks.json'), JSON.stringify({at: new Date().toISOString(), platform: process.platform, arch: process.arch, version, storage, encryptionEvidence: process.platform === 'darwin' ? 'Playwright MockKeychain; real Keychain not verified' : process.platform === 'win32' ? 'native Windows DPAPI' : storage.encryptionAvailable ? 'available safeStorage backend' : 'session-only; real secret-service not verified', historyTimersPaused: true, executablePath: path.resolve(exe), scope: 'Native Electron package + real IPC + authenticated loopback SSH + local shell/forwarding, storage policy and restart; simulated GPU metrics.', checks}, null, 2) + '\n');

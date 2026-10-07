@@ -16,6 +16,17 @@ function installFixture(language = 'en') {
       return () => { listeners[key].delete(fn); if (!listeners[key].size) delete callbacks[key]; };
     };
     return (...args) => {
+      if (key === 'historyQuery') {
+        const query = args[0]; (window.__fixture.historyRequests ||= []).push(query);
+        const end = query.end || Date.now(), start = end - query.rangeMs;
+        const stepMs = query.rangeMs <= 1800000 ? 5000 : query.rangeMs <= 3600000 ? 10000 : query.rangeMs <= 43200000 ? 60000 : query.rangeMs <= 86400000 ? 120000 : 900000;
+        return Promise.resolve({ start, end, stepMs, rawHours: 24, retentionDays: 30,
+          devices: [{ device: 'all', metric: 'util', label: 'All GPUs' }, { device: 'system', metric: 'cpu', label: 'System' }, { device: 'system', metric: 'memory', label: 'System' }, ...['util','memory','temp','power'].map((metric) => ({device: 'gpu:0', label: 'GPU 0 · NVIDIA H100', metric}))],
+          points: Array.from({length: Math.ceil(query.rangeMs / stepMs)}, (_, i) => {
+            const value = query.metric === 'power' ? 150 + Math.sin(i / 20) * 40 : query.metric === 'temp' ? 55 + Math.sin(i / 20) * 10 : 45 + Math.sin(i / 20) * 35;
+            return {at: start + i * stepMs, value, min: value - 4, max: value + 5, coveredMs: stepMs, gap: false};
+          }) });
+      }
       if (key === 'sftpWriteText') {
         window.__fixture.lastWrite = args;
         return new Promise((resolve) => { window.__fixture.finishWrite = () => resolve({ ok: true }); });

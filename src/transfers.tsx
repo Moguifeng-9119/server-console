@@ -49,6 +49,7 @@ interface TransferStore {
 }
 
 const Ctx = createContext<TransferStore | null>(null);
+const CommandsCtx = createContext<Pick<TransferStore, 'upload' | 'download'> | null>(null);
 
 // 失败轻提示音（WebAudio 合成，无需音频文件）
 function beep() {
@@ -309,7 +310,14 @@ export function TransferProvider({ children }: { children: ReactNode }) {
     refresh,
   ]);
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  const commands = useMemo(() => ({ upload, download }), [upload, download]);
+  return <Ctx.Provider value={value}><CommandsCtx.Provider value={commands}>{children}</CommandsCtx.Provider></Ctx.Provider>;
+}
+
+export function useTransferCommands() {
+  const value = useContext(CommandsCtx);
+  if (!value) throw new Error('useTransferCommands must be used inside TransferProvider');
+  return value;
 }
 
 export function useTransfers() {

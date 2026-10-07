@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { api } from '../api';
-import { useStore } from '../state';
+import { useStoreControls } from '../state';
 import { useTranslation } from 'react-i18next';
 import type { TerminalSessionInfo } from '../types';
 
@@ -240,7 +240,7 @@ export function TerminalPane({
 
 // 会话条 + 多开管理：所有 TerminalPane 常驻挂载（仅 CSS 隐藏非活跃的），切 tab 不卸载
 export function TerminalSessions({ serverId, visible }: { serverId: string; visible: boolean }) {
-  const { pushToast } = useStore();
+  const { pushToast } = useStoreControls();
   const { t } = useTranslation();
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([]);
   const [loaded, setLoaded] = useState(false);

@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
-import { useStore } from '../state';
+import { memo, useEffect, useMemo, useState, useRef } from 'react';
+import { useStoreControls } from '../state';
 import { useTranslation } from 'react-i18next';
 import { freeGiB, gpuOwners, isFreshSample } from '../resources';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
-import { FileManager } from './FileManager';
+import { HistoryPanel } from './HistoryPanel';
 
 type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
 function KpiStrip({ s }: { s: Server }) {
-  const { colorOf } = useStore();
+  const { colorOf } = useStoreControls();
   const { t } = useTranslation();
   const avg = s.gpus.reduce((a, g) => a + g.util, 0) / (s.gpus.length || 1);
   const vram =
@@ -41,8 +41,8 @@ function KpiStrip({ s }: { s: Server }) {
   );
 }
 
-function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y: number) => void }) {
-  const { colorOf } = useStore();
+function GpuList({ s, onMenu, focusGpuIndex, actionable }: { s: Server; onMenu: (pid: number, x: number, y: number) => void; focusGpuIndex?: number; actionable: boolean }) {
+  const { colorOf } = useStoreControls();
   const { t } = useTranslation();
   const [matrix, setMatrix] = useState<boolean>(() => {
     try {
@@ -75,7 +75,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
       {s.gpus.map((g) => {
         const memPct = (g.memUsed / g.memTotal) * 100;
         return (
-          <div className="gpu-card" key={g.index}>
+          <div className="gpu-card" key={g.index} data-gpu-index={g.index} data-focused={g.index === focusGpuIndex || undefined}>
             <div className="h">
               <span className="idx">GPU {g.index}</span>
               <span className="nm">{gpuOwners(s, g).join(', ') || t('workbench.noProcesses')}</span>
@@ -121,7 +121,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
                   key={p.pid}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    onMenu(p.pid, e.clientX, e.clientY);
+                    if (actionable) onMenu(p.pid, e.clientX, e.clientY);
                   }}
                   className="gpu-proc-line"
                 >
@@ -131,7 +131,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
                   <span title={p.name}>{p.user || s.processes.find((item) => item.pid === p.pid)?.user || p.name}</span>
                   <span className="mono" style={{ marginLeft: 'auto' }}>
                     {(p.memMb / 1024).toFixed(1)} GiB
-                  </span><button className="btn mini proc-action" aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button>
+                  </span><button className="btn mini proc-action" disabled={!actionable} aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button>
                 </div>
               ))}
             </div>
@@ -143,7 +143,7 @@ function GpuList({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y:
   );
 }
 
-function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: number, y: number) => void }) {
+function ProcessTable({ s, onMenu, actionable }: { s: Server; onMenu: (pid: number, x: number, y: number) => void; actionable: boolean }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [user, setUser] = useState('all');
@@ -231,7 +231,7 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
                 key={p.pid}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  onMenu(p.pid, e.clientX, e.clientY);
+                  if (actionable) onMenu(p.pid, e.clientX, e.clientY);
                 }}
               >
                 <td className="mono">{p.pid}</td>
@@ -245,7 +245,7 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
                 <td className="mono">{(p.gpuIndices || (p.gpu == null ? [] : [p.gpu])).join(', ')}</td>
                 <td className="mono" title={p.command}>
                   {p.command}
-                </td><td><button className="btn mini proc-action" aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button></td>
+                </td><td><button className="btn mini proc-action" disabled={!actionable} aria-label={t('ctx.proc', { pid: p.pid })} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(p.pid, r.left, r.bottom); }}>⋯</button></td>
               </tr>
             ))}
           </tbody>
@@ -255,26 +255,38 @@ function ProcessTable({ s, onMenu }: { s: Server; onMenu: (pid: number, x: numbe
   );
 }
 
-export function ServerPanel({
+export const ServerPanel = memo(function ServerPanel({
   s,
   onBack,
   tab,
   onTab,
+  sampleNow,
+  focusGpuIndex,
 }: {
   s: Server;
   onBack: () => void;
-  tab: 'gpu' | 'proc' | 'files' | 'term';
-  onTab: (t: 'gpu' | 'proc' | 'files' | 'term') => void;
+  tab: 'gpu' | 'proc' | 'files' | 'term' | 'history';
+  onTab: (t: 'gpu' | 'proc' | 'files' | 'term' | 'history') => void;
+  sampleNow: number;
+  focusGpuIndex?: number;
 }) {
-  const { kill, restartService, demo, refreshMs, sampleNow } = useStore();
+  const { kill, restartService, demo, refreshMs } = useStoreControls();
   const { t } = useTranslation();
   const fresh = isFreshSample(s, demo, refreshMs, sampleNow);
+  const actionable = fresh && s.status === 'online';
+  const hasSample = demo || !!s.collectedAt;
+  useEffect(() => {
+    if (tab === 'gpu' && hasSample && focusGpuIndex != null) document.querySelector(`[data-gpu-index="${focusGpuIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [s.id, tab, hasSample, focusGpuIndex]);
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
   const [restartAsk, setRestartAsk] = useState(false);
   const [svcName, setSvcName] = useState('docker');
   const [snippets, setSnippets] = useState<Array<{ id: string; name: string; cmd: string }>>([]);
   const [snipOut, setSnipOut] = useState<{ name: string; output: string; running: boolean } | null>(null);
+  useEffect(() => {
+    if (!actionable) { setMenu(null); setConfirm(null); setRestartAsk(false); }
+  }, [actionable]);
 
   useEffect(() => {
     api?.snippetsList().then(setSnippets).catch(() => {});
@@ -345,7 +357,8 @@ export function ServerPanel({
         </div>
       )}
         <>
-          {fresh && s.status === 'online' ? <KpiStrip s={s} /> : s.status === 'online' && <div className="inline-status" role="status">{t('workbench.staleDetail')}</div>}
+          {!actionable && <div className="inline-status" role="status">{s.collectedAt ? `${t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() })} · ${t('workbench.stale')}` : t('workbench.waiting')}</div>}
+          {hasSample && <KpiStrip s={s} />}
           <div className="tabs">
             <button className={tab === 'gpu' ? 'on' : ''} onClick={() => onTab('gpu')}>
               {t('server.gpuTab', { n: s.gpus.length })}
@@ -359,13 +372,16 @@ export function ServerPanel({
             <button className={tab === 'term' ? 'on' : ''} onClick={() => onTab('term')}>
               {t('server.termTab')}
             </button>
+            <button className={tab === 'history' ? 'on' : ''} onClick={() => onTab('history')}>
+              {t('monitor.title')}
+            </button>
             <span className="note" style={{ marginLeft: 'auto', alignSelf: 'center' }}>
               {t(tab === 'files' ? 'server.filesHint' : 'workbench.processHint')}
             </span>
           </div>
-          {tab === 'gpu' && fresh && s.status === 'online' && <GpuList s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
-          {tab === 'proc' && fresh && s.status === 'online' && <ProcessTable s={s} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
-          {tab === 'files' && <FileManager serverId={s.id} />}
+          {tab === 'gpu' && hasSample && <GpuList s={s} actionable={actionable} focusGpuIndex={focusGpuIndex} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'proc' && hasSample && <ProcessTable s={s} actionable={actionable} onMenu={(pid, x, y) => setMenu({ pid, x, y })} />}
+          {tab === 'history' && <HistoryPanel s={s} />}
         </>
 
       {menu && (
@@ -504,4 +520,4 @@ export function ServerPanel({
       )}
     </>
   );
-}
+});

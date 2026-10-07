@@ -9,6 +9,7 @@ export interface GpuProc {
 
 export interface Gpu {
   index: number;
+  uuid?: string;
   name: string;
   util: number;
   memUsed: number;
@@ -33,6 +34,14 @@ export interface ProcessItem {
 }
 
 export interface HistoryPoint { at: number; value: number | null }
+export interface HistoryQuery {
+  serverId: string; device: string; metric: string; rangeMs: number; end?: number;
+}
+export interface HistoryResult {
+  start: number; end: number; stepMs: number; retentionDays: number; rawHours: number;
+  points: Array<HistoryPoint & { min: number | null; max: number | null; coveredMs: number; gap: boolean }>;
+  devices: Array<{ device: string; label: string; metric: string }>;
+}
 export interface AlertRecord { id: string; serverId: string; serverName: string; type: string; createdAt: number; resolvedAt?: number }
 export interface CredentialInfo { encryptionAvailable: boolean; backend: string; mode: 'encrypted' | 'session'; migrationError?: string }
 

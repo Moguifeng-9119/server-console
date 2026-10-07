@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Télécharger](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) · [Signaler un problème](https://github.com/Moguifeng-9119/server-console/issues)
+[Télécharger](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [Signaler un problème](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.12.3 :** installateur Windows, changement de serveur réactif et sessions, historique et sorties conservés entre terminaux, serveurs et vue générale. Installez `ServerConsole-Setup-0.12.3.exe` une fois, puis lancez depuis le bureau ou le menu Démarrer. [0.12.3](docs/VALIDATION-0.12.3.md)
+**0.13.0 :** jauges circulaires par GPU, affichage immédiat du cache, panneaux de fichiers conservés et historique visible : 30 minutes, 1 heure, 12 heures, 1 jour, 1 semaine. SQLite supprime automatiquement les données brutes après 24 heures et les résumés par minute après 30 jours. La collecte fonctionne lorsque l’application est ouverte. Installez `ServerConsole-Setup-0.13.0.exe`. [Validation et capacité](docs/VALIDATION-0.13.0.md)
 
 **Les fichiers Windows ne sont pas signés. SmartScreen peut afficher un avertissement. Comparez le SHA-256 au fichier de la version.**
 
@@ -14,7 +14,7 @@
 
 **Nouveautés de 0.12.0**
 
-Journal persistant pour récupérer et nettoyer les fichiers temporaires de chaque tâche ; progression SHA-256 visible et explication des anciennes tâches. Commandes clavier des fichiers/relais, protection du texte non enregistré et ESLint/Hooks ajoutés. Les dix langues ont 678 clés ; la relecture native de tous les textes assistés par traduction automatique reste à faire.
+Journal persistant pour récupérer et nettoyer les fichiers temporaires de chaque tâche ; progression SHA-256 visible et explication des anciennes tâches. Commandes clavier des fichiers/relais, protection du texte non enregistré et ESLint/Hooks ajoutés. Les dix langues ont 702 clés ; la relecture native de tous les textes assistés par traduction automatique reste à faire.
 
 0.12.2 a validé sur deux serveurs Linux réels un envoi de 16 MiB, rsync, la reprise après arrêt forcé du processus principal, la progression du préfixe et le nettoyage des clés/répertoires appartenant aux tâches. Les chiffres 0.11.1 suivants sont historiques. Portée actuelle : [0.12.2](docs/VALIDATION-0.12.2.md).
 
