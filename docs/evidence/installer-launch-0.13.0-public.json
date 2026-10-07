@@ -1,0 +1,11 @@
+{
+  "version": "0.13.0",
+  "historyWorkerQuery": "passed",
+  "scope": "Anonymous public release NSIS embedded payload extracted to owned temporary directory; executable, version and preload checked. No registry install or user upgrade performed.",
+  "installerBytes": 118561631,
+  "installerSha256": "8afc63f3ea67199fd59db81f88ed9c029845ee2b93d89d0bf11f4d6e593c0f54",
+  "payloadAsarSha256": "60da445c32060d10b437cf1a9d0b49828222ed0baa822a948faa24d8ab44e485",
+  "startupToNavigationMs": [
+    2114
+  ]
+}
