@@ -1,0 +1,277 @@
+{
+  "version": "0.13.1",
+  "scope": "Production browser renderer with explicitly simulated GPU snapshots; 1/2/3/4/8 GPUs, three widths, light/dark",
+  "checks": [
+    {
+      "gpuCount": 1,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 1,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 2,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 3,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 900,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 900,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1280,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1280,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1600,
+      "theme": "light",
+      "columns": [
+        2,
+        2
+      ]
+    },
+    {
+      "gpuCount": 8,
+      "width": 1600,
+      "theme": "dark",
+      "columns": [
+        2,
+        2
+      ]
+    }
+  ],
+  "errors": []
+}

@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
+[Baixar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [Relatar problema](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.13.0:** indicadores circulares por GPU, troca imediata com dados em cache, painéis de arquivos preservados e histórico visível de 30 minutos, 1 hora, 12 horas, 1 dia e 1 semana. O SQLite remove amostras brutas após 24 horas e resumos por minuto após 30 dias automaticamente. A coleta funciona enquanto o aplicativo está aberto. Instale `ServerConsole-Setup-0.13.0.exe`. [Validação e capacidade](docs/VALIDATION-0.13.0.md)
+**0.13.1:** indicadores circulares por GPU, troca imediata com dados em cache, painéis de arquivos preservados e histórico visível de 30 minutos, 1 hora, 12 horas, 1 dia e 1 semana. O SQLite remove amostras brutas após 24 horas e resumos por minuto após 30 dias automaticamente. A coleta funciona enquanto o aplicativo está aberto. Instale `ServerConsole-Setup-0.13.1.exe`. [Validação e capacidade](docs/VALIDATION-0.13.1.md)
 
 **Os arquivos Windows não são assinados. O SmartScreen pode avisar. Compare o SHA-256 com o arquivo da versão.**
 

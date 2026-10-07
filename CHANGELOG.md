@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.1 — 2026-10-07
+
+- Use two GPU gauge columns by default and four in sufficiently wide server cards; never auto-fit odd column counts.
+- Remove large filled GPU tiles, normalize ring sizes and improve metric text spacing.
+- Validate 30 simulated GPU-count/window/theme combinations and existing monitoring interactions.
+
+Evidence: [0.13.1 validation ledger](docs/VALIDATION-0.13.1.md).
+
 ## 0.13.0 — 2026-10-07
 
 - Independent per-host polling and immediate cached panels prevent a slow host from blocking navigation.

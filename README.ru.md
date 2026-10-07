@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
+[Скачать](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [Сообщить о проблеме](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.13.0:** круговые индикаторы каждой GPU, мгновенное отображение кэша при переключении, сохранение файловых панелей и доступная история за 30 минут, 1 час, 12 часов, 1 день и 1 неделю. SQLite автоматически удаляет исходные отсчёты через 24 часа, минутные сводки — через 30 дней. Данные собираются при открытом приложении. Установите `ServerConsole-Setup-0.13.0.exe`. [Проверки и объём](docs/VALIDATION-0.13.0.md)
+**0.13.1:** круговые индикаторы каждой GPU, мгновенное отображение кэша при переключении, сохранение файловых панелей и доступная история за 30 минут, 1 час, 12 часов, 1 день и 1 неделю. SQLite автоматически удаляет исходные отсчёты через 24 часа, минутные сводки — через 30 дней. Данные собираются при открытом приложении. Установите `ServerConsole-Setup-0.13.1.exe`. [Проверки и объём](docs/VALIDATION-0.13.1.md)
 
 **Файлы Windows не подписаны. SmartScreen может показать предупреждение. Сверьте SHA-256 с файлом контрольных сумм релиза.**
 
@@ -39,7 +39,7 @@ ServerConsole — персональный настольный инструме
 
 ## Начало работы
 
-Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
+Скачайте пакет своей ОС из [релиза](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1). Проверьте подключение и добавьте сервер либо импортируйте SSH config. Для GPU нужен удалённый nvidia-smi, для системных метрик — Linux /proc. Исходный код запускается с Node.js 22 и npm:
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git

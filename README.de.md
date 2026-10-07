@@ -4,9 +4,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.0) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
+[Herunterladen](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [Problem melden](https://github.com/Moguifeng-9119/server-console/issues)
 
-**0.13.0:** Kreisanzeigen je GPU, sofortige Anzeige gespeicherter Messwerte, erhaltene Dateiansichten und sichtbarer Verlauf für 30 Minuten, 1 Stunde, 12 Stunden, 1 Tag und 1 Woche. SQLite löscht Rohdaten nach 24 Stunden und Minutenwerte nach 30 Tagen automatisch. Die Messung läuft bei geöffneter App. Installieren Sie `ServerConsole-Setup-0.13.0.exe`. [Prüfungen und Speicherbedarf](docs/VALIDATION-0.13.0.md)
+**0.13.1:** Kreisanzeigen je GPU, sofortige Anzeige gespeicherter Messwerte, erhaltene Dateiansichten und sichtbarer Verlauf für 30 Minuten, 1 Stunde, 12 Stunden, 1 Tag und 1 Woche. SQLite löscht Rohdaten nach 24 Stunden und Minutenwerte nach 30 Tagen automatisch. Die Messung läuft bei geöffneter App. Installieren Sie `ServerConsole-Setup-0.13.1.exe`. [Prüfungen und Speicherbedarf](docs/VALIDATION-0.13.1.md)
 
 **Windows-Dateien sind nicht signiert. SmartScreen kann warnen. Vergleichen Sie SHA-256 mit der Prüfsummendatei der Version.**
 
