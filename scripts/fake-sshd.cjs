@@ -277,8 +277,16 @@ function attachSession(client, rootDir, onWindowChange) {
         const input = process.platform === 'win32' ? d : d.toString('utf8').replace(/\r\n?/g, '\n');
         try { child.stdin.write(input); } catch { /* noop */ }
       });
-      child.stdout.on('data', (d) => stream.write(d));
-      child.stderr.on('data', (d) => stream.write(d));
+      // A real POSIX PTY applies ONLCR; pipes need the same output translation.
+      // Decode per stream so a UTF-8 character split between chunks stays intact.
+      for (const output of [child.stdout, child.stderr]) {
+        const decoder = new (require('node:string_decoder').StringDecoder)('utf8');
+        output.on('data', (d) => {
+          const text = decoder.write(d);
+          stream.write(process.platform === 'win32' ? text : text.replace(/\r?\n/g, '\r\n'));
+        });
+        output.on('end', () => { const tail = decoder.end(); if (tail) stream.write(tail); });
+      }
       child.on('error', (error) => { stream.write('Shell failed: ' + error.message); stream.end(); });
       child.on('close', () => stream.end());
       stream.on('close', () => {

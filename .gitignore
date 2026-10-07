@@ -17,7 +17,7 @@ _stage*
 _cdp_*
 .env
 .env.*
-.zcode/
+.worktrees/
 test-artifacts/
 
 # Keep project assessment notes local.

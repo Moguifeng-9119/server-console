@@ -55,6 +55,5 @@
     "actual OS key-store behavior",
     "signing, installer and update",
     "GitHub CI or public release"
-  ],
-  "sourceBranch": "codex/serverconsole-0.11-improvements"
+  ]
 }

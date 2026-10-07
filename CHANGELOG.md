@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.3 — 2026-10-06
+## 0.12.3 — 2026-10-07
 
 - Publish an assisted Windows NSIS installer as the primary Windows release download.
 - Preserve terminal instances, scrollback, background output and per-server selected tabs across session/server/overview navigation.

@@ -142,6 +142,7 @@ async function main() {
     await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().split(/\r?\n/).some((line) => line.trim() === 'bg-45'), ids[0], {timeout: 30000});
     await page.locator('.term:visible .term-chip-select').first().click();
     const background = await dumpId(ids[0]);
+    fs.writeFileSync(path.join(artifacts, 'background-output.txt'), background);
     for (let i = 1; i <= 45; i++) assert.equal(background.split(/\r?\n/).filter((line) => line.trim() === 'bg-' + i).length, 1);
     assert(await page.evaluate(() => window.__originalTermNodes.every((node) => node.isConnected && document.querySelector(`[data-term-id="${node.dataset.termId}"]`) === node)));
     pass('session switches retain xterm DOM, scrollback and 45 background output lines exactly once');
