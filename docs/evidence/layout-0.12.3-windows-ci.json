@@ -1,0 +1,153 @@
+{
+  "version": "0.12.3",
+  "sourceAndAssetSHA256": "passed",
+  "scope": "Current packaged app, isolated data; real native window chrome; no remote server connections",
+  "checks": [
+    {
+      "label": "win32 en scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 en scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 en scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 en scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1.25 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1.25 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 en scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 en scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 de scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 fr scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 ru scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 pt-BR scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1.5 maximized=false",
+      "titlebarHeight": 34
+    },
+    {
+      "label": "win32 zh-CN scale=1.5 maximized=true",
+      "titlebarHeight": 34
+    }
+  ],
+  "packageRun": 37590959257,
+  "appCommit": "c72e1b54956161559e1607d3df2e5d1cc1ed39c9"
+}

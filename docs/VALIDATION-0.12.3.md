@@ -19,8 +19,20 @@ This release addresses navigation responsiveness, terminal continuity and Window
 
 Native additions verify actual terminal-chip switches with unchanged xterm nodes, 45 background lines exactly once, server/overview navigation with unchanged session IDs and shell variables, closing the active terminal, renderer reload replay without duplicates, and server-removal cleanup. Full application restart verifies configuration/credential policy; it does not claim live SSH-shell recovery.
 
-The local synthetic directory workload compares the previous production renderer with this build using the same simulated IPC and 12,000 file entries in each pane. Five monitoring/transfer update-to-frame samples were approximately 1.8–4.7 seconds before and 32–51 ms after. Eight one-click server switches all selected the intended server; this build painted in approximately 25–372 ms, including re-entering a file page. These are local browser measurements, not production SSH/network latency guarantees.
+The local synthetic directory workload compares the previous production renderer with this build using the same simulated IPC and 12,000 file entries in each pane. Five monitoring/transfer update-to-frame samples were approximately 1.8–4.7 seconds [before](evidence/navigation-baseline-0.12.2.json); the latest local run measured 21–33 ms [after](evidence/navigation-0.12.3-local.json). Eight one-click server switches all selected the intended server and painted in approximately 21–275 ms, including re-entering a file page. These are local browser measurements, not production SSH/network latency guarantees.
 
 ## Release status
 
-Cross-platform CI, package/native results and the public installer download will be recorded here after completion. Windows packages are unsigned; the macOS package is not notarized. No test installation silently upgrades the existing user application or changes its data.
+All three platforms passed [source CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37590957458) and [package/native CI](https://github.com/Moguifeng-9119/server-console/actions/runs/37590959257) at application commit `c72e1b54956161559e1607d3df2e5d1cc1ed39c9`. [Source receipt](evidence/source-ci-0.12.3.json) and [package receipt](evidence/packages-ci-0.12.3.json) record the completed jobs.
+
+| Platform | Source validation | Current packaged native validation |
+| --- | --- | --- |
+| Windows x64 | 164 tests; lint/types/build; SSH/SFTP smoke; 22 UI, 23 workflow, 60 layout, 6 language and 7 navigation checks | 21 terminal/IPC and 36 layout; real DPAPI; NSIS installer |
+| Linux x64 | Same source checks passed | 21 terminal/IPC and 12 layout under Xvfb; credentials remain session-only without secure storage |
+| macOS arm64 | Same source checks passed | 21 terminal/IPC and 12 layout; universal DMG; Playwright MockKeychain, not real Keychain |
+
+The final terminal harness waits for completed asynchronous IPC predicates on the Node side and checks the second server's real shell readiness, then compares the full retained ID set. Earlier POSIX fixture pipes lacked terminal ONLCR output translation; the final fixture includes per-stream UTF-8 decoding and POSIX newline translation. These corrected runs are the release evidence.
+
+The local NSIS embedded payload was extracted to an owned temporary directory and its app archive matched the current unpacked package. Three launches verified v0.12.3, the navigation UI and native preload/settings IPC; timings were approximately 2.3, 1.0 and 1.4 seconds. This checks the executable layout produced by installation; it does not claim an actual registry installation or an upgrade of the user's existing application. [Local payload receipt](evidence/installer-0.12.3-local.json).
+
+Windows packages are unsigned; the macOS package is not notarized. Public release/download verification will be appended after publishing.

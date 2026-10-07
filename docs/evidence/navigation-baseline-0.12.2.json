@@ -1,0 +1,51 @@
+{
+  "scope": "Production renderer, simulated IPC, 12000 files per pane; timings are local synthetic measurements",
+  "checks": [
+    "12000-file directories render with bounded initial rows",
+    "a single click selects each server during large-directory updates",
+    "navigation has no uncaught renderer errors"
+  ],
+  "updateFrameMs": [
+    4066.899999976158,
+    4656,
+    1989.199999988079,
+    1822.300000011921,
+    1962.0999999642372
+  ],
+  "navigation": [
+    {
+      "ms": 53.60000002384186,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 20.19999998807907,
+      "title": "Demo training"
+    },
+    {
+      "ms": 4.900000035762787,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 6.700000047683716,
+      "title": "Demo training"
+    },
+    {
+      "ms": 5.699999988079071,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 6.100000023841858,
+      "title": "Demo training"
+    },
+    {
+      "ms": 6.399999976158142,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 7,
+      "title": "Demo training"
+    }
+  ],
+  "errors": [],
+  "rendererVersion": "0.12.2"
+}

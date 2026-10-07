@@ -1,0 +1,12 @@
+{
+  "version": "0.12.3",
+  "scope": "NSIS embedded payload extracted to owned temporary directory; executable, version and preload checked. No registry install or user upgrade performed.",
+  "installerBytes": 118717513,
+  "installerSha256": "6d667f2b4b5c6f669f2c90e9169f2ffe8a60c1ef40a2d47e8009358f4729f856",
+  "payloadAsarSha256": "644f86a7cc90c2bf07d2f0798bafcb26488d618a7fae42c5684447aff6ca5aaf",
+  "startupToNavigationMs": [
+    2292,
+    999,
+    1430
+  ]
+}
