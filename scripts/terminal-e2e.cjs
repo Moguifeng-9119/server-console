@@ -18,7 +18,7 @@ const listen = (server) => new Promise((resolve, reject) => { server.once('error
 async function availablePort() { const server = net.createServer(); const port = await listen(server); await new Promise((resolve) => server.close(resolve)); return port; }
 async function waitUntil(predicate, message) {
   const deadline = Date.now() + 5000;
-  while (!predicate()) {
+  while (!await predicate()) {
     if (Date.now() >= deadline) throw new Error(message);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -70,7 +70,7 @@ async function main() {
     await page.getByPlaceholder('root').fill('fixture');
     await page.locator('input[type="password"]').first().fill('fixture');
     await page.getByRole('button', {name: '添加', exact: true}).click();
-    await page.waitForFunction(async () => (await window.api.listServers()).some((server) => server.name === 'e2e-test'));
+    await waitUntil(() => page.evaluate(async () => (await window.api.listServers()).some((server) => server.name === 'e2e-test')), 'Added server did not appear');
     await page.locator('[role=dialog]').getByRole('button', {name: '关闭', exact: true}).click();
     const storage = await page.evaluate(() => window.api.storeInfo());
     const persisted = JSON.parse(fs.readFileSync(path.join(tmp, 'userdata', 'servers.json'), 'utf8'));
@@ -103,6 +103,7 @@ async function main() {
     const secondServer = await page.evaluate((port) => window.api.addServer({name: 'e2e-second', host: '127.0.0.1', port, username: 'fixture', authType: 'password', password: 'fixture'}), sshd.address().port);
     assert(secondServer.ok);
     await page.reload(); await page.waitForSelector('.nav');
+    await page.evaluate(() => { window.__sessionEvents = []; window.api.onTerminalSessions((list) => window.__sessionEvents.push(list)); });
     await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
     await page.waitForFunction(() => !!document.querySelector('.tabs'));
     await page.getByRole('button', {name: '终端', exact: true}).click();
@@ -124,7 +125,7 @@ async function main() {
     pass('terminal content survives tab switch');
     await page.locator('.term-chip.add').click();
     await page.waitForFunction(() => document.querySelectorAll('.term-chip:not(.add)').length === 2);
-    await page.waitForFunction(async () => (await window.api.terminalList()).length === 2);
+    await waitUntil(() => page.evaluate(async () => (await window.api.terminalList()).length === 2), 'Second SSH session did not open');
     pass('two native SSH sessions coexist');
     const ids = await page.evaluate(async () => (await window.api.terminalList()).map((s) => s.termId));
     const dumpId = (id) => page.evaluate((id) => window.__scTerms?.[id]?.dump() || '', id);
@@ -149,13 +150,17 @@ async function main() {
     await page.locator('.nav-server').filter({hasText: 'e2e-second'}).click();
     assert.equal(await page.locator('.topbar .title').innerText(), 'e2e-second');
     await page.getByRole('button', {name: '终端', exact: true}).click();
-    await page.waitForFunction(async () => (await window.api.terminalList()).length === 3);
+    await waitUntil(() => page.evaluate(async (serverId) => (await window.api.terminalList()).some((s) => s.serverId === serverId), secondServer.server.id), 'Second server SSH session did not open');
+    const secondSession = await page.evaluate(async (serverId) => (await window.api.terminalList()).find((s) => s.serverId === serverId), secondServer.server.id);
+    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().includes('fake-shell ready'), secondSession.termId);
     await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
     assert.equal(await page.locator('.tabs button.on').innerText(), '终端');
     await page.locator('.nav > button').first().click();
     await page.locator('.nav-server').filter({hasText: 'e2e-test'}).click();
     assert((await dumpId(ids[0])).includes('sc-e2e-marker'));
-    assert.equal((await page.evaluate(() => window.api.terminalList())).length, 3);
+    const retainedSessions = await page.evaluate(() => window.api.terminalList());
+    fs.writeFileSync(path.join(artifacts, 'session-navigation.json'), JSON.stringify({expected: [...ids, secondSession.termId], actual: retainedSessions, events: await page.evaluate(() => window.__sessionEvents)}, null, 2));
+    assert.deepEqual(retainedSessions.map((s) => s.termId).sort(), [...ids, secondSession.termId].sort());
     assert(await page.evaluate(() => window.__originalTermNodes.every((node) => node.isConnected)));
     await page.evaluate(({id, command}) => window.api.terminalWrite(id, command + '\r'), {
       id: ids[0], command: process.platform === 'win32' ? 'Write-Output $scSessionToken' : 'printf "%s\\n" "$scSessionToken"'
