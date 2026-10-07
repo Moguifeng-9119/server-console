@@ -1,0 +1,40 @@
+{
+  "version": "0.12.3",
+  "releaseUrl": "https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3",
+  "targetCommitish": "e089a8223250e6d218646d313091a7e9f632d041",
+  "publisherRun": 37594465940,
+  "downloadScope": "Anonymous public checksum and complete Windows NSIS installer; other binary API digests verified against checksum manifest",
+  "rangeCount": 24,
+  "windows": {
+    "name": "ServerConsole-Setup-0.12.3.exe",
+    "bytes": 118569957,
+    "sha256": "079e47f0b161269bfb2ffbd15fd84175df834201f4d270c5857b721066b912e9",
+    "seconds": 26.695
+  },
+  "assets": [
+    {
+      "name": "ServerConsole-0.12.3-universal.dmg",
+      "size": 233241993,
+      "digest": "sha256:478e2185dd043097f49209be0006a8cc21a979c5cd35ca3a380e60bb599863b1",
+      "state": "uploaded"
+    },
+    {
+      "name": "ServerConsole-0.12.3.AppImage",
+      "size": 131073878,
+      "digest": "sha256:458815346888c325cf9b843bcc6d44b6cfc6ec919d207337005d38ab805a694b",
+      "state": "uploaded"
+    },
+    {
+      "name": "ServerConsole-Setup-0.12.3.exe",
+      "size": 118569957,
+      "digest": "sha256:079e47f0b161269bfb2ffbd15fd84175df834201f4d270c5857b721066b912e9",
+      "state": "uploaded"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 294,
+      "digest": "sha256:c3d76bd35677e0035ee943e04a71be2be27321ee5567532cd1d61b32aeff3ceb",
+      "state": "uploaded"
+    }
+  ]
+}

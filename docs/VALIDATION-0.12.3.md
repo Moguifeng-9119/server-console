@@ -35,4 +35,12 @@ The final terminal harness waits for completed asynchronous IPC predicates on th
 
 The local NSIS embedded payload was extracted to an owned temporary directory and its app archive matched the current unpacked package. Three launches verified v0.12.3, the navigation UI and native preload/settings IPC; timings were approximately 2.3, 1.0 and 1.4 seconds. This checks the executable layout produced by installation; it does not claim an actual registry installation or an upgrade of the user's existing application. [Local payload receipt](evidence/installer-0.12.3-local.json).
 
-Windows packages are unsigned; the macOS package is not notarized. Public release/download verification will be appended after publishing.
+Windows packages are unsigned; the macOS package is not notarized.
+
+## Published download verification
+
+[v0.12.3](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.12.3) is public and marked as the latest release. The [publisher workflow](https://github.com/Moguifeng-9119/server-console/actions/runs/37594465940) completed successfully after checking the matching source and package validation runs.
+
+The public checksum manifest and the complete Windows NSIS installer were downloaded without authentication. All 24 HTTP ranges returned the exact requested offsets and sizes; the assembled 118,569,957-byte installer matched SHA-256 `079e47f0b161269bfb2ffbd15fd84175df834201f4d270c5857b721066b912e9`. The other published binaries' GitHub asset digests matched the manifest; they were not downloaded locally again. [Public download receipt](evidence/release-downloads-0.12.3.json).
+
+The verified public installer payload was extracted into an owned temporary directory. One launch with isolated application data verified version 0.12.3, the navigation UI and native preload/settings IPC. Startup to navigation took approximately 3.5 seconds in this local acceptance run. No installer wizard, registry installation or upgrade of the user's existing application was performed. [Public payload launch receipt](evidence/installer-launch-0.12.3-public.json).
