@@ -1,0 +1,34 @@
+{
+  "version": "0.13.0",
+  "scope": "Current packaged Windows app; two previously authorized real SSH hosts; existing trusted fingerprints; isolated user data; monitoring only",
+  "checks": [
+    "At least one real host produced an online GPU snapshot while the other host was independently polled",
+    "Eight one-click server switches painted the active server independently of live SSH responses",
+    "Real snapshots persisted through main IPC into SQLite with individual GPU channels"
+  ],
+  "timingsMs": [
+    281,
+    36,
+    37,
+    27,
+    32,
+    30,
+    32,
+    26
+  ],
+  "hostStatus": [
+    {
+      "status": "online",
+      "gpuCount": 2
+    },
+    {
+      "status": "offline",
+      "gpuCount": 0
+    }
+  ],
+  "gpuCounts": [
+    2,
+    0
+  ],
+  "result": "passed"
+}

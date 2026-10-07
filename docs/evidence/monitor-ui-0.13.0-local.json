@@ -1,0 +1,15 @@
+{
+  "version": "0.13.0",
+  "scope": "Production renderer with simulated IPC, no real GPU evidence",
+  "checks": [
+    "each GPU has a utilization ring",
+    "ring click opens and highlights its GPU",
+    "server status-dot click switches with one click",
+    "stale server switches show cached metrics and sample age immediately",
+    "visited file panes retain DOM and do not repeat home requests",
+    "all five visible range buttons request their exact time windows",
+    "GPU selection remains visible while a metric query is pending",
+    "monitoring interactions have no renderer errors"
+  ],
+  "errors": []
+}

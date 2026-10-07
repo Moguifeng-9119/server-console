@@ -1,0 +1,87 @@
+{
+  "conclusion": "success",
+  "databaseId": 37603994949,
+  "headSha": "ae88fd77ad85d7a75b93e80ab8b9c5a8c4ecacee",
+  "jobs": [
+    {
+      "name": "verify (windows-latest)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "安装依赖",
+        "类型检查（src strict + electron checkJs）",
+        "单元测试",
+        "ESLint and Hooks checks",
+        "e2e 冒烟（双假服务器，真实 SFTP）",
+        "生产构建",
+        "Install browser for renderer checks",
+        "Production renderer smoke (simulated metrics)",
+        "File, editor, relay and resume workflow checks",
+        "Window chrome and multilingual layout checks",
+        "Language initialization and failed-load checks",
+        "Responsive navigation and persistent terminal checks",
+        "Monitoring history, rings and cached navigation checks",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "verify (macos-latest)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "安装依赖",
+        "类型检查（src strict + electron checkJs）",
+        "单元测试",
+        "ESLint and Hooks checks",
+        "e2e 冒烟（双假服务器，真实 SFTP）",
+        "生产构建",
+        "Install browser for renderer checks",
+        "Production renderer smoke (simulated metrics)",
+        "File, editor, relay and resume workflow checks",
+        "Window chrome and multilingual layout checks",
+        "Language initialization and failed-load checks",
+        "Responsive navigation and persistent terminal checks",
+        "Monitoring history, rings and cached navigation checks",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "verify (ubuntu-latest)",
+      "conclusion": "success",
+      "checks": [
+        "Set up job",
+        "Run actions/checkout@v4",
+        "Run actions/setup-node@v4",
+        "安装依赖",
+        "类型检查（src strict + electron checkJs）",
+        "单元测试",
+        "ESLint and Hooks checks",
+        "e2e 冒烟（双假服务器，真实 SFTP）",
+        "生产构建",
+        "Install browser for renderer checks",
+        "Production renderer smoke (simulated metrics)",
+        "File, editor, relay and resume workflow checks",
+        "Window chrome and multilingual layout checks",
+        "Language initialization and failed-load checks",
+        "Responsive navigation and persistent terminal checks",
+        "Monitoring history, rings and cached navigation checks",
+        "Run actions/upload-artifact@v4",
+        "Post Run actions/setup-node@v4",
+        "Post Run actions/checkout@v4",
+        "Complete job"
+      ]
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/Moguifeng-9119/server-console/actions/runs/37603994949"
+}

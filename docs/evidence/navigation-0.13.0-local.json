@@ -1,0 +1,55 @@
+{
+  "version": "0.13.0",
+  "scope": "Production renderer, simulated IPC, 12000 files per pane; timings are local synthetic measurements",
+  "checks": [
+    "12000-file directories render with bounded initial rows",
+    "a single click selects each server during large-directory updates",
+    "pending remote directory requests do not prevent local loading or server navigation",
+    "attach replay precedes queued live output exactly once; stale lists cannot erase newer sessions",
+    "terminal/server/overview switches retain panes without attaching again or detaching",
+    "same-server tab switches do not reschedule backend focus",
+    "navigation has no uncaught renderer errors"
+  ],
+  "updateFrameMs": [
+    5.100000000093132,
+    5.899999999906868,
+    6.5,
+    6.899999999906868,
+    4.2999999998137355
+  ],
+  "navigation": [
+    {
+      "ms": 81,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 202.60000000009313,
+      "title": "Demo training"
+    },
+    {
+      "ms": 53.799999999813735,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 187.09999999962747,
+      "title": "Demo training"
+    },
+    {
+      "ms": 50,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 209.59999999962747,
+      "title": "Demo training"
+    },
+    {
+      "ms": 85,
+      "title": "Demo inference"
+    },
+    {
+      "ms": 181.20000000018626,
+      "title": "Demo training"
+    }
+  ],
+  "errors": []
+}
