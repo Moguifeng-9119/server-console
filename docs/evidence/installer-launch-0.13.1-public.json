@@ -1,0 +1,12 @@
+{
+  "version": "0.13.1",
+  "gpuColumnRule": "2/4 passed in public packaged window",
+  "historyWorkerQuery": "passed",
+  "scope": "Anonymous public release NSIS embedded payload extracted to owned temporary directory; executable, version and preload checked. No registry install or user upgrade performed.",
+  "installerBytes": 118561651,
+  "installerSha256": "a0a07c773f41441008873af6386108401b89399f881938111294441ac71559b8",
+  "payloadAsarSha256": "b78d3d6be4fd6537cb80e6925e57e1b52ec8a5ef8e6a112cd6aa442f52991ea0",
+  "startupToNavigationMs": [
+    2458
+  ]
+}
