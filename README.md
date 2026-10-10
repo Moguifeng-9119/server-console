@@ -6,9 +6,7 @@
 
 [Download desktop releases](https://github.com/Moguifeng-9119/server-console/releases) · [Report a problem](https://github.com/Moguifeng-9119/server-console/issues) · [Contribute](CONTRIBUTING.md)
 
-**0.13.2 source/local update:** Overview GPU grids now use four columns, including narrow cards. [Local validation](docs/VALIDATION-0.13.2.md).
-
-**0.13.1:** Circular per-GPU gauges, immediate cached server panels, retained file panes and visible history ranges: 30 minutes, 1 hour, 12 hours, 1 day and 1 week. SQLite automatically expires raw samples after 24 hours and minute summaries after 30 days. Monitoring runs while the desktop app is open. Install `ServerConsole-Setup-0.13.1.exe`. [Validation and storage measurement](docs/VALIDATION-0.13.1.md)
+**0.13.2:** Overview GPU grids now default to four columns across all supported server card widths. Server cards prefer at least 430 px, while narrow cards retain four columns with proportional gauge scaling and compact spacing. Includes circular per-GPU gauges, immediate cached server panels, retained file panes, and visible 1-week history monitoring with SQLite 24h/30d automatic retention. [Validation ledger](docs/VALIDATION-0.13.2.md).
 
 **Windows downloads are unsigned. SmartScreen may show a warning. Compare the download SHA-256 with the release checksum file.**
 
@@ -19,7 +17,7 @@
 
 ![Visible one-week history with simulated metrics](assets/screenshots/monitor-history-0.13.0.png)
 
-*The overview screenshot shows v0.13.1; the history screenshot shows v0.13.0, both with explicitly simulated metrics; older transfer screenshots remain from v0.12.0. [v0.13.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) provides Windows x64 installer, Linux x86_64 AppImage and macOS universal DMG packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.13.1.md) for platform coverage.*
+*The overview screenshot shows v0.13.1; the history screenshot shows v0.13.0, both with explicitly simulated metrics; older transfer screenshots remain from v0.12.0. [v0.13.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.2) provides desktop packages with SHA-256 checksums. See the [latest validation ledger](docs/VALIDATION-0.13.2.md) for platform coverage.*
 
 [Detailed usage, transfer decisions, recovery and source map (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -95,7 +93,7 @@ npm run benchmark
 
 The current source passes 179 regressions, type checking, ESLint/Hooks and two loopback SSH/SFTP byte checks. Production browser checks cover the workbench, file/editor/relay, all ten locales, resource-load failures and keyboard language races. A current packaged Windows build passed 22 native terminal/IPC checks and 36 native layout checks at 100/125/150% scaling. Two real Linux hosts passed 16 MiB upload and rsync relay SHA-256 checks after separately forcing the entire Electron main process to terminate; restart restored prefix-verified upload recovery and removed exact old direct keys/scratch. These bounded checks do not establish production fleet or 100 GB performance.
 
-The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.13.1.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
+The stack is React 18, TypeScript, Electron, Vite and ssh2; exact versions are in [package.json](package.json) and the lockfile. See [architecture](docs/ARCHITECTURE.md), [latest validation evidence](docs/VALIDATION-0.13.2.md) and [benchmark methodology](docs/BENCHMARKS.md). ESLint/Hooks and behavior/browser checks run in CI.
 
 Build targets: dist:win:lite, dist:win:nsis, dist:linux and dist:mac. [Manual packaging CI](.github/workflows/package.yml) uploads unsigned artifacts for review and does not publish a release. The current platform/package results are recorded in the validation ledger. Signing/notarization, installers/updates, Intel macOS execution and real macOS/Linux key stores remain unverified; macOS automation uses MockKeychain.
 

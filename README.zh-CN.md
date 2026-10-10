@@ -6,9 +6,7 @@
 
 [下载桌面版本](https://github.com/Moguifeng-9119/server-console/releases) · [反馈问题](https://github.com/Moguifeng-9119/server-console/issues) · [参与贡献](CONTRIBUTING.md)
 
-**0.13.2 源码／本地安装包更新：**主页 GPU 固定每行 4 张，窄卡片缩小圆环和间距，仍保持四列。[本地验证](docs/VALIDATION-0.13.2.md)。
-
-**0.13.1：**主页逐卡圆形 GPU 仪表默认每行 2 个，宽卡片每行 4 个；切换服务器先显示缓存、后台独立刷新，保留已打开的文件面板。总览卡片和服务器页均有“历史监控”入口，可选 30 分钟、1 小时、半天、1 天、1 周。SQLite 自动清理超过 24 小时的原始采样和超过 30 天的分钟汇总；应用运行时持续采集。安装 `ServerConsole-Setup-0.13.1.exe`。[验证与存储实测](docs/VALIDATION-0.13.1.md)
+**0.13.2：**主页 GPU 仪表在所有支持的卡片宽度下均固定每行 4 张。服务器卡片优先保证至少 430 px 宽度；窄卡片自适应缩小仪表与间距并允许显存文字换行，严格维持四列规整布局。包含逐卡圆形仪表、秒级切换缓存面板、保留已打开文件面板，以及 SQLite 24小时/30天自动清理的可见一周历史监控。[验证记录](docs/VALIDATION-0.13.2.md)。
 
 **Windows 下载包未签名，SmartScreen 可能显示警告。请使用 Release 附带的 SHA-256 文件核对下载内容。**
 
@@ -19,7 +17,7 @@
 
 ![可见的一周历史监控，模拟数据](assets/screenshots/monitor-history-0.13.0.png)
 
-*主页截图来自 v0.13.1，历史监控图来自 v0.13.0，旧传输截图来自 v0.12.0，均使用明确标注的模拟数据。[v0.13.1](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) 提供 Windows x64 安装版、Linux x86_64 AppImage 和 macOS 通用 DMG，以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.13.1.md)。*
+*主页截图来自 v0.13.1，历史监控图来自 v0.13.0，旧传输截图来自 v0.12.0，均使用明确标注的模拟数据。[v0.13.2](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.2) 提供桌面安装包以及 SHA-256 校验文件。各系统的验证范围见[最新验证记录](docs/VALIDATION-0.13.2.md)。*
 
 详细操作、传输决策流程、崩溃恢复和源码布局见[使用与恢复指南](docs/USER-GUIDE.zh-CN.md)。
 
@@ -95,9 +93,9 @@ npm run benchmark
 
 当前源码通过 164 项回归、类型检查、ESLint/Hooks 和双本机 SSH/SFTP 字节检查；生产浏览器覆盖工作台、文件/编辑/互传、十语言，以及语言资源失败和真实键盘竞争操作。新版 Windows 包通过 16 项原生终端与 36 项原生布局检查，涵盖 100/125/150% 缩放。两台真实 Linux 主机完成 16 MiB 上传和 rsync 互传 SHA-256；分别强杀整个 Electron 主进程后，上传恢复包含前缀校验，直传重连会清除原有的精确临时密钥和目录。这些有界测试不代表生产集群或 100 GB 性能已验证。
 
-准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.13.1.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
+准确依赖版本以 [package.json](package.json) 与锁文件为准。参阅 [架构](docs/ARCHITECTURE.md)、[最新验证证据](docs/VALIDATION-0.13.2.md)、[基准说明](docs/BENCHMARKS.md)。ESLint/Hooks 与行为/浏览器检查在 CI 执行。
 
-构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.13.1.md)。
+构建命令为 dist:win:lite、dist:win:nsis、dist:linux、dist:mac。[手动打包 CI](.github/workflows/package.yml) 在各平台构建后运行原生检查，再上传未签名构建；所有命令显式关闭自动发布。发布包未签名，macOS 未公证；真实硬件、真实系统密钥库及安装器验证范围见[验证记录](docs/VALIDATION-0.13.2.md)。
 
 ## 语言、贡献与后续方向
 
