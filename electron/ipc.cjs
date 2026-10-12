@@ -13,6 +13,7 @@ const { ForwardingManager } = require('./forwardings.cjs');
 const { TransferManager } = require('./transfer.cjs');
 const { HistoryStore } = require('./history-store.cjs');
 const { PollScheduler } = require('./poll-scheduler.cjs');
+const { HistoryAggregator } = require('./monitoring/history-aggregator.cjs');
 
 const pool = new Pool();
 let servers = [];
@@ -22,6 +23,8 @@ let transfers = null;
 let forwardings = null;
 let configWatchPath = '';
 let knownAliases = null; // 上次 config 的别名集合（null=尚未建立基线，首次不报删除）
+const historyAggregator = new HistoryAggregator();
+let historyFlushTimer = null;
 
 function broadcast(channel, payload) {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send(channel, payload);
@@ -50,7 +53,7 @@ async function collectServer(cfg) {
     const snap = await conn.collect();
     if (!servers.includes(cfg)) return;
     const payload = { id: cfg.id, status: 'online', error: '', ...snap };
-    void historyStore?.request('snapshot', payload).catch((e) => historyError(e));
+    historyAggregator.ingestSnapshot(payload);
     void transfers?.collectStaging({ serverId: cfg.id });
     const json = JSON.stringify(snap);
     if (lastSnapJson.get(cfg.id) === json) return;
@@ -244,7 +247,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('ssh:setInterval', (_e, ms) => {
-    intervalMs = Math.max(1000, Number(ms) || 2000);
+    intervalMs = Math.max(200, Number(ms) || 2000);
     start();
     return intervalMs;
   });
@@ -894,7 +897,26 @@ function init() {
   watchDefaultConfig();
   // 恢复启用的端口转发规则（异步，不阻塞启动）
   forwardings.startAll().catch((e) => logError('forwardings startAll', e));
+  // 启动历史 1 秒桶批量写入循环
+  if (historyFlushTimer) clearInterval(historyFlushTimer);
+  historyFlushTimer = setInterval(() => {
+    const buckets = historyAggregator.flush();
+    if (buckets.length > 0) {
+      void historyStore?.request('buckets', buckets).catch((e) => historyError(e));
+    }
+  }, 1000);
 }
 
-module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
-  shutdown: async () => { scheduler.stop(); await historyStore?.close(); } };
+module.exports = {
+  init,
+  hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
+  shutdown: async () => {
+    if (historyFlushTimer) clearInterval(historyFlushTimer);
+    scheduler.stop();
+    const finalBuckets = historyAggregator.flush(Date.now());
+    if (finalBuckets.length > 0) {
+      await historyStore?.request('buckets', finalBuckets).catch((e) => historyError(e));
+    }
+    await historyStore?.close();
+  },
+};
