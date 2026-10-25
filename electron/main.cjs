@@ -1,16 +1,21 @@
 // 主进程：SSH 采集、凭据存储、系统通知都跑在这里（renderer 只负责展示）
-const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Tray, Menu, nativeImage, shell, Notification } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const ipc = require('./ipc.cjs');
 const lang = require('./lang.cjs');
 const { checkUpdate } = require('./updates.cjs');
+const { StatusServer } = require('./statusserver.cjs');
+const nodeCrypto = require('node:crypto');
 
 let mainWindow = null;
 let forceQuit = false; // 用户在确认框里选了强制退出后置位，绕过关窗拦截
 let tray = null;
 let closeAction = 'ask'; // ask=每次询问 | minimize=隐藏到托盘 | exit=直接退出
 let savedLanguage;
+let updateAutoInstall = false; // 自动更新：默认仅通知，开启后自动下载、退出时安装
+let statusPage = { enabled: false, token: '', port: 0 }; // 手机状态页配置
+let updateStatus = { available: false }; // 最近一次更新检查结果（广播给设置页横幅）
 
 const appSettingsFile = () => path.join(app.getPath('userData'), 'appsettings.json');
 function loadAppSettings() {
@@ -18,6 +23,8 @@ function loadAppSettings() {
     const o = JSON.parse(fs.readFileSync(appSettingsFile(), 'utf8'));
     if (['ask', 'minimize', 'exit'].includes(o.closeAction)) closeAction = o.closeAction;
     if (lang.setLanguage(o.language)) savedLanguage = o.language;
+    updateAutoInstall = o.updateAutoInstall === true;
+    if (o.statusPage && typeof o.statusPage === 'object') statusPage = { enabled: o.statusPage.enabled === true, token: String(o.statusPage.token || ''), port: Number(o.statusPage.port) || 0 };
   } catch {
     /* 默认 ask */
   }
@@ -30,6 +37,35 @@ function logCrash(tag, detail) {
     fs.appendFileSync(path.join(app.getPath('userData'), 'error.log'), `[${new Date().toISOString()}] ${tag}: ${body}\n`);
   } catch {
     /* noop */
+  }
+}
+
+// ===== 自动更新（electron-updater）：默认仅通知；设置里可开"自动下载并安装" =====
+let autoUpdater = null;
+function setupAutoUpdate() {
+  if (!app.isPackaged) return; // 开发态/便携解压态不启用
+  try {
+    const { autoUpdater: updater } = require('electron-updater');
+    autoUpdater = updater;
+    autoUpdater.autoDownload = updateAutoInstall;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-available', (info) => {
+      updateStatus = { available: true, version: info && info.version };
+      pushUpdateStatus();
+      if (Notification.isSupported()) new Notification({ title: lang.t('updateAvailableTitle'), body: lang.t('updateAvailableBody', { version: (info && info.version) || '' }) }).show();
+      if (updateAutoInstall) autoUpdater.downloadUpdate().catch((e) => logCrash('update-download', String(e)));
+    });
+    autoUpdater.on('update-not-available', () => { updateStatus = { available: false, checked: true }; pushUpdateStatus(); });
+    autoUpdater.on('download-progress', (p) => { updateStatus = { ...updateStatus, downloading: true, percent: Math.round(p.percent || 0) }; pushUpdateStatus(); });
+    autoUpdater.on('update-downloaded', (info) => {
+      updateStatus = { ...updateStatus, available: true, version: (info && info.version) || updateStatus.version, downloaded: true, downloading: false };
+      pushUpdateStatus();
+      if (Notification.isSupported()) new Notification({ title: lang.t('updateDownloadedTitle'), body: lang.t('updateDownloadedBody') }).show();
+    });
+    autoUpdater.on('error', (e) => { updateStatus = { ...updateStatus, error: String((e && e.message) || e) }; pushUpdateStatus(); });
+    setTimeout(() => autoUpdater.checkForUpdates().catch((e) => logCrash('update-check', String(e))), 30000);
+  } catch (e) {
+    logCrash('update-init', String(e));
   }
 }
 
@@ -130,7 +166,28 @@ ipcMain.on('app:show-main', () => {
   mainWindow.show();
   mainWindow.focus();
 });
-ipcMain.handle('app:get-settings', () => ({ closeAction, language: savedLanguage }));
+ipcMain.handle('app:get-settings', () => ({ closeAction, language: savedLanguage, updateAutoInstall, statusPage: statusPageInfo() }));
+ipcMain.handle('app:set-status-page', (_e, payload) => {
+  const enabled = !!(payload && (payload.enabled ?? payload));
+  return applyStatusPage(enabled);
+});
+ipcMain.handle('update:get-status', () => updateStatus);
+ipcMain.handle('update:auto-install', (_e, on) => {
+  updateAutoInstall = on === true;
+  saveAppSettings({ closeAction, language: savedLanguage, updateAutoInstall, statusPage });
+  if (autoUpdater) autoUpdater.autoDownload = updateAutoInstall;
+  if (updateAutoInstall && updateStatus.available && !updateStatus.downloaded && autoUpdater) autoUpdater.downloadUpdate().catch((e) => logCrash('update-download', String(e)));
+  return updateAutoInstall;
+});
+ipcMain.handle('update:download', () => {
+  if (!autoUpdater) return Promise.resolve(false);
+  return autoUpdater.downloadUpdate().then(() => true).catch((e) => { logCrash('update-download', String(e)); return false; });
+});
+ipcMain.handle('update:install', () => {
+  if (autoUpdater && updateStatus.downloaded) { autoUpdater.quitAndInstall(); return true; }
+  shell.openExternal('https://github.com/Moguifeng-9119/server-console/releases/latest');
+  return false;
+});
 // 语言：主进程通知文案跟随设置里选择的语言
 ipcMain.handle('app:set-language', (_e, payload) => {
   const language = payload && typeof payload === 'object' ? payload.lang : payload;
@@ -171,6 +228,31 @@ ipcMain.handle('app:set-theme-overlay', (_e, payload) => {
     return false;
   }
 });
+
+// ===== 手机状态页（只读）：设置开关控制启停，数据由 ipc.statusSnapshot 提供 =====
+const statusServer = new StatusServer({ getSummary: () => ipc.statusSnapshot(), token: statusPage.token, log: logCrash });
+function statusPageInfo() {
+  const running = statusServer.running();
+  const { urls, localhost } = statusServer.lanAddresses(statusServer.port || statusPage.port);
+  return { enabled: statusPage.enabled, running, token: statusServer.token || statusPage.token, port: statusServer.port || statusPage.port, url: localhost, urls };
+}
+async function applyStatusPage(enabled) {
+  statusPage.enabled = !!enabled;
+  if (statusPage.enabled) {
+    if (!statusPage.token) statusPage.token = nodeCrypto.randomBytes(16).toString('hex');
+    statusServer.token = statusPage.token;
+    await statusServer.start(statusPage.port || 0);
+    statusPage.port = statusServer.port;
+  } else {
+    statusServer.stop();
+  }
+  saveAppSettings({ closeAction, language: savedLanguage, updateAutoInstall, statusPage });
+  return statusPageInfo();
+}
+function pushUpdateStatus() {
+  const [win] = BrowserWindow.getAllWindows();
+  if (win && !win.isDestroyed()) win.webContents.send('update:status', updateStatus);
+}
 
 function saveAppSettings(settings) {
   const file = appSettingsFile();
@@ -227,6 +309,8 @@ if (!gotLock) {
   app.whenReady().then(() => {
     loadAppSettings();
     ipc.init();
+    setupAutoUpdate();
+    if (statusPage.enabled) applyStatusPage(true).catch((e) => logCrash('statuspage-start', String(e)));
     let historyClosed = false;
     let closingHistory = false;
     app.on('before-quit', (event) => {

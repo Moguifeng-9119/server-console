@@ -6,6 +6,7 @@ import { useDialogFocus } from '../hooks/useDialogFocus';
 import { CredentialStatus } from './CredentialStatus';
 import { LANGUAGES, changeLanguage } from '../i18n';
 import type { ForwardingRule, TrustedHost } from '../types';
+import type { StatusPageInfo, UpdateStatus } from '../types';
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const {
@@ -54,6 +55,8 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const [rules, setRules] = useState<ForwardingRule[]>([]);
   const [exportPass, setExportPass] = useState('');
   const [newRule, setNewRule] = useState({ serverId: '', localPort: '', remoteHost: '127.0.0.1', remotePort: '' });
+  const [statusPage, setStatusPage] = useState<StatusPageInfo | null>(null);
+  const [update, setUpdate] = useState<UpdateStatus | null>(null);
 
   useEffect(() => {
     if (!api) return;
@@ -64,8 +67,12 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     a.webhookGet().then((o) => setWebhookUrl(o.url || '')).catch(fail);
     a.snippetsList().then(setSnippets).catch(fail);
     a.forwardingsList().then(setRules).catch(fail);
+    a.getAppSettings().then((o) => { setStatusPage(o.statusPage || null); if (typeof o.updateAutoInstall === 'boolean') setAutoInstall(o.updateAutoInstall); }).catch(fail);
+    a.getUpdateStatus().then(setUpdate).catch(() => {});
     return a.onForwardingsChanged(setRules);
   }, []);
+  const [autoInstall, setAutoInstall] = useState(false);
+  const copyStatus = async (text: string) => { try { await navigator.clipboard.writeText(text); setStatus(t('settings.statusCopied')); } catch { /* clipboard unavailable */ } };
 
   const themes: Array<[ThemeMode, string]> = [
     ['system', t('settings.themeSystem')],
@@ -83,7 +90,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
       <div className="mask" style={{ background: 'rgba(0,0,0,0.25)' }} onClick={onClose} />
       <div className="drawer settings-drawer" ref={ref} role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1}>
         <h3 id="settings-title">{t('settings.title')}<button className="btn mini" onClick={onClose}>{t('settings.close')}</button></h3>
-        <div className="settings-tabs" role="group" aria-label={t('settings.title')}>{['appearance','monitoring','security','workflow','activity'].map((key) => <button aria-pressed={section === key} aria-controls={'settings-' + key} id={'settings-tab-' + key} className={section === key ? 'on' : ''} key={key} onClick={() => setSection(key)}>{t('workbench.section_' + key)}</button>)}</div>
+        <div className="settings-tabs" role="group" aria-label={t('settings.title')}>{['appearance','monitoring','security','workflow','activity','mobile','updates'].map((key) => <button aria-pressed={section === key} aria-controls={'settings-' + key} id={'settings-tab-' + key} className={section === key ? 'on' : ''} key={key} onClick={() => setSection(key)}>{t('workbench.section_' + key)}</button>)}</div>
         {status && <div className="inline-status" role="status">{status}</div>}
 
         {section === 'appearance' && <section className="settings-pane" id="settings-appearance"  aria-labelledby="settings-tab-appearance">
@@ -513,6 +520,55 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        </section>}
+        {section === 'mobile' && <section className="settings-pane" id="settings-mobile" aria-labelledby="settings-tab-mobile">
+        <div className="field">
+          <label>{t('settings.statusTitle')}</label>
+          <div className="seg" role="group" aria-label={t('settings.statusTitle')}>
+            <button aria-pressed={!!statusPage?.enabled} className={statusPage?.enabled ? 'on' : ''} onClick={() => { void run(api?.setStatusPage(true)); api?.getAppSettings().then((o) => setStatusPage(o.statusPage || null)).catch(fail); }}>{t('settings.statusOn')}</button>
+            <button aria-pressed={!statusPage?.enabled} className={!statusPage?.enabled ? 'on' : ''} onClick={() => { void run(api?.setStatusPage(false)); api?.getAppSettings().then((o) => setStatusPage(o.statusPage || null)).catch(fail); }}>{t('settings.statusOff')}</button>
+          </div>
+          <div className="note" style={{ marginTop: 4 }}>{t('settings.statusDesc')}</div>
+          {statusPage?.running && <>
+            <div style={{ marginTop: 8, fontSize: 12 }}>{t('settings.statusUrl')}:</div>
+            {(statusPage.urls || []).map((u: string) => (
+              <div className="row" style={{ gap: 6, marginTop: 4 }} key={u}>
+                <input className="mono" readOnly value={u} style={{ flex: 1 }} onFocus={(e) => e.target.select()} />
+                <button className="btn mini" onClick={() => void copyStatus(u)}>{t('settings.statusCopy')}</button>
+              </div>
+            ))}
+            <div style={{ marginTop: 6, fontSize: 12 }}>{t('settings.statusLocalUrl')}: <span className="mono">{statusPage.url}</span></div>
+            <div className="row" style={{ gap: 6, marginTop: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 12 }}>{t('settings.statusToken')}:</span>
+              <span className="mono faint ellipsis" style={{ flex: 1 }} title={statusPage.token}>{statusPage.token.slice(0, 8)}…</span>
+              <button className="btn mini" onClick={() => void copyStatus(statusPage.url)}>{t('settings.statusCopy')}</button>
+            </div>
+            <div className="note" style={{ marginTop: 6 }}>{t('settings.statusPrivacy')}</div>
+          </>}
+        </div>
+        </section>}
+        {section === 'updates' && <section className="settings-pane" id="settings-updates" aria-labelledby="settings-tab-updates">
+        <div className="field">
+          <label>{t('settings.updateSectionTitle')}</label>
+          {update?.available && (
+            <div className="note" style={{ color: 'var(--accent)', marginBottom: 6 }}>
+              {t('settings.updateVersion', { version: update.version || '' })}
+              {update.downloading ? ' ' + t('settings.updateDownloading', { percent: update.percent || 0 }) : ''}
+            </div>
+          )}
+          {update && !update.available && update.checked && <div className="note" style={{ marginBottom: 6 }}>{t('settings.updateUpToDate')}</div>}
+          {update?.error && <div role="alert" className="note" style={{ color: 'var(--warn)', marginBottom: 6 }}>{update.error}</div>}
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn mini" disabled={!api} onClick={() => run(api ? api.checkUpdate() : undefined)}>{t('settings.updateNow')}</button>
+            {update?.available && !update.downloaded && <button className="btn mini" disabled={!api || update.downloading} onClick={() => run(api?.updateDownload())}>{t('settings.updateDownload')}</button>}
+            {update?.available && <button className="btn mini" onClick={() => void api?.updateInstall()}>{update.downloaded ? t('settings.updateInstallOnQuit') : t('settings.updateOpenPage')}</button>}
+          </div>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+            <input type="checkbox" checked={autoInstall} disabled={!api} onChange={(e) => { setAutoInstall(e.target.checked); run(api?.setUpdateAutoInstall(e.target.checked)); }} />
+            {t('settings.updateAutoTitle')}
+          </label>
+          <div className="note" style={{ marginTop: 4 }}>{t('settings.updateAutoDesc')}</div>
+        </div>
         </section>}
         <button className="btn" style={{ width: '100%' }} onClick={onClose}>
           {t('settings.close')}

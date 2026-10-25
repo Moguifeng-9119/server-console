@@ -15,10 +15,12 @@ import type {
   SnapshotPayload,
   SshConfigInfo,
   SshHostEntry,
+  StatusPageInfo,
   SyncPlan,
   SyncRun,
   TerminalSessionInfo,
   TransferItem,
+  UpdateStatus,
   TrustedHost,
 } from './types';
 
@@ -70,7 +72,13 @@ interface Api {
   webhookSend: (payload: { title: string; body: string }) => Promise<IpcResult<boolean>>;
 
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
-  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit'; language?: string }>;
+  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit'; language?: string; updateAutoInstall?: boolean; statusPage?: StatusPageInfo }>;
+  setStatusPage: (enabled: boolean) => Promise<IpcResult<StatusPageInfo>>;
+  getUpdateStatus: () => Promise<UpdateStatus>;
+  setUpdateAutoInstall: (on: boolean) => Promise<boolean>;
+  updateDownload: () => Promise<boolean>;
+  updateInstall: () => Promise<boolean>;
+  onUpdateStatus: (cb: (payload: UpdateStatus) => void) => () => void;
   setAppLanguage: (lang: string) => Promise<boolean>;
   showMainWindow: () => void;
   checkUpdate: () => Promise<IpcResult<{ latest: string; current: string; isNew: boolean; url: string }>>;

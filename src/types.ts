@@ -220,6 +220,8 @@ export interface ConfigChange {
 // 主进程 wrap() 的统一返回
 export interface DevSyncPair { id: string; localDir: string; serverId: string; remoteDir: string; excludes: string[]; enabled: boolean; lastSyncAt: number; lastFiles: string[]; lastError: string }
 export interface CommandHistoryEntry { id: string; at: number; command: string; servers: string[]; source: string; ok: boolean }
+export interface StatusPageInfo { enabled: boolean; running: boolean; token: string; port: number; url: string; urls: string[] }
+export interface UpdateStatus { available: boolean; version?: string; downloading?: boolean; percent?: number; downloaded?: boolean; error?: string; checked?: boolean }
 export interface IpcResult<T> {
   ok: boolean;
   data?: T;

@@ -330,7 +330,27 @@
     "exportFail": "Exportation échouée",
     "importDone": "Importation terminée",
     "importedN": "{{n}} serveurs ajoutés",
-    "importFail": "Importation échouée"
+    "importFail": "Importation échouée",
+    "statusTitle": "Page d’état pour téléphone (lecture seule)",
+    "statusDesc": "Sert un tableau de bord mobile en lecture seule : GPU / mémoire / température par serveur, transferts actifs et alertes récentes. Protégé par un jeton ; n’expose ni identifiants ni commandes.",
+    "statusOn": "Activé",
+    "statusOff": "Désactivé",
+    "statusUrl": "Ouvrir sur le téléphone (même Wi-Fi)",
+    "statusLocalUrl": "Cet ordinateur",
+    "statusToken": "Jeton d’accès",
+    "statusCopy": "Copier",
+    "statusCopied": "Copié",
+    "statusPrivacy": "Toute personne disposant de ce lien peut consulter le tableau de bord sur votre réseau local. Désactivez l’interrupteur pour révoquer l’accès.",
+    "updateAutoTitle": "Télécharger et installer les mises à jour automatiquement",
+    "updateAutoDesc": "Désactivé = notification seule ; la mise à jour s’installe à la fermeture après téléchargement.",
+    "updateSectionTitle": "Mises à jour",
+    "updateNow": "Vérifier maintenant",
+    "updateDownload": "Télécharger la mise à jour",
+    "updateInstallOnQuit": "Téléchargée — installation à la fermeture",
+    "updateDownloading": "Téléchargement… {{percent}}%",
+    "updateUpToDate": "Vous avez la dernière version.",
+    "updateVersion": "La version {{version}} est disponible.",
+    "updateOpenPage": "Ouvrir la page des versions"
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} nouvelles anomalies serveur",
     "historySaveFail": "Impossible de sauvegarder l’historique",
     "staleDetail": "La dernière mesure est périmée. Les indicateurs reviendront au prochain relevé ; terminal et fichiers restent accessibles.",
-    "invalidPort": "Le port SSH doit être un entier de 1 à 65535"
+    "invalidPort": "Le port SSH doit être un entier de 1 à 65535",
+    "section_mobile": "Page mobile",
+    "section_updates": "Mises à jour"
   },
   "backend": {
     "commandFailed": "Échec de la commande (code {{code}}) : {{detail}}",
@@ -744,7 +766,11 @@
     "error": "Erreur",
     "alarm": "Alerte",
     "trayShow": "Afficher la fenêtre principale",
-    "trayQuit": "Quitter"
+    "trayQuit": "Quitter",
+    "updateAvailableTitle": "Mise à jour de ServerConsole disponible",
+    "updateAvailableBody": "La version {{version}} est prête à être installée. Ouvrez Réglages → Mises à jour.",
+    "updateDownloadedTitle": "Mise à jour téléchargée",
+    "updateDownloadedBody": "La mise à jour s’installe automatiquement à la fermeture de l’application."
   },
   "monitor": {
     "title": "Historique de surveillance",

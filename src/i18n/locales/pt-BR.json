@@ -330,7 +330,27 @@
     "exportFail": "Exportação falhada",
     "importDone": "Importação terminada",
     "importedN": "{{n}} servidores adicionados",
-    "importFail": "A importação falhou"
+    "importFail": "A importação falhou",
+    "statusTitle": "Página de status para celular (somente leitura)",
+    "statusDesc": "Serve um painel somente leitura amigável ao celular: GPU / memória / temperatura por servidor, transferências ativas e alertas recentes. Protegida por token; não expõe credenciais nem comandos.",
+    "statusOn": "Ligada",
+    "statusOff": "Desligada",
+    "statusUrl": "Abrir no celular (mesmo Wi-Fi)",
+    "statusLocalUrl": "Este computador",
+    "statusToken": "Token de acesso",
+    "statusCopy": "Copiar",
+    "statusCopied": "Copiado",
+    "statusPrivacy": "Qualquer pessoa com este link pode ver o painel na sua rede local. Desligue o interruptor para revogar o acesso.",
+    "updateAutoTitle": "Baixar e instalar atualizações automaticamente",
+    "updateAutoDesc": "Desligado = apenas notificar; a atualização é instalada ao sair, depois de baixada.",
+    "updateSectionTitle": "Atualizações",
+    "updateNow": "Verificar agora",
+    "updateDownload": "Baixar atualização",
+    "updateInstallOnQuit": "Baixada — instala ao sair",
+    "updateDownloading": "Baixando… {{percent}}%",
+    "updateUpToDate": "Você já está na versão mais recente.",
+    "updateVersion": "A versão {{version}} está disponível.",
+    "updateOpenPage": "Abrir página de versões"
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} novas anomalias de servidor",
     "historySaveFail": "Não foi possível salvar o histórico",
     "staleDetail": "Os dados estão desatualizados. As métricas voltarão após a próxima coleta; terminal e arquivos continuam acessíveis.",
-    "invalidPort": "A porta SSH deve ser um inteiro de 1 a 65535"
+    "invalidPort": "A porta SSH deve ser um inteiro de 1 a 65535",
+    "section_mobile": "Página do celular",
+    "section_updates": "Atualizações"
   },
   "backend": {
     "commandFailed": "Comando falhou (código {{code}}): {{detail}}",
@@ -744,7 +766,11 @@
     "error": "Erro",
     "alarm": "Alerta",
     "trayShow": "Mostrar janela principal",
-    "trayQuit": "Sair"
+    "trayQuit": "Sair",
+    "updateAvailableTitle": "Atualização do ServerConsole disponível",
+    "updateAvailableBody": "A versão {{version}} está pronta para instalar. Abra Ajustes → Atualizações.",
+    "updateDownloadedTitle": "Atualização baixada",
+    "updateDownloadedBody": "A atualização é instalada automaticamente ao sair do aplicativo."
   },
   "monitor": {
     "title": "Histórico de monitoramento",

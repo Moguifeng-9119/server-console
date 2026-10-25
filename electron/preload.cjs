@@ -145,6 +145,16 @@ contextBridge.exposeInMainWorld('api', {
   cmdHistoryList: (query) => ipcRenderer.invoke('cmdhistory:list', { query }),
   cmdHistoryDelete: (id) => ipcRenderer.invoke('cmdhistory:delete', { id }),
   cmdHistoryClear: () => ipcRenderer.invoke('cmdhistory:clear'),
+  setStatusPage: (enabled) => ipcRenderer.invoke('app:set-status-page', { enabled }),
+  getUpdateStatus: () => ipcRenderer.invoke('update:get-status'),
+  setUpdateAutoInstall: (on) => ipcRenderer.invoke('update:auto-install', on),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb) => {
+    const listener = (_e, payload) => cb(payload);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.removeListener('update:status', listener);
+  },
   dlgPickKey: () => ipcRenderer.invoke('dialog:pickKey'),
   dlgSave: (opts) => ipcRenderer.invoke('dialog:save', opts),
 

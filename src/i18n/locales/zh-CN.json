@@ -475,7 +475,27 @@
     "importDone": "导入完成",
     "importedN": "新增 {{n}} 台服务器",
     "importFail": "导入失败",
-    "close": "关闭"
+    "close": "关闭",
+    "statusTitle": "手机状态页（只读）",
+    "statusDesc": "提供一个手机友好的只读面板：各服务器 GPU / 显存 / 温度、活跃传输与最近告警。使用令牌保护，不暴露任何凭据与命令。",
+    "statusOn": "开",
+    "statusOff": "关",
+    "statusUrl": "在手机上打开（同一 Wi-Fi）",
+    "statusLocalUrl": "本机",
+    "statusToken": "访问令牌",
+    "statusCopy": "复制",
+    "statusCopied": "已复制",
+    "statusPrivacy": "任何拿到此链接的人都能在局域网内查看该面板。关闭开关即撤销访问。",
+    "updateAutoTitle": "自动下载并安装更新",
+    "updateAutoDesc": "关闭 = 仅通知；下载完成后退出软件时自动安装。",
+    "updateSectionTitle": "更新",
+    "updateNow": "立即检查",
+    "updateDownload": "下载更新",
+    "updateInstallOnQuit": "已下载 —— 退出时安装",
+    "updateDownloading": "下载中… {{percent}}%",
+    "updateUpToDate": "已是最新版本。",
+    "updateVersion": "有新版本 {{version}} 可用。",
+    "updateOpenPage": "打开发布页"
   },
   "relay": {
     "title": "服务器互传（左侧勾选内容，右侧选择落到哪个目录）",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} 项新的服务器异常",
     "historySaveFail": "历史记录无法保存",
     "staleDetail": "采样数据已过期，收到新样本后恢复监控显示；终端和文件管理仍可进入。",
-    "invalidPort": "SSH 端口必须为 1～65535 的整数"
+    "invalidPort": "SSH 端口必须为 1～65535 的整数",
+    "section_mobile": "手机页",
+    "section_updates": "更新"
   },
   "backend": {
     "commandFailed": "命令失败（退出码 {{code}}）：{{detail}}",
@@ -744,7 +766,11 @@
     "error": "错误",
     "alarm": "告警",
     "trayShow": "显示主窗口",
-    "trayQuit": "退出"
+    "trayQuit": "退出",
+    "updateAvailableTitle": "ServerConsole 有新版本",
+    "updateAvailableBody": "版本 {{version}} 已可安装。打开 设置 → 更新。",
+    "updateDownloadedTitle": "更新已下载",
+    "updateDownloadedBody": "退出软件时会自动安装更新。"
   },
   "monitor": {
     "title": "历史监控",

@@ -475,7 +475,27 @@
     "importDone": "Import finished",
     "importedN": "{{n}} servers added",
     "importFail": "Import failed",
-    "close": "Close"
+    "close": "Close",
+    "statusTitle": "Phone status page (read-only)",
+    "statusDesc": "Serves a mobile-friendly read-only dashboard: GPU / memory / temperature per server, active transfers and recent alerts. Guarded by a token; no credentials or commands are exposed.",
+    "statusOn": "On",
+    "statusOff": "Off",
+    "statusUrl": "Open on your phone (same Wi-Fi)",
+    "statusLocalUrl": "This computer",
+    "statusToken": "Access token",
+    "statusCopy": "Copy",
+    "statusCopied": "Copied",
+    "statusPrivacy": "Anyone with this link can read the dashboard on your LAN. Turn the page off to revoke access.",
+    "updateAutoTitle": "Auto download and install updates",
+    "updateAutoDesc": "Off = notify only; the update installs when you quit after downloading.",
+    "updateSectionTitle": "Updates",
+    "updateNow": "Check now",
+    "updateDownload": "Download update",
+    "updateInstallOnQuit": "Downloaded — installs on quit",
+    "updateDownloading": "Downloading… {{percent}}%",
+    "updateUpToDate": "You are on the latest version.",
+    "updateVersion": "Version {{version}} is available.",
+    "updateOpenPage": "Open releases page"
   },
   "relay": {
     "title": "Server relay (pick source content on the left, target directory on the right)",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} new server anomalies",
     "historySaveFail": "History could not be saved",
     "staleDetail": "The last sample is stale. Monitoring metrics will return after a new sample; terminal and file tools remain accessible.",
-    "invalidPort": "SSH port must be an integer between 1 and 65535"
+    "invalidPort": "SSH port must be an integer between 1 and 65535",
+    "section_mobile": "Phone page",
+    "section_updates": "Updates"
   },
   "backend": {
     "commandFailed": "Command failed (exit {{code}}): {{detail}}",
@@ -744,7 +766,11 @@
     "error": "Error",
     "alarm": "Alert",
     "trayShow": "Show main window",
-    "trayQuit": "Quit"
+    "trayQuit": "Quit",
+    "updateAvailableTitle": "ServerConsole update available",
+    "updateAvailableBody": "Version {{version}} is ready to install. Open Settings → Updates.",
+    "updateDownloadedTitle": "Update downloaded",
+    "updateDownloadedBody": "The update installs automatically when you quit the app."
   },
   "monitor": {
     "title": "History monitoring",

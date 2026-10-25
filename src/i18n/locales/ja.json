@@ -330,7 +330,27 @@
     "exportFail": "エクスポート失敗",
     "importDone": "インポート完了",
     "importedN": "{{n}} サーバが追加されました",
-    "importFail": "インポートに失敗"
+    "importFail": "インポートに失敗",
+    "statusTitle": "スマホ状態ページ（読み取り専用）",
+    "statusDesc": "モバイル向けの読み取り専用ダッシュボードを提供：サーバーごとの GPU / メモリ / 温度、転送状況、最近のアラート。トークンで保護され、認証情報やコマンドは公開しません。",
+    "statusOn": "オン",
+    "statusOff": "オフ",
+    "statusUrl": "スマホで開く（同じ Wi-Fi）",
+    "statusLocalUrl": "この PC",
+    "statusToken": "アクセストークン",
+    "statusCopy": "コピー",
+    "statusCopied": "コピーしました",
+    "statusPrivacy": "このリンクを知る人は誰でも LAN 内でダッシュボードを閲覧できます。オフにするとアクセスを取り消せます。",
+    "updateAutoTitle": "更新を自動ダウンロードしてインストール",
+    "updateAutoDesc": "オフ = 通知のみ。ダウンロード完了後、アプリ終了時に自動インストールします。",
+    "updateSectionTitle": "更新",
+    "updateNow": "今すぐ確認",
+    "updateDownload": "更新をダウンロード",
+    "updateInstallOnQuit": "ダウンロード済み — 終了時にインストール",
+    "updateDownloading": "ダウンロード中… {{percent}}%",
+    "updateUpToDate": "最新バージョンです。",
+    "updateVersion": "バージョン {{version}} が利用可能です。",
+    "updateOpenPage": "リリースページを開く"
   },
   "terminal": {
     "termN": "ターミナル {{n}}",
@@ -699,7 +719,9 @@
     "alertSummary": "サーバーの新しい異常 {{n}} 件",
     "historySaveFail": "履歴を保存できません",
     "staleDetail": "データは古くなっています。次の取得で表示が更新されます。ターミナルとファイルは引き続き利用できます。",
-    "invalidPort": "SSH ポートは 1～65535 の整数です"
+    "invalidPort": "SSH ポートは 1～65535 の整数です",
+    "section_mobile": "スマホページ",
+    "section_updates": "更新"
   },
   "backend": {
     "commandFailed": "コマンド失敗（終了コード {{code}}）：{{detail}}",
@@ -744,7 +766,11 @@
     "error": "エラー",
     "alarm": "警告",
     "trayShow": "メインウィンドウを表示",
-    "trayQuit": "終了"
+    "trayQuit": "終了",
+    "updateAvailableTitle": "ServerConsole の更新があります",
+    "updateAvailableBody": "バージョン {{version}} をインストールできます。設定 → 更新 を開いてください。",
+    "updateDownloadedTitle": "更新をダウンロードしました",
+    "updateDownloadedBody": "アプリ終了時に自動でインストールされます。"
   },
   "monitor": {
     "title": "履歴モニタリング",

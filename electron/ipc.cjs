@@ -964,6 +964,7 @@ function handleInteractive({ name, prompts }) {
   });
 }
 
+/** @type {any} */ let devsync = null;
 function init() {
   const userData = app.getPath('userData');
   historyStore = new HistoryStore(userData, historyError);
@@ -981,5 +982,29 @@ function init() {
   forwardings.startAll().catch((e) => logError('forwardings startAll', e));
 }
 
-module.exports = { init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
-  shutdown: async () => { scheduler.stop(); await historyStore?.close(); } };
+module.exports = {
+  // 手机状态页数据源：各服务器 GPU/显存/温度摘要 + 活跃传输 + 最近告警事件（纯只读，无凭据）
+  statusSnapshot: () => ({
+    generatedAt: Date.now(),
+    servers: servers.map((cfg) => {
+      const snap = workbench && workbench.snapshots ? workbench.snapshots.get(cfg.id) : null;
+      return {
+        name: cfg.name,
+        status: snap ? snap.status : (cfg.status || 'offline'),
+        cpu: snap ? snap.cpuUsage ?? null : null,
+        memUsed: snap ? snap.memUsed ?? null : null,
+        memTotal: snap ? snap.memTotal ?? null : null,
+        gpus: (snap && snap.gpus ? snap.gpus : []).slice(0, 16).map((g) => ({ index: g.index, name: g.name, util: g.util ?? null, memUsed: g.memUsed ?? null, memTotal: g.memTotal ?? null, temp: g.temp ?? null })),
+      };
+    }),
+    transfers: (transfers ? transfers.list() : []).slice(0, 20).map((t) => ({
+      name: t.name,
+      kind: t.kind,
+      active: t.status === 'active' || t.status === 'queued' || t.status === 'verifying',
+      percent: t.size > 0 ? Math.min(100, (t.transferred / t.size) * 100) : 0,
+      status: t.status,
+    })),
+    events: ((workbench && workbench.data && workbench.data.events) || []).slice(-10).reverse().map((e) => ({ at: e.at, title: e.title, body: e.body || '' })),
+  }),
+  init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
+  shutdown: async () => { scheduler.stop(); try { devsync?.stopAll(); } catch { /* watcher already closed */ } await historyStore?.close(); } };

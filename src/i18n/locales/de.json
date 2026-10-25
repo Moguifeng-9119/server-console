@@ -330,7 +330,27 @@
     "exportFail": "Ausfuhr fehlgeschlagen",
     "importDone": "Einfuhr beendet",
     "importedN": "{{n}} Server hinzugefügt",
-    "importFail": "Einfuhr fehlgeschlagen"
+    "importFail": "Einfuhr fehlgeschlagen",
+    "statusTitle": "Telefon-Statusseite (schreibgeschützt)",
+    "statusDesc": "Bietet ein mobilfreundliches, schreibgeschütztes Dashboard: GPU / Speicher / Temperatur pro Server, aktive Übertragungen und aktuelle Alarme. Durch ein Token geschützt; keine Zugangsdaten oder Befehle sichtbar.",
+    "statusOn": "Ein",
+    "statusOff": "Aus",
+    "statusUrl": "Auf dem Telefon öffnen (gleiches WLAN)",
+    "statusLocalUrl": "Dieser Rechner",
+    "statusToken": "Zugriffstoken",
+    "statusCopy": "Kopieren",
+    "statusCopied": "Kopiert",
+    "statusPrivacy": "Jeder mit diesem Link kann das Dashboard in deinem LAN sehen. Schalte die Seite aus, um den Zugriff zu widerrufen.",
+    "updateAutoTitle": "Updates automatisch herunterladen und installieren",
+    "updateAutoDesc": "Aus = nur benachrichtigen; das Update wird nach dem Herunterladen beim Beenden installiert.",
+    "updateSectionTitle": "Updates",
+    "updateNow": "Jetzt prüfen",
+    "updateDownload": "Update herunterladen",
+    "updateInstallOnQuit": "Geladen — wird beim Beenden installiert",
+    "updateDownloading": "Wird geladen… {{percent}}%",
+    "updateUpToDate": "Du verwendest die neueste Version.",
+    "updateVersion": "Version {{version}} ist verfügbar.",
+    "updateOpenPage": "Release-Seite öffnen"
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} neue Server-Anomalien",
     "historySaveFail": "Verlauf konnte nicht gespeichert werden",
     "staleDetail": "Die letzte Messung ist veraltet. Nach der nächsten Messung erscheinen die Werte wieder; Terminal und Dateien bleiben erreichbar.",
-    "invalidPort": "SSH-Port muss eine Ganzzahl von 1 bis 65535 sein"
+    "invalidPort": "SSH-Port muss eine Ganzzahl von 1 bis 65535 sein",
+    "section_mobile": "Telefonseite",
+    "section_updates": "Updates"
   },
   "backend": {
     "commandFailed": "Befehl fehlgeschlagen (Status {{code}}): {{detail}}",
@@ -744,7 +766,11 @@
     "error": "Fehler",
     "alarm": "Warnung",
     "trayShow": "Hauptfenster anzeigen",
-    "trayQuit": "Beenden"
+    "trayQuit": "Beenden",
+    "updateAvailableTitle": "ServerConsole-Update verfügbar",
+    "updateAvailableBody": "Version {{version}} ist bereit zur Installation. Öffne Einstellungen → Updates.",
+    "updateDownloadedTitle": "Update heruntergeladen",
+    "updateDownloadedBody": "Das Update wird beim Beenden der App automatisch installiert."
   },
   "monitor": {
     "title": "Monitoring-Verlauf",

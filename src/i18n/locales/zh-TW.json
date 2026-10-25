@@ -330,7 +330,27 @@
     "exportFail": "匯出失敗",
     "importDone": "匯入完成",
     "importedN": "新增 {{n}} 臺伺服器",
-    "importFail": "匯入失敗"
+    "importFail": "匯入失敗",
+    "statusTitle": "手機狀態頁（唯讀）",
+    "statusDesc": "提供一個手機友善的唯讀面板：各伺服器 GPU / 記憶體 / 溫度、活躍傳輸與最近告警。使用權杖保護，不暴露任何憑證與命令。",
+    "statusOn": "開",
+    "statusOff": "關",
+    "statusUrl": "在手機上開啟（同一 Wi-Fi）",
+    "statusLocalUrl": "本機",
+    "statusToken": "存取權杖",
+    "statusCopy": "複製",
+    "statusCopied": "已複製",
+    "statusPrivacy": "任何拿到此連結的人都能在區網內檢視該面板。關閉開關即撤銷存取。",
+    "updateAutoTitle": "自動下載並安裝更新",
+    "updateAutoDesc": "關閉 = 僅通知；下載完成後結束軟體時自動安裝。",
+    "updateSectionTitle": "更新",
+    "updateNow": "立即檢查",
+    "updateDownload": "下載更新",
+    "updateInstallOnQuit": "已下載 —— 結束時安裝",
+    "updateDownloading": "下載中… {{percent}}%",
+    "updateUpToDate": "已是最新版本。",
+    "updateVersion": "有新版本 {{version}} 可用。",
+    "updateOpenPage": "開啟發布頁"
   },
   "terminal": {
     "termN": "終端機 {{n}}",
@@ -699,7 +719,9 @@
     "alertSummary": "{{n}} 項新的伺服器異常",
     "historySaveFail": "歷史記錄無法儲存",
     "staleDetail": "取樣資料已過期，收到新樣本後恢復監控顯示；終端和檔案管理仍可進入。",
-    "invalidPort": "SSH 埠必須為 1～65535 的整數"
+    "invalidPort": "SSH 埠必須為 1～65535 的整數",
+    "section_mobile": "手機頁",
+    "section_updates": "更新"
   },
   "backend": {
     "commandFailed": "命令失敗（退出碼 {{code}}）：{{detail}}",
@@ -744,7 +766,11 @@
     "error": "錯誤",
     "alarm": "警示",
     "trayShow": "顯示主視窗",
-    "trayQuit": "結束"
+    "trayQuit": "結束",
+    "updateAvailableTitle": "ServerConsole 有新版本",
+    "updateAvailableBody": "版本 {{version}} 已可安裝。開啟 設定 → 更新。",
+    "updateDownloadedTitle": "更新已下載",
+    "updateDownloadedBody": "結束軟體時會自動安裝更新。"
   },
   "monitor": {
     "title": "歷史監控",
