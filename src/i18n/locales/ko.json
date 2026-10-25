@@ -343,7 +343,11 @@
     "loadingSessions": "세션 불러오는 중…",
     "openFail": "터미널 열기 실패",
     "connFailed": "연결 실패: {{error}}",
-    "disconnected": "연결이 끊어졌습니다. 위의 다시 연결을 클릭하세요.\r\n"
+    "disconnected": "연결이 끊어졌습니다. 위의 다시 연결을 클릭하세요.\r\n",
+    "searchPh": "터미널에서 검색…",
+    "searchPrev": "이전 일치",
+    "searchNext": "다음 일치",
+    "searchClose": "검색 닫기"
   },
   "serverManager": {
     "title": "서버 연결",
@@ -555,7 +559,13 @@
     "copyOut": "출력 복사",
     "noOut": "(출력 없음)",
     "ended": "병렬 명령 완료",
-    "startFail": "명령 시작 실패"
+    "startFail": "명령 시작 실패",
+    "historyTitle": "명령 기록",
+    "historySearch": "기록 검색…",
+    "historyClear": "기록 비우기",
+    "historyEmpty": "아직 기록된 명령이 없습니다.",
+    "historyFill": "클릭하여 명령란에 채우기",
+    "historyDelete": "항목 삭제"
   },
   "viewer": {
     "head": "처음",
@@ -807,6 +817,25 @@
     "usageLoad": "불러오기",
     "usageTotal": "합계",
     "usageEmpty": "이 범위에는 사용 기록이 없습니다.",
-    "user": "사용자"
+    "user": "사용자",
+    "syncTitle": "저장 즉시 업로드 (개발 동기화)",
+    "syncNote": "로컬 폴더를 감시하고 변경된 파일을 자동으로 서버에 업로드합니다(500ms 디바운스). 제외 패턴은 한 줄에 하나의 glob, 예: **/*.tmp 또는 node_modules.",
+    "syncLocalDir": "로컬 디렉터리",
+    "syncRemoteDir": "원격 디렉터리 (서버)",
+    "syncExcludes": "제외 (한 줄에 glob 하나)",
+    "addPair": "페어 추가",
+    "pickOnce": "지금 모두 업로드",
+    "lastSync": "마지막 동기화",
+    "syncNever": "변경 사항 없음",
+    "syncError": "감시 오류",
+    "browse": "찾아보기…"
+  },
+  "filePreview": {
+    "imageTitle": "이미지 미리보기",
+    "fit": "창에 맞추기",
+    "original": "원래 크기",
+    "csvTitle": "CSV 미리보기",
+    "rowsLimited": "처음 {{n}}행만 표시합니다",
+    "imageTruncated": "처음 2 MB만 불러왔습니다."
   }
 }

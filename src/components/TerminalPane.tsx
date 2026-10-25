@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { api } from '../api';
 import { useStoreControls } from '../state';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +44,17 @@ export function TerminalPane({
   const activateRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState('');
   const { t } = useTranslation();
+  // ===== 终端内搜索（Ctrl+F，xterm 官方 addon）=====
+  const searchRef = useRef<import('@xterm/addon-search').SearchAddon | null>(null);
+  const termFocusRef = useRef<(() => void) | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const runSearch = (direction: 'next' | 'previous') => {
+    const addon = searchRef.current;
+    if (!addon || !searchQuery) return;
+    const opts = { caseSensitive: false, incremental: false };
+    if (direction === 'next') void addon.findNext(searchQuery, opts); else void addon.findPrevious(searchQuery, opts);
+  };
   // 用 ref 存 onClosed，避免它作为 effect 依赖导致反复重建
   const onClosedRef = useRef(onClosed);
   onClosedRef.current = onClosed;
@@ -81,6 +92,11 @@ export function TerminalPane({
       });
       fit = new FitAddon();
       term.loadAddon(fit);
+      const { SearchAddon } = await import('@xterm/addon-search');
+      const search = new SearchAddon();
+      term.loadAddon(search);
+      searchRef.current = search;
+      termFocusRef.current = () => term?.focus();
       term.open(host);
       try {
         fit.fit();
@@ -138,6 +154,8 @@ export function TerminalPane({
         const k = ev.key.toLowerCase();
         if (ev.ctrlKey && ev.shiftKey && k === 'c') { if (term) copySelection(); return false; }
         if (ev.ctrlKey && ev.shiftKey && k === 'v') { void pasteClipboard(); return false; }
+        // Ctrl+F：终端内搜索
+        if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && k === 'f') { setSearchOpen(true); return false; }
         // Windows 风格 Ctrl+C：有选中=复制，无选中=发送中断信号
         if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && k === 'c' && term && term.hasSelection()) {
           copySelection();
@@ -206,6 +224,9 @@ export function TerminalPane({
     return () => {
       disposed = true;
       activateRef.current = null;
+      searchRef.current = null;
+      termFocusRef.current = null;
+      setSearchOpen(false);
       offList.forEach((off) => off());
       if (debugWindow.__scTerm === debugWindow.__scTerms?.[termId]) delete debugWindow.__scTerm;
       if (debugWindow.__scTerms) delete debugWindow.__scTerms[termId];
@@ -234,7 +255,27 @@ export function TerminalPane({
       className="term-host"
       data-term-id={termId}
       style={{ display: active ? 'block' : 'none' }}
-    >{error && <div role="alert">{t('terminal.openFail')}: {error}</div>}</div>
+    >
+      {searchOpen && (
+        <div className="term-search-bar">
+          <input
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); runSearch(e.shiftKey ? 'previous' : 'next'); }
+              if (e.key === 'Escape') { e.preventDefault(); setSearchOpen(false); searchRef.current?.clearDecorations(); termFocusRef.current?.(); }
+            }}
+            placeholder={t('terminal.searchPh')}
+            aria-label={t('terminal.searchPh')}
+          />
+          <button className="btn mini" title={t('terminal.searchPrev')} aria-label={t('terminal.searchPrev')} onClick={() => runSearch('previous')}><ChevronUp size={12} /></button>
+          <button className="btn mini" title={t('terminal.searchNext')} aria-label={t('terminal.searchNext')} onClick={() => runSearch('next')}><ChevronDown size={12} /></button>
+          <button className="btn mini" title={t('terminal.searchClose')} aria-label={t('terminal.searchClose')} onClick={() => { setSearchOpen(false); searchRef.current?.clearDecorations(); termFocusRef.current?.(); }}><X size={12} /></button>
+        </div>
+      )}
+      {error && <div role="alert">{t('terminal.openFail')}: {error}</div>}
+    </div>
   );
 }
 
@@ -324,8 +365,15 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
     setActive((a) => (a === termId ? '' : a));
   };
 
+  // 服务器着色：serverId hash → 固定 hue，多开会话时防走错服务器
+  const hue = useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < serverId.length; i += 1) h = (h * 31 + serverId.charCodeAt(i)) % 360;
+    return h;
+  }, [serverId]);
+
   return (
-    <div className="term" style={{ display: visible ? 'flex' : 'none' }}>
+    <div className="term" style={{ display: visible ? 'flex' : 'none', '--term-hue': hue } as React.CSSProperties}>
       <div className="term-chips">
         {sessions.map((s, i) => (
           <div
@@ -333,6 +381,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             className={`term-chip ${s.termId === active ? 'on' : ''}`}
             title={t('terminal.switchHint')}
           >
+            <i className="term-dot" aria-hidden="true" />
             <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => setActive(s.termId)}>{t('terminal.termN', { n: i + 1 })}</button>
             <button
               className="term-chip-x"

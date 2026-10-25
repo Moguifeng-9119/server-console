@@ -359,6 +359,26 @@ function registerIpc() {
     }),
   );
 
+  // 图片/二进制预览：读前 2MB 转 base64，按扩展名猜 MIME
+  ipcMain.handle(
+    'sftp:readBinary',
+    wrap(async ({ id, path: p }) => {
+      const conn = await getConn(id);
+      const MAX = 2 * 1024 * 1024;
+      const st = await conn.statRemote(p);
+      const sftp = await conn.sftp();
+      const data = await new Promise((resolve, reject) => {
+        const chunks = [];
+        const stream = sftp.createReadStream(p, { start: 0, end: MAX - 1 });
+        stream.on('data', (d) => chunks.push(d));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+      });
+      const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp' };
+      return { data: data.toString('base64'), mime: MIME[path.extname(p).toLowerCase()] || 'application/octet-stream', truncated: st.size > MAX, size: st.size };
+    }),
+  );
+
   // 远程文本保存：写临时文件后原子改名，避免写一半损坏原文件
   ipcMain.handle(
     'sftp:writeText',
@@ -726,6 +746,19 @@ function registerIpc() {
   ipcMain.handle('sync:preview', wrap((req) => syncPlanner.preview(req || {})));
   ipcMain.handle('sync:apply', wrap((planId) => syncPlanner.apply(String(planId || ''))));
   ipcMain.handle('sync:list', () => syncPlanner.list());
+
+  // ============ 保存即上传（Dev Sync，fs.watch + 去抖 + 复用 transfers 上传） ============
+  const { DevSyncManager } = require('./devsync.cjs');
+  const devsync = new DevSyncManager({
+    storeFile: path.join(app.getPath('userData'), 'syncpairs.json'),
+    enqueue: (jobs) => transfers.addMany(jobs),
+    getServers: () => servers,
+  }).init();
+  ipcMain.handle('devsync:list', wrap(() => devsync.list()));
+  ipcMain.handle('devsync:save', wrap((pair) => devsync.save(pair || {})));
+  ipcMain.handle('devsync:delete', wrap(({ id }) => devsync.delete(String(id || ''))));
+  ipcMain.handle('devsync:toggle', wrap(({ id, enabled }) => devsync.toggle(String(id || ''), enabled !== false)));
+  ipcMain.handle('devsync:pick', wrap(({ id }) => devsync.pickOnce(String(id || ''))));
 
   // ============ 运维工作台（任务/GPU 监视/告警规则/容器/模板，复用 WorkbenchManager） ============
   const { WorkbenchManager } = require('./workbench.cjs');

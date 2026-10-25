@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Square, Copy } from 'lucide-react';
+import { Play, Square, Copy, History, Trash2 } from 'lucide-react';
 import { api } from '../api';
+import type { CommandHistoryEntry } from '../types';
 import { useStore } from '../state';
 
 // 多服务器并行命令：勾选 N 台 → 同一命令同时执行 → 分栏实时输出
@@ -72,6 +73,17 @@ export function ParallelCommand() {
     setRunning(false);
   };
 
+  // 跨服务器命令历史：搜索过滤、点击回填、单条删除/清空
+  const [history, setHistory] = useState<CommandHistoryEntry[]>([]);
+  const [historyQuery, setHistoryQuery] = useState('');
+  const loadHistory = async (query = historyQuery) => {
+    if (!api) return;
+    const r = await api.cmdHistoryList(query);
+    if (r.ok && r.data) setHistory(r.data);
+  };
+  useEffect(() => { void loadHistory(''); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { if (running) return; const timer = setTimeout(() => void loadHistory(historyQuery), 200); return () => clearTimeout(timer); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [historyQuery, running]);
+
   const entries = Object.entries(out);
   const cols = entries.length <= 1 ? 1 : entries.length <= 4 ? 2 : 3;
 
@@ -140,6 +152,38 @@ export function ParallelCommand() {
           })}
         </div>
       )}
+      <div className="pc-history">
+        <div className="pc-history-head">
+          <span className="pc-label"><History size={13} /> {t('parallel.historyTitle')}</span>
+          <input
+            className="mini"
+            style={{ width: 200 }}
+            value={historyQuery}
+            onChange={(e) => setHistoryQuery(e.target.value)}
+            placeholder={t('parallel.historySearch')}
+          />
+          <button className="btn mini" disabled={!history.length} onClick={async () => { await api?.cmdHistoryClear(); void loadHistory(); }}>
+            {t('parallel.historyClear')}
+          </button>
+        </div>
+        {history.length === 0 ? (
+          <div className="pc-history-empty">{t('parallel.historyEmpty')}</div>
+        ) : (
+          history.map((entry) => (
+            <div key={entry.id} className={`pc-history-row ${entry.ok ? '' : 'fail'}`}>
+              <button className="pc-history-cmd mono" title={t('parallel.historyFill')} onClick={() => setCmd(entry.command)}>
+                {entry.ok ? '' : '✗ '}
+                {entry.command}
+              </button>
+              <span className="pc-history-meta">{entry.servers.join(', ')}</span>
+              <time>{new Date(entry.at).toLocaleString()}</time>
+              <button className="btn mini" title={t('parallel.historyDelete')} onClick={async () => { await api?.cmdHistoryDelete(entry.id); void loadHistory(); }}>
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

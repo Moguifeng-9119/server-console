@@ -9,6 +9,7 @@ import { fmtDate, formatBytes, joinPosix, parentPosix } from '../format';
 import type { DirListing, FileEntry, IpcResult } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { TextViewer } from './TextViewer';
+import { ImagePreview, CsvPreview } from './FilePreview';
 import { RelayDialog } from './ServerRelay';
 
 interface PaneState {
@@ -92,6 +93,8 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
   const [searching, setSearching] = useState(false);
 
   const [viewer, setViewer] = useState<{ path: string; name: string; size: number } | null>(null);
+  const [image, setImage] = useState<{ name: string; url: string; truncated: boolean } | null>(null);
+  const [csv, setCsv] = useState<{ name: string; text: string; truncated: boolean } | null>(null);
   const [relay, setRelay] = useState<{ sel: FileEntry[] } | null>(null);
 
   const [menu, setMenu] = useState<{ x: number; y: number; side: 'local' | 'remote'; entry: FileEntry } | null>(null);
@@ -635,6 +638,10 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
       )}
 
       {active && viewer && <TextViewer serverId={serverId} path={viewer.path} name={viewer.name} size={viewer.size} onClose={() => setViewer(null)} />}
+
+      {active && image && <ImagePreview name={image.name} url={image.url} truncated={image.truncated} onClose={() => setImage(null)} />}
+
+      {active && csv && <CsvPreview name={csv.name} text={csv.text} truncated={csv.truncated} onClose={() => setCsv(null)} />}
 
       {active && relay && <RelayDialog selfId={serverId} selfName={cfg?.name || ''} sel={relay.sel} onClose={() => setRelay(null)} onDone={() => { setRelay(null); showTransfers(); }} />}
     </div>

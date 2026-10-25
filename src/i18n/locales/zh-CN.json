@@ -532,7 +532,13 @@
     "copyOut": "复制输出",
     "noOut": "（无输出）",
     "ended": "并行命令已结束",
-    "startFail": "启动失败"
+    "startFail": "启动失败",
+    "historyTitle": "命令历史",
+    "historySearch": "搜索历史…",
+    "historyClear": "清空历史",
+    "historyEmpty": "还没有记录的命令。",
+    "historyFill": "点击回填到命令框",
+    "historyDelete": "删除该条"
   },
   "terminal": {
     "termN": "终端 {{n}}",
@@ -545,7 +551,11 @@
     "sessionEnded": "会话已结束",
     "openFail": "终端打开失败",
     "connFailed": "连接失败：{{error}}",
-    "disconnected": "连接已断开，点击上方「重连」。\r\n"
+    "disconnected": "连接已断开，点击上方「重连」。\r\n",
+    "searchPh": "在终端中搜索…",
+    "searchPrev": "上一个匹配",
+    "searchNext": "下一个匹配",
+    "searchClose": "关闭搜索"
   },
   "viewer": {
     "head": "开头",
@@ -807,6 +817,25 @@
     "usageLoad": "加载",
     "usageTotal": "合计",
     "usageEmpty": "该范围内没有用量记录。",
-    "user": "用户"
+    "user": "用户",
+    "syncTitle": "保存即上传（开发同步）",
+    "syncNote": "监听本地文件夹，文件一有改动就自动上传到服务器（500 毫秒去抖）。排除规则为通配符模式，每行一个，如 **/*.tmp 或 node_modules。",
+    "syncLocalDir": "本地目录",
+    "syncRemoteDir": "远程目录（服务器上的）",
+    "syncExcludes": "排除规则（每行一个通配符）",
+    "addPair": "添加配对",
+    "pickOnce": "立即上传全部",
+    "lastSync": "上次同步",
+    "syncNever": "暂无改动",
+    "syncError": "监听错误",
+    "browse": "浏览…"
+  },
+  "filePreview": {
+    "imageTitle": "图片预览",
+    "fit": "适应窗口",
+    "original": "原始大小",
+    "csvTitle": "CSV 预览",
+    "rowsLimited": "仅显示前 {{n}} 行",
+    "imageTruncated": "仅加载了前 2 MB。"
   }
 }

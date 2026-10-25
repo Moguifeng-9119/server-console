@@ -2493,3 +2493,24 @@ a.link:hover {
 
 .fm-inline, .term-chip-select { background: none; border: 0; padding: 2px 4px; color: inherit; font: inherit; cursor: pointer; text-align: inherit; }
 .fm-inline:focus-visible, .term-chip-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ===== 跨服务器命令历史 ===== */
+.pc-history { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 6px; }
+.pc-history-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pc-history-head .pc-label { display: inline-flex; align-items: center; gap: 5px; }
+.pc-history-head input { border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text); padding: 4px 8px; font-size: 12px; }
+.pc-history-empty { color: var(--text-dim); font-size: 12px; }
+.pc-history-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.pc-history-row.fail .pc-history-cmd { color: var(--crit); }
+.pc-history-cmd { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; border: 0; color: var(--text); cursor: pointer; padding: 2px 0; }
+.pc-history-cmd:hover { color: var(--accent); }
+.pc-history-meta { color: var(--text-dim); max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-history-row time { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+
+/* ===== 终端搜索条 + 服务器着色会话条 ===== */
+.term-host { position: relative; }
+.term-search-bar { position: absolute; top: 8px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 4px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; padding: 4px 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.term-search-bar input { width: 180px; border: 0; background: none; color: var(--text); font-size: 12px; outline: none; }
+.term-dot { width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--term-hue, 210), 70%, 55%); flex: none; }
+.term-chip.on { border-color: hsl(var(--term-hue, 210), 70%, 55%); color: hsl(var(--term-hue, 210), 80%, 70%); background: hsl(var(--term-hue, 210), 70%, 55% / 0.12); }
+.term-chips { box-shadow: inset 0 -2px 0 hsl(var(--term-hue, 210), 70%, 55% / 0.5); padding-bottom: 4px; }

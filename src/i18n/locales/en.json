@@ -532,7 +532,13 @@
     "copyOut": "Copy output",
     "noOut": "(no output)",
     "ended": "Parallel command finished",
-    "startFail": "Failed to start command"
+    "startFail": "Failed to start command",
+    "historyTitle": "Command history",
+    "historySearch": "Search history…",
+    "historyClear": "Clear history",
+    "historyEmpty": "No commands recorded yet.",
+    "historyFill": "Click to fill the command box",
+    "historyDelete": "Delete entry"
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -545,7 +551,11 @@
     "sessionEnded": "Session ended",
     "openFail": "Terminal failed to open",
     "connFailed": "Connection failed: {{error}}",
-    "disconnected": "Connection lost, click \"Reconnect\" above.\r\n"
+    "disconnected": "Connection lost, click \"Reconnect\" above.\r\n",
+    "searchPh": "Search in terminal…",
+    "searchPrev": "Previous match",
+    "searchNext": "Next match",
+    "searchClose": "Close search"
   },
   "viewer": {
     "head": "Head",
@@ -807,6 +817,25 @@
     "usageLoad": "Load",
     "usageTotal": "Total",
     "usageEmpty": "No usage recorded in this range.",
-    "user": "User"
+    "user": "User",
+    "syncTitle": "Save & upload (Dev sync)",
+    "syncNote": "Watches a local folder and uploads every changed file to the server automatically (500 ms debounce). Excludes are glob patterns, one per line, e.g. **/*.tmp or node_modules.",
+    "syncLocalDir": "Local directory",
+    "syncRemoteDir": "Remote directory (on the server)",
+    "syncExcludes": "Excludes (one glob per line)",
+    "addPair": "Add pair",
+    "pickOnce": "Upload all now",
+    "lastSync": "Last sync",
+    "syncNever": "No changes yet",
+    "syncError": "Watch error",
+    "browse": "Browse…"
+  },
+  "filePreview": {
+    "imageTitle": "Image preview",
+    "fit": "Fit window",
+    "original": "Original size",
+    "csvTitle": "CSV preview",
+    "rowsLimited": "Showing the first {{n}} rows only",
+    "imageTruncated": "Only the first 2 MB were loaded."
   }
 }

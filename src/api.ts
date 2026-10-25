@@ -4,7 +4,9 @@ import type {
   HistoryPoint,
   HistoryQuery,
   HistoryResult,
+  CommandHistoryEntry,
   ConfigChange,
+  DevSyncPair,
   DirListing,
   FileEntry,
   ForwardingRule,
@@ -96,6 +98,14 @@ interface Api {
   // 本机对话框
   dlgOpenFiles: () => Promise<string[]>;
   dlgOpenDir: () => Promise<string>;
+  devsyncList: () => Promise<IpcResult<DevSyncPair[]>>;
+  devsyncSave: (pair: Partial<DevSyncPair>) => Promise<IpcResult<DevSyncPair>>;
+  devsyncDelete: (id: string) => Promise<IpcResult<boolean>>;
+  devsyncToggle: (id: string, enabled: boolean) => Promise<IpcResult<DevSyncPair>>;
+  devsyncPick: (id: string) => Promise<IpcResult<number>>;
+  cmdHistoryList: (query?: string) => Promise<IpcResult<CommandHistoryEntry[]>>;
+  cmdHistoryDelete: (id: string) => Promise<IpcResult<boolean>>;
+  cmdHistoryClear: () => Promise<IpcResult<boolean>>;
   dlgPickKey: () => Promise<string>;
   dlgSave: (opts?: { defaultPath?: string; title?: string }) => Promise<string>;
 
@@ -123,6 +133,7 @@ interface Api {
   sftpStat: (id: string, p: string) => Promise<IpcResult<{ size: number; type: string }>>;
   sftpReadText: (id: string, p: string, tail?: boolean) => Promise<IpcResult<{ text: string; truncated: boolean; mode: string; size?: number }>>;
   sftpWriteText: (id: string, p: string, text: string) => Promise<IpcResult<boolean>>;
+  sftpReadBinary: (id: string, p: string) => Promise<IpcResult<{ data: string; mime: string; truncated: boolean; size: number }>>;
   sftpSearch: (id: string, base: string, keyword: string) => Promise<IpcResult<{ base: string; paths: string[] }>>;
   sftpArchive: (id: string, cwd: string, names: string[], archiveName: string) => Promise<IpcResult<{ name: string }>>;
   sftpExtract: (id: string, cwd: string, p: string) => Promise<IpcResult<{ ok: boolean }>>;

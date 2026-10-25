@@ -343,7 +343,11 @@
     "loadingSessions": "Wir laden Sitzungen...",
     "openFail": "Terminal hat nicht geöffnet",
     "connFailed": "Verbindung fehlgeschlagen: {{error}}",
-    "disconnected": "Verbindung verloren, klicken Sie auf \"Reconnect\" oben."
+    "disconnected": "Verbindung verloren, klicken Sie auf \"Reconnect\" oben.",
+    "searchPh": "Im Terminal suchen…",
+    "searchPrev": "Vorheriger Treffer",
+    "searchNext": "Nächster Treffer",
+    "searchClose": "Suche schließen"
   },
   "serverManager": {
     "title": "Serververbindung",
@@ -555,7 +559,13 @@
     "copyOut": "Ausgabe kopieren",
     "noOut": "(kein Ausgang)",
     "ended": "Parallel-Befehl beendet",
-    "startFail": "Fehler beim Start des Befehls"
+    "startFail": "Fehler beim Start des Befehls",
+    "historyTitle": "Befehlsverlauf",
+    "historySearch": "Verlauf durchsuchen…",
+    "historyClear": "Verlauf leeren",
+    "historyEmpty": "Noch keine Befehle aufgezeichnet.",
+    "historyFill": "Klicken, um den Befehl einzusetzen",
+    "historyDelete": "Eintrag löschen"
   },
   "viewer": {
     "head": "Anfang",
@@ -807,6 +817,25 @@
     "usageLoad": "Laden",
     "usageTotal": "Gesamt",
     "usageEmpty": "In diesem Zeitraum ist keine Nutzung aufgezeichnet.",
-    "user": "Benutzer"
+    "user": "Benutzer",
+    "syncTitle": "Speichern & hochladen (Dev-Sync)",
+    "syncNote": "Überwacht einen lokalen Ordner und lädt jede geänderte Datei automatisch auf den Server (500 ms Entprellung). Ausschlüsse sind Glob-Muster, eines pro Zeile, z. B. **/*.tmp oder node_modules.",
+    "syncLocalDir": "Lokales Verzeichnis",
+    "syncRemoteDir": "Remote-Verzeichnis (auf dem Server)",
+    "syncExcludes": "Ausschlüsse (ein Glob pro Zeile)",
+    "addPair": "Paar hinzufügen",
+    "pickOnce": "Alle jetzt hochladen",
+    "lastSync": "Letzte Synchronisierung",
+    "syncNever": "Noch keine Änderungen",
+    "syncError": "Überwachungsfehler",
+    "browse": "Durchsuchen…"
+  },
+  "filePreview": {
+    "imageTitle": "Bildvorschau",
+    "fit": "An Fenster anpassen",
+    "original": "Originalgröße",
+    "csvTitle": "CSV-Vorschau",
+    "rowsLimited": "Nur die ersten {{n}} Zeilen werden angezeigt",
+    "imageTruncated": "Nur die ersten 2 MB wurden geladen."
   }
 }

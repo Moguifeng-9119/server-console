@@ -137,6 +137,14 @@ contextBridge.exposeInMainWorld('api', {
   // 本机对话框
   dlgOpenFiles: () => ipcRenderer.invoke('dialog:openFiles'),
   dlgOpenDir: () => ipcRenderer.invoke('dialog:openDir'),
+  devsyncList: () => ipcRenderer.invoke('devsync:list'),
+  devsyncSave: (pair) => ipcRenderer.invoke('devsync:save', pair),
+  devsyncDelete: (id) => ipcRenderer.invoke('devsync:delete', { id }),
+  devsyncToggle: (id, enabled) => ipcRenderer.invoke('devsync:toggle', { id, enabled }),
+  devsyncPick: (id) => ipcRenderer.invoke('devsync:pick', { id }),
+  cmdHistoryList: (query) => ipcRenderer.invoke('cmdhistory:list', { query }),
+  cmdHistoryDelete: (id) => ipcRenderer.invoke('cmdhistory:delete', { id }),
+  cmdHistoryClear: () => ipcRenderer.invoke('cmdhistory:clear'),
   dlgPickKey: () => ipcRenderer.invoke('dialog:pickKey'),
   dlgSave: (opts) => ipcRenderer.invoke('dialog:save', opts),
 
@@ -168,6 +176,7 @@ contextBridge.exposeInMainWorld('api', {
   sftpStat: (id, p) => ipcRenderer.invoke('sftp:stat', { id, path: p }),
   sftpReadText: (id, p, tail) => ipcRenderer.invoke('sftp:readText', { id, path: p, tail }),
   sftpWriteText: (id, p, text) => ipcRenderer.invoke('sftp:writeText', { id, path: p, text }),
+  sftpReadBinary: (id, p) => ipcRenderer.invoke('sftp:readBinary', { id, path: p }),
   sftpSearch: (id, base, keyword) => ipcRenderer.invoke('sftp:search', { id, base, keyword }),
   sftpArchive: (id, cwd, names, archiveName) =>
     ipcRenderer.invoke('sftp:archive', { id, cwd, names, archiveName }),

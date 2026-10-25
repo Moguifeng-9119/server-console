@@ -343,7 +343,11 @@
     "loadingSessions": "載入會話…",
     "openFail": "終端開啟失敗",
     "connFailed": "連線失敗：{{error}}",
-    "disconnected": "連線已斷開，點選上方「重連」。\r\n"
+    "disconnected": "連線已斷開，點選上方「重連」。\r\n",
+    "searchPh": "在終端機中搜尋…",
+    "searchPrev": "上一個符合",
+    "searchNext": "下一個符合",
+    "searchClose": "關閉搜尋"
   },
   "serverManager": {
     "title": "伺服器連線",
@@ -555,7 +559,13 @@
     "copyOut": "複製輸出",
     "noOut": "（無輸出）",
     "ended": "並行命令已結束",
-    "startFail": "啟動失敗"
+    "startFail": "啟動失敗",
+    "historyTitle": "命令歷史",
+    "historySearch": "搜尋歷史…",
+    "historyClear": "清空歷史",
+    "historyEmpty": "還沒有記錄的命令。",
+    "historyFill": "點擊回填到命令框",
+    "historyDelete": "刪除該條"
   },
   "viewer": {
     "head": "開頭",
@@ -807,6 +817,25 @@
     "usageLoad": "載入",
     "usageTotal": "合計",
     "usageEmpty": "該範圍內沒有用量記錄。",
-    "user": "使用者"
+    "user": "使用者",
+    "syncTitle": "儲存即上傳（開發同步）",
+    "syncNote": "監聽本機資料夾，檔案一有變更就自動上傳到伺服器（500 毫秒去抖）。排除規則為萬用字元模式，每行一個，如 **/*.tmp 或 node_modules。",
+    "syncLocalDir": "本機目錄",
+    "syncRemoteDir": "遠端目錄（伺服器上的）",
+    "syncExcludes": "排除規則（每行一個萬用字元）",
+    "addPair": "新增配對",
+    "pickOnce": "立即上傳全部",
+    "lastSync": "上次同步",
+    "syncNever": "暫無變更",
+    "syncError": "監聽錯誤",
+    "browse": "瀏覽…"
+  },
+  "filePreview": {
+    "imageTitle": "圖片預覽",
+    "fit": "適應視窗",
+    "original": "原始大小",
+    "csvTitle": "CSV 預覽",
+    "rowsLimited": "僅顯示前 {{n}} 列",
+    "imageTruncated": "僅載入了前 2 MB。"
   }
 }

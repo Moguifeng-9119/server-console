@@ -343,7 +343,11 @@
     "loadingSessions": "セッションを読み込み中...",
     "openFail": "ターミナルを開けませんでした",
     "connFailed": "接続失敗: {{error}}",
-    "disconnected": "接続が失われます。上をクリックして再接続をクリックします。"
+    "disconnected": "接続が失われます。上をクリックして再接続をクリックします。",
+    "searchPh": "ターミナル内を検索…",
+    "searchPrev": "前の一致",
+    "searchNext": "次の一致",
+    "searchClose": "検索を閉じる"
   },
   "serverManager": {
     "title": "サーバー接続",
@@ -555,7 +559,13 @@
     "copyOut": "出力をコピー",
     "noOut": "(出力なし)",
     "ended": "平行コマンドが終了しました",
-    "startFail": "コマンドを開始できませんでした"
+    "startFail": "コマンドを開始できませんでした",
+    "historyTitle": "コマンド履歴",
+    "historySearch": "履歴を検索…",
+    "historyClear": "履歴を消去",
+    "historyEmpty": "記録されたコマンドはまだありません。",
+    "historyFill": "クリックでコマンド欄に反映",
+    "historyDelete": "この項目を削除"
   },
   "viewer": {
     "head": "先頭",
@@ -807,6 +817,25 @@
     "usageLoad": "読み込み",
     "usageTotal": "合計",
     "usageEmpty": "この期間の使用記録はありません。",
-    "user": "ユーザー"
+    "user": "ユーザー",
+    "syncTitle": "保存して即アップロード（開発同期）",
+    "syncNote": "ローカルフォルダーを監視し、変更されたファイルを自動でサーバーへアップロードします（500 ms デバウンス）。除外は glob パターンで 1 行に 1 つ、例：**/*.tmp や node_modules。",
+    "syncLocalDir": "ローカルディレクトリ",
+    "syncRemoteDir": "リモートディレクトリ（サーバー上）",
+    "syncExcludes": "除外（1 行に 1 つの glob）",
+    "addPair": "ペアを追加",
+    "pickOnce": "すべて今すぐアップロード",
+    "lastSync": "最終同期",
+    "syncNever": "変更はまだありません",
+    "syncError": "監視エラー",
+    "browse": "参照…"
+  },
+  "filePreview": {
+    "imageTitle": "画像プレビュー",
+    "fit": "ウィンドウに合わせる",
+    "original": "元のサイズ",
+    "csvTitle": "CSV プレビュー",
+    "rowsLimited": "先頭 {{n}} 行のみ表示しています",
+    "imageTruncated": "最初の 2 MB のみ読み込みました。"
   }
 }

@@ -343,7 +343,11 @@
     "loadingSessions": "Chargement des sessions...",
     "openFail": "Terminal n'a pas ouvert",
     "connFailed": "Connexion échouée: {{error}}",
-    "disconnected": "Connexion perdue, cliquez sur \"Reconnecter\" ci-dessus."
+    "disconnected": "Connexion perdue, cliquez sur \"Reconnecter\" ci-dessus.",
+    "searchPh": "Rechercher dans le terminal…",
+    "searchPrev": "Correspondance précédente",
+    "searchNext": "Correspondance suivante",
+    "searchClose": "Fermer la recherche"
   },
   "serverManager": {
     "title": "Connexion au serveur",
@@ -555,7 +559,13 @@
     "copyOut": "Sortie de la copie",
     "noOut": "(pas de sortie)",
     "ended": "Commande Parallel terminée",
-    "startFail": "Failed to start command"
+    "startFail": "Failed to start command",
+    "historyTitle": "Historique des commandes",
+    "historySearch": "Rechercher dans l’historique…",
+    "historyClear": "Vider l’historique",
+    "historyEmpty": "Aucune commande enregistrée pour le moment.",
+    "historyFill": "Cliquer pour remplir le champ de commande",
+    "historyDelete": "Supprimer l’entrée"
   },
   "viewer": {
     "head": "Début",
@@ -807,6 +817,25 @@
     "usageLoad": "Charger",
     "usageTotal": "Total",
     "usageEmpty": "Aucune utilisation enregistrée sur cette période.",
-    "user": "Utilisateur"
+    "user": "Utilisateur",
+    "syncTitle": "Enregistrer et envoyer (synchro dev)",
+    "syncNote": "Surveille un dossier local et envoie automatiquement au serveur chaque fichier modifié (anti-rebond de 500 ms). Les exclusions sont des motifs glob, un par ligne, p. ex. **/*.tmp ou node_modules.",
+    "syncLocalDir": "Dossier local",
+    "syncRemoteDir": "Dossier distant (sur le serveur)",
+    "syncExcludes": "Exclusions (un motif glob par ligne)",
+    "addPair": "Ajouter une paire",
+    "pickOnce": "Tout envoyer maintenant",
+    "lastSync": "Dernière synchro",
+    "syncNever": "Aucun changement pour le moment",
+    "syncError": "Erreur de surveillance",
+    "browse": "Parcourir…"
+  },
+  "filePreview": {
+    "imageTitle": "Aperçu de l’image",
+    "fit": "Ajuster à la fenêtre",
+    "original": "Taille d’origine",
+    "csvTitle": "Aperçu CSV",
+    "rowsLimited": "Seules les {{n}} premières lignes sont affichées",
+    "imageTruncated": "Seuls les 2 premiers Mo ont été chargés."
   }
 }

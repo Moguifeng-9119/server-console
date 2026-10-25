@@ -343,7 +343,11 @@
     "loadingSessions": "Carregando sessões...",
     "openFail": "Terminal falhou em abrir",
     "connFailed": "Conexão falhou: {{error}}",
-    "disconnected": "Conexão perdida, clique em \"Reconectar\" acima."
+    "disconnected": "Conexão perdida, clique em \"Reconectar\" acima.",
+    "searchPh": "Pesquisar no terminal…",
+    "searchPrev": "Correspondência anterior",
+    "searchNext": "Próxima correspondência",
+    "searchClose": "Fechar pesquisa"
   },
   "serverManager": {
     "title": "Conexão de servidor",
@@ -555,7 +559,13 @@
     "copyOut": "Saída de cópia",
     "noOut": "(sem saída)",
     "ended": "Comando paralelo terminado",
-    "startFail": "Falhado para iniciar o comando"
+    "startFail": "Falhado para iniciar o comando",
+    "historyTitle": "Histórico de comandos",
+    "historySearch": "Pesquisar no histórico…",
+    "historyClear": "Limpar histórico",
+    "historyEmpty": "Nenhum comando registrado ainda.",
+    "historyFill": "Clique para preencher o campo de comando",
+    "historyDelete": "Excluir entrada"
   },
   "viewer": {
     "head": "Início",
@@ -807,6 +817,25 @@
     "usageLoad": "Carregar",
     "usageTotal": "Total",
     "usageEmpty": "Nenhum uso registrado nesse período.",
-    "user": "Usuário"
+    "user": "Usuário",
+    "syncTitle": "Salvar e enviar (sincronização de dev)",
+    "syncNote": "Vigia uma pasta local e envia automaticamente ao servidor cada arquivo alterado (debounce de 500 ms). As exclusões são padrões glob, um por linha, ex.: **/*.tmp ou node_modules.",
+    "syncLocalDir": "Diretório local",
+    "syncRemoteDir": "Diretório remoto (no servidor)",
+    "syncExcludes": "Exclusões (um glob por linha)",
+    "addPair": "Adicionar par",
+    "pickOnce": "Enviar tudo agora",
+    "lastSync": "Última sincronização",
+    "syncNever": "Nenhuma alteração ainda",
+    "syncError": "Erro de vigilância",
+    "browse": "Procurar…"
+  },
+  "filePreview": {
+    "imageTitle": "Pré-visualização de imagem",
+    "fit": "Ajustar à janela",
+    "original": "Tamanho original",
+    "csvTitle": "Pré-visualização de CSV",
+    "rowsLimited": "Mostrando apenas as primeiras {{n}} linhas",
+    "imageTruncated": "Apenas os primeiros 2 MB foram carregados."
   }
 }
