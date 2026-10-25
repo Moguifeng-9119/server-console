@@ -5,7 +5,8 @@
     "servers": "伺服器",
     "import": "匯入",
     "settings": "設定",
-    "files": "檔案"
+    "files": "檔案",
+    "workcenter": "任務"
   },
   "topbar": {
     "transfers": "傳輸",
@@ -760,5 +761,22 @@
     "loading": "正在載入歷史…",
     "empty": "此時間範圍內尚無記錄",
     "note": "原始取樣保留 24 小時，分鐘彙總保留 30 天，逾期自動清理。取樣缺失處留白；結束應用程式或電腦睡眠後停止記錄。"
+  },
+  "features": {
+    "scheduleToggle": "定時執行（時間窗）",
+    "scheduleStart": "視窗開始",
+    "scheduleEnd": "視窗結束",
+    "scheduleDays": "生效日",
+    "scheduleNote": "觸發需要本軟體保持執行。時間按伺服器本地時鐘計算：視窗開始時啟動程序，視窗結束時強制終止；視窗之外伺服器上不執行任何程序。",
+    "waitingWindow": "等待視窗",
+    "everyDay": "每天",
+    "stop": "停止",
+    "d0": "日",
+    "d1": "一",
+    "d2": "二",
+    "d3": "三",
+    "d4": "四",
+    "d5": "五",
+    "d6": "六"
   }
 }

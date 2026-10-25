@@ -5,7 +5,8 @@
     "servers": "Servers",
     "import": "Import",
     "settings": "Settings",
-    "files": "Files"
+    "files": "Files",
+    "workcenter": "Tasks"
   },
   "topbar": {
     "transfers": "Transfers",
@@ -760,5 +761,22 @@
     "loading": "Loading history…",
     "empty": "No recorded data in this range",
     "note": "Raw samples: 24 hours; minute summaries: 30 days. Expired data is automatically removed. Sampling gaps remain empty. Recording stops when the app exits or the computer sleeps."
+  },
+  "features": {
+    "scheduleToggle": "Run on a schedule (time window)",
+    "scheduleStart": "Window start",
+    "scheduleEnd": "Window end",
+    "scheduleDays": "Days",
+    "scheduleNote": "The app must be running to fire the window. Times follow the server’s local clock; the process starts at window start and is terminated at window end. Outside the window nothing runs on the server.",
+    "waitingWindow": "Waiting for window",
+    "everyDay": "Every day",
+    "stop": "Stop",
+    "d0": "Su",
+    "d1": "Mo",
+    "d2": "Tu",
+    "d3": "We",
+    "d4": "Th",
+    "d5": "Fr",
+    "d6": "Sa"
   }
 }

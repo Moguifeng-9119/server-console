@@ -5,7 +5,8 @@
     "servers": "服务器",
     "import": "导入",
     "settings": "设置",
-    "files": "文件"
+    "files": "文件",
+    "workcenter": "任务"
   },
   "topbar": {
     "transfers": "传输",
@@ -760,5 +761,22 @@
     "loading": "正在加载历史…",
     "empty": "此时间范围内暂无记录",
     "note": "原始采样保留 24 小时，分钟汇总保留 30 天，超期自动清理。采样缺失处留空；退出应用或电脑休眠后停止记录。"
+  },
+  "features": {
+    "scheduleToggle": "定时执行（时间窗）",
+    "scheduleStart": "窗口开始",
+    "scheduleEnd": "窗口结束",
+    "scheduleDays": "生效日",
+    "scheduleNote": "触发需要本软件保持运行。时间按服务器本地时钟计算：窗口开始时启动进程，窗口结束时强制终止；窗口之外服务器上不运行任何进程。",
+    "waitingWindow": "等待窗口",
+    "everyDay": "每天",
+    "stop": "停止",
+    "d0": "日",
+    "d1": "一",
+    "d2": "二",
+    "d3": "三",
+    "d4": "四",
+    "d5": "五",
+    "d6": "六"
   }
 }

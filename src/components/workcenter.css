@@ -33,3 +33,11 @@
 .sync-delete { display: flex; gap: 8px; margin-top: 16px; align-items: center; } .sync-dialog table { width: 100%; font-size: 12px; border-collapse: collapse; }
 .sync-dialog td, .sync-dialog th { text-align: left; padding: 7px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .term-chips { flex-wrap: wrap; } .term-tools { display: flex; gap: 5px; margin-left: auto; flex-wrap: wrap; }
+
+/* ===== 定时计划（时间窗）表单 ===== */
+.schedule-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; border-top: 1px dashed var(--border-strong); padding-top: 10px; margin-top: 4px; }
+.schedule-row .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 12.5px; }
+.schedule-row .note { grid-column: 1 / -1; }
+.day-picker { display: inline-flex; gap: 4px; }
+.day-picker button { min-width: 30px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text-dim); font-size: 11px; }
+.day-picker button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }

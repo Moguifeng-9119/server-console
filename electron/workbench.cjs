@@ -11,6 +11,50 @@ const idOf = (value) => { const id = String(value || ''); if (!/^[a-zA-Z0-9_-]{1
 const taskPath = (id) => '"$HOME"/.local/state/serverconsole/tasks/' + quote(idOf(id));
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
+// ===== 定时计划（时间窗）辅助：纯函数，供测试直接导入 =====
+const CLOCK_RE = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/;
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const minutesOf = (value) => { const [h, m] = String(value).split(':').map(Number); return h * 60 + m; };
+const dayShift = (date, delta) => { const d = new Date(date + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + delta); return d.toISOString().slice(0, 10); };
+const weekdayOf = (date) => new Date(date + 'T00:00:00Z').getUTCDay();
+
+// 服务器时钟解析：date '+%F %H:%M' 输出 → { date: 'YYYY-MM-DD', minutes: 当日分钟数 }
+function parseClock(output) {
+  const m = String(output).trim().match(CLOCK_RE);
+  if (!m) throw new Error('Server clock unavailable');
+  return { date: m[1], minutes: Number(m[2]) * 60 + Number(m[3]) };
+}
+
+// 窗口判定：inside 含起点不含终点；跨夜窗口（start > end）的 occurrenceKey 归属窗口开始那天。
+// days（0=周日…6=周六）按 occurrenceKey 的星期过滤；空数组视为每天。
+function windowState(schedule, serverDate, serverMinutes) {
+  const start = minutesOf(schedule.start), end = minutesOf(schedule.end), now = serverMinutes;
+  let inside, occurrenceKey;
+  if (start < end) { inside = now >= start && now < end; occurrenceKey = serverDate; }
+  else { inside = now >= start || now < end; occurrenceKey = now >= start ? serverDate : dayShift(serverDate, -1); }
+  const days = Array.isArray(schedule.days) && schedule.days.length ? schedule.days : [0, 1, 2, 3, 4, 5, 6];
+  if (inside && !days.includes(weekdayOf(occurrenceKey))) inside = false;
+  return { inside, occurrenceKey };
+}
+
+// schedule 入参校验与归一化；windowUnchanged 时保留 lastOccurrence/lastStartAt（防改名后同窗重复启动）
+function normalizeSchedule(input, previous) {
+  if (input == null) return undefined;
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid schedule');
+  const start = String(input.start || ''), end = String(input.end || '');
+  if (!TIME_RE.test(start) || !TIME_RE.test(end)) throw new Error('Schedule window must use HH:MM');
+  if (start === end) throw new Error('Schedule window start and end must differ');
+  const rawDays = input.days == null ? [] : [...new Set((Array.isArray(input.days) ? input.days : [input.days]).map(Number))];
+  const days = rawDays.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort((a, b) => a - b);
+  if (!days.length) days.push(0, 1, 2, 3, 4, 5, 6); // 未指定/空数组归一为每天；全非法输入同样回退每天
+  const schedule = { start, end, days, enabled: input.enabled !== false };
+  if (previous && previous.start === start && previous.end === end && JSON.stringify(previous.days) === JSON.stringify(days)) {
+    schedule.lastOccurrence = previous.lastOccurrence;
+    schedule.lastStartAt = previous.lastStartAt;
+  }
+  return schedule;
+}
+
 /** Parse Linux procfs counters and POSIX df output, retaining unsupported values. */
 function parseSystem(stdout, previous, at = Date.now()) {
   const blocks = {}; let section = '';
@@ -36,6 +80,7 @@ class WorkbenchManager {
   constructor({ directory, getConnection, getServers = () => [], notify = (_title, _body) => {}, onEvent = (_event) => {}, historyQuery = null, onResource = (_serverId, _value) => {}, resourceConcurrency = 4, now = Date.now }) {
     this.file = path.join(directory, 'workbench.json'); this.getConnection = getConnection; this.getServers = getServers; this.notify = notify; this.onEvent = onEvent; this.historyQuery = historyQuery;
     this.data = { version: 1, tasks: [], watches: [], rules: [], events: [], templates: [] }; this.previous = new Map(); this.snapshots = new Map(); this.progress = new Map(); this.running = new Set(); this.closed = false; this.taskPollAt = new Map();
+    this.clockCache = new Map(); // serverId -> { at, date, minutes }（服务器本地时钟，10s 缓存）
     this.onResource = onResource; this.resourceNow = now; this.resourceConcurrency = Math.max(1, Math.min(16, Math.floor(Number(resourceConcurrency) || 4)));
     this.resourceIdentities = new Map(); this.resourceInFlight = new Map(); this.resourceFailures = new Map(); this.resourceQueue = []; this.resourceActive = 0; this.resourceBusyHosts = new Set();
   }
@@ -156,15 +201,16 @@ class WorkbenchManager {
   upsert(kind, item) { const id = item.id ? idOf(item.id) : crypto.randomUUID(); const index = this.data[kind].findIndex((o) => o.id === id); if (index < 0 && this.data[kind].length >= 500) throw new Error('Workspace item limit reached'); const value = { ...item, id }; if (index < 0) this.data[kind].push(value); else this.data[kind][index] = value; this.persist(); return clone(value); }
   async request(request) {
     const r = request || {}; const op = r.operation; const sid = String(r.serverId || '');
-    if (sid && ['taskStart', 'taskStatus', 'taskLog', 'taskDelete'].includes(op) && this.task(idOf(r.id)).serverId !== sid) throw new Error('Task belongs to another server');
+    if (sid && ['taskStart', 'taskStatus', 'taskStop', 'taskLog', 'taskDelete'].includes(op) && this.task(idOf(r.id)).serverId !== sid) throw new Error('Task belongs to another server');
     if (op === 'eventList') return clone(this.data.events.filter((e) => !sid || e.serverId === sid));
     if (op === 'system') return this.observeResources(sid, { maxAgeMs: 2000 });
     if (op === 'process') return this.processDetails(sid, pidOf(r.pid));
     if (op === 'tmux' || op === 'tmux.list') { const result = await this.exec(sid, "if ! command -v tmux >/dev/null 2>&1; then printf '__UNSUPPORTED__'; elif tmux list-sessions -F '#{session_name}\\t#{session_windows}\\t#{session_attached}' 2>/dev/null; then :; else printf '__EMPTY__'; fi"); return { available: !result.includes('__UNSUPPORTED__'), sessions: result.split(/\r?\n/).filter((l) => l && !l.startsWith('__')).map((line) => { const [name, windows, attached] = line.split('\t'); return { name, windows: +windows, attached: +attached }; }) }; }
     if (op === 'tmux.attach') { const sessions = await this.request({ operation: 'tmux.list', serverId: sid }); if (!sessions.sessions.some((s) => s.name === r.name)) throw new Error('Session no longer exists'); return { command: 'tmux attach-session -t ' + quote(String(r.name)) }; }
     if (op === 'taskList') return clone(this.data.tasks.filter((t) => !sid || t.serverId === sid));
-    if (op === 'taskSave') { this.server(sid); const existing = this.data.tasks.find((t) => t.id === r.id); if (existing && existing.serverId !== sid) throw new Error('Task server cannot be changed'); if (existing?.remoteId) throw new Error('Started tasks are immutable; create a new task'); const command = text(r.command, 65536).trim(); if (!command) throw new Error('Enter a command'); const cwd = text(r.cwd || '~'); if (cwd !== '~' && !cwd.startsWith('/')) throw new Error('Working directory must be absolute or ~'); const gpu = text(r.gpu, 2048); if (gpu && !/^[a-zA-Z0-9,._/-]+$/.test(gpu)) throw new Error('Invalid GPU selection'); return this.upsert('tasks', { id: r.id, serverId: sid, name: text(r.name || command.slice(0, 60), 120), command, cwd, gpu, logPath: text(r.logPath), terminal: r.terminal && typeof r.terminal === 'object' ? { name: text(r.terminal.name, 120) } : {}, status: 'saved', createdAt: existing?.createdAt || Date.now() }); }
+    if (op === 'taskSave') { this.server(sid); const existing = this.data.tasks.find((t) => t.id === r.id); if (existing && existing.serverId !== sid) throw new Error('Task server cannot be changed'); if (existing?.remoteId) throw new Error('Started tasks are immutable; create a new task'); const command = text(r.command, 65536).trim(); if (!command) throw new Error('Enter a command'); const cwd = text(r.cwd || '~'); if (cwd !== '~' && !cwd.startsWith('/')) throw new Error('Working directory must be absolute or ~'); const gpu = text(r.gpu, 2048); if (gpu && !/^[a-zA-Z0-9,._/-]+$/.test(gpu)) throw new Error('Invalid GPU selection'); const schedule = normalizeSchedule(r.schedule, existing?.schedule); return this.upsert('tasks', { id: r.id, serverId: sid, name: text(r.name || command.slice(0, 60), 120), command, cwd, gpu, schedule, logPath: text(r.logPath), terminal: r.terminal && typeof r.terminal === 'object' ? { name: text(r.terminal.name, 120) } : {}, status: 'saved', createdAt: existing?.createdAt || Date.now() }); }
     if (op === 'taskStart') return this.startTask(idOf(r.id));
+    if (op === 'taskStop') return this.killTask(idOf(r.id), 'Stopped manually');
     if (op === 'taskStatus') return this.taskStatus(idOf(r.id));
     if (op === 'taskLog') { const task = this.task(idOf(r.id)); if (!task.remoteId) return { text: '', truncated: false }; return { text: await this.exec(task.serverId, 'tail -c 262144 -- ' + taskPath(task.remoteId) + '/output.log'), truncated: true }; }
     if (op === 'taskDelete') { const task = this.task(idOf(r.id)); if (['starting', 'running', 'unknown'].includes(task.status)) throw new Error('A live task must remain tracked'); this.data.tasks = this.data.tasks.filter((t) => t.id !== task.id); this.persist(); return true; }
@@ -210,6 +256,7 @@ class WorkbenchManager {
   }
   async taskStatus(id) {
     const task = this.task(id); if (!task.remoteId) return clone(task);
+    if (task.status === 'stopped') return clone(task); // 计划/手动终止后不再被退出码覆盖回 failed
     const dir = taskPath(task.remoteId);
     const command = 'if test -f ' + dir + '/exit.code; then cat ' + dir + '/exit.code; ' +
       'elif test -s ' + dir + '/runner.pid && test -s ' + dir + '/runner.start; then pid=$(cat ' + dir + '/runner.pid); expected=$(cat ' + dir + '/runner.start); ' +
@@ -223,6 +270,80 @@ class WorkbenchManager {
       if (!done) { task.finishedAt = Date.now(); this.event('task-finished', task.serverId, task.name, 'Exit code: ' + task.exitCode, { taskId: task.id }); }
     } else task.status = output === '__PENDING__' ? 'running' : output === '__STARTING__' && Date.now() - task.startedAt < 30000 ? 'starting' : 'unknown';
     this.persist(); return clone(task);
+  }
+
+  // 终止运行中的任务：tmux 会话优先杀；再按 runner.pid+runner.start 校验杀主进程（TERM→1s→KILL）
+  async killTask(id, reason = 'Stopped') {
+    const task = this.task(id);
+    if (!task.remoteId || !['starting', 'running', 'unknown'].includes(task.status)) throw new Error('Task is not running');
+    const dir = taskPath(task.remoteId);
+    const parts = [];
+    if (task.mode === 'tmux' && task.sessionName) parts.push('tmux kill-session -t ' + quote(task.sessionName) + ' 2>/dev/null || true');
+    parts.push('if test -s ' + dir + '/runner.pid; then pid=$(cat ' + dir + '/runner.pid); case "$pid" in ""|*[!0-9]*) ;; *) kill -TERM "$pid" 2>/dev/null || true; sleep 1; kill -KILL "$pid" 2>/dev/null || true;; esac; fi');
+    try { await this.exec(task.serverId, parts.join('; '), 15000); } catch { /* 尽力而为：状态仍标记停止 */ }
+    task.status = 'stopped'; task.finishedAt = Date.now(); this.persist();
+    this.event('task-stopped', task.serverId, task.name + ' · ' + reason, '', { taskId: task.id });
+    return clone(task);
+  }
+
+  // 服务器本地时钟（10s 缓存）。按服务器时间计算窗口是用户确认的语义。
+  async serverClock(serverId, now = Date.now()) {
+    const cached = this.clockCache.get(serverId);
+    if (cached && now - cached.at < 10000) return cached;
+    const clock = { at: now, ...parseClock(await this.exec(serverId, "date '+%F %H:%M'", 10000)) };
+    this.clockCache.set(serverId, clock);
+    return clock;
+  }
+
+  // 定时计划 tick（主进程每 15s 调一次）：
+  // 窗口内且本窗口未触发过 → 重置并启动；窗口外且仍在跑 → 强制终止。服务器不可达 → 本轮跳过。
+  async tickSchedules(now = Date.now()) {
+    if (this.closed) return;
+    const scheduled = this.data.tasks.filter((t) => t.schedule && t.schedule.enabled !== false && t.serverId);
+    if (!scheduled.length) return;
+    const byServer = new Map();
+    for (const task of scheduled) {
+      if (!byServer.has(task.serverId)) byServer.set(task.serverId, []);
+      byServer.get(task.serverId).push(task);
+    }
+    for (const [serverId, tasks] of byServer) {
+      let clock;
+      try { clock = await this.serverClock(serverId, now); } catch { continue; }
+      for (const task of tasks) {
+        const lock = 'sched:' + task.id;
+        if (this.running.has(lock)) continue;
+        this.running.add(lock);
+        try { await this.applySchedule(task, clock, now); } catch { /* 下轮重试 */ }
+        finally { this.running.delete(lock); }
+      }
+    }
+  }
+
+  async applySchedule(task, clock, now) {
+    const schedule = task.schedule;
+    const { inside, occurrenceKey } = windowState(schedule, clock.date, clock.minutes);
+    const live = !!task.remoteId && ['starting', 'running', 'unknown'].includes(task.status);
+    if (!inside) {
+      if (live) await this.killTask(task.id, 'Window ended (' + schedule.start + '–' + schedule.end + ')');
+      return;
+    }
+    if (schedule.lastOccurrence === occurrenceKey) return; // 本窗口已处理
+    if (live) { // 用户在窗口内手动启动了：占用本窗口，避免双跑；到点终止依然生效
+      schedule.lastOccurrence = occurrenceKey; schedule.lastStartAt = now; this.persist();
+      return;
+    }
+    // 新窗口：重置上次运行痕迹后启动
+    task.remoteId = undefined; task.sessionName = undefined; task.exitCode = undefined; task.error = undefined;
+    task.mode = undefined; task.ownedLog = undefined; task.finishedAt = undefined; task.startedAt = undefined; task.status = 'saved';
+    schedule.lastOccurrence = occurrenceKey; schedule.lastStartAt = now;
+    this.persist();
+    try {
+      await this.startTask(task.id);
+      this.event('schedule-start', task.serverId, task.name, 'Window ' + schedule.start + '–' + schedule.end + ' started', { taskId: task.id });
+    } catch (error) {
+      task.status = 'unknown'; task.error = String(error); this.persist();
+      this.event('schedule-error', task.serverId, task.name, 'Scheduled start failed: ' + String(error), { taskId: task.id });
+    }
   }
 
   async processDetails(sid, pid) {
@@ -245,6 +366,6 @@ class WorkbenchManager {
   }
 }
 
-module.exports = { WorkbenchManager, parseSystem, quote, SYSTEM_COMMAND };
+module.exports = { WorkbenchManager, parseSystem, quote, SYSTEM_COMMAND, windowState, parseClock, normalizeSchedule };
 
 

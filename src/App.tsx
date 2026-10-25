@@ -19,6 +19,7 @@ import { TransferDrawer } from './components/TransferDrawer';
 import { ParallelCommand } from './components/ParallelCommand';
 import { HistoryDialog } from './components/HistoryDialog';
 import { CommandPalette, type PaletteAction } from './components/CommandPalette';
+import { WorkCenter } from './components/WorkCenter';
 import { useTransfers } from './transfers';
 import type { SetStateAction } from 'react';
 
@@ -27,11 +28,14 @@ type ServerTab = 'gpu' | 'proc' | 'files' | 'term' | 'history';
 const LS_VIEW = 'sc.view';
 
 // 恢复上次页面：只在结构合法时采用，服务器已被删除则由下方 effect 兜底回总览
-function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'server'; id: string; tab: ServerTab } {
+function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'workcenter' } | { kind: 'server'; id: string; tab: ServerTab } {
   try {
     const raw = JSON.parse(localStorage.getItem(LS_VIEW) || 'null');
     if (raw && raw.kind === 'parallel') {
       return { kind: 'parallel' };
+    }
+    if (raw && raw.kind === 'workcenter') {
+      return { kind: 'workcenter' };
     }
     if (raw && raw.kind === 'server' && typeof raw.id === 'string' && ['gpu', 'proc', 'files', 'term', 'history'].includes(raw.tab)) {
       return { kind: 'server', id: raw.id, tab: raw.tab };
@@ -248,6 +252,18 @@ export default function App() {
             <span>{t('nav.overview')}</span>
             <span className="sub">{servers.filter((s) => s.status === 'online').length}/{servers.length}</span>
           </button>
+          <button
+            className={`nav-item ${view.kind === 'parallel' ? 'active' : ''}`}
+            onClick={() => setView({ kind: 'parallel' })}
+          >
+            <span>{t('nav.parallel')}</span>
+          </button>
+          <button
+            className={`nav-item ${view.kind === 'workcenter' ? 'active' : ''}`}
+            onClick={() => setView({ kind: 'workcenter' })}
+          >
+            <span>{t('nav.workcenter', '任务')}</span>
+          </button>
           {!hasGroups && <div className="note" style={{ padding: '10px 10px 4px' }}>{t('nav.servers')}</div>}
           {hasGroups
             ? groupSections.map((sec) => (
@@ -287,7 +303,7 @@ export default function App() {
 
       <main className="main">
         <header className="topbar">
-          <span className="title">{view.kind === 'overview' ? t('nav.overview') : view.kind === 'parallel' ? t('nav.parallel') : current?.name}</span>
+          <span className="title">{view.kind === 'overview' ? t('nav.overview') : view.kind === 'parallel' ? t('nav.parallel') : view.kind === 'workcenter' ? t('nav.workcenter', '任务') : current?.name}</span>
           {demo && (
             <button className="btn" style={{ color: 'var(--warn)' }} onClick={() => setManagerOpen(true)}>
               {t('topbar.demoBanner')}
@@ -315,6 +331,16 @@ export default function App() {
         <div className="content">
           {view.kind === 'parallel' ? (
             <ParallelCommand />
+          ) : view.kind === 'workcenter' ? (
+            <WorkCenter
+              servers={servers}
+              onTerminal={(serverId, command) => {
+                openServer(serverId, 'term');
+                if (command) setTimeout(() => window.dispatchEvent(new CustomEvent('sc:terminal-command', { detail: command })), 400);
+              }}
+              onFiles={(serverId) => openServer(serverId, 'files')}
+              onForward={async () => setSettingsOpen(true)}
+            />
           ) : view.kind === 'overview' ? (
             configs.length === 0 && !demo ? (
               <div className="empty">

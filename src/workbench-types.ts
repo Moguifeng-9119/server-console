@@ -1,4 +1,12 @@
-export interface WorkspaceTask { id: string; serverId: string; name: string; cwd: string; command: string; gpu?: string; status: string; remoteId?: string; sessionName?: string; exitCode?: number; startedAt?: number; finishedAt?: number; ownedLog?: string }
+export interface TaskSchedule {
+  start: string; // 'HH:MM' 窗口开始（服务器本地时间）
+  end: string; // 'HH:MM' 窗口结束，支持跨夜（如 22:00–06:00）
+  days: number[]; // 生效的星期（0=周日…6=周六）
+  enabled: boolean;
+  lastOccurrence?: string; // 上次触发的窗口起始日 YYYY-MM-DD（防同窗重复启动）
+  lastStartAt?: number;
+}
+export interface WorkspaceTask { id: string; serverId: string; name: string; cwd: string; command: string; gpu?: string; status: string; remoteId?: string; sessionName?: string; exitCode?: number; startedAt?: number; finishedAt?: number; ownedLog?: string; schedule?: TaskSchedule }
 export interface GpuWatch { id: string; serverId: string; model: string; minFreeGiB: number; durationSeconds: number; enabled: boolean }
 export interface WorkbenchEvent { id: string; serverId: string; type: string; title: string; body?: string; at: number }
 export interface AlertRule { id: string; serverId: string; name: string; metric: string; direction: string; threshold: number; recovery: number; durationSeconds: number; cooldownSeconds: number; quietStart?: string; quietEnd?: string; enabled: boolean }

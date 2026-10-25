@@ -5,7 +5,8 @@
     "servers": "Serveurs",
     "import": "Importer",
     "settings": "Paramètres",
-    "files": "Fichiers"
+    "files": "Fichiers",
+    "workcenter": "Tâches"
   },
   "topbar": {
     "transfers": "Transferts",
@@ -760,5 +761,22 @@
     "loading": "Chargement de l’historique…",
     "empty": "Aucune donnée enregistrée sur cette période",
     "note": "Échantillons bruts : 24 heures ; résumés par minute : 30 jours. Les données expirées sont supprimées automatiquement. Les lacunes restent vides. L’enregistrement s’arrête à la fermeture ou en veille."
+  },
+  "features": {
+    "scheduleToggle": "Exécution planifiée (fenêtre horaire)",
+    "scheduleStart": "Début de fenêtre",
+    "scheduleEnd": "Fin de fenêtre",
+    "scheduleDays": "Jours",
+    "scheduleNote": "L’app doit rester ouverte pour déclencher la fenêtre. Les horaires suivent l’horloge locale du serveur : le processus démarre à l’ouverture et est arrêté à la fermeture ; en dehors de la fenêtre, rien ne tourne.",
+    "waitingWindow": "En attente de fenêtre",
+    "everyDay": "Chaque jour",
+    "stop": "Arrêter",
+    "d0": "Di",
+    "d1": "Lu",
+    "d2": "Ma",
+    "d3": "Me",
+    "d4": "Je",
+    "d5": "Ve",
+    "d6": "Sa"
   }
 }

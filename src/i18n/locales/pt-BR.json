@@ -5,7 +5,8 @@
     "servers": "Servidores",
     "import": "Importar",
     "settings": "Configurações",
-    "files": "Arquivos"
+    "files": "Arquivos",
+    "workcenter": "Tarefas"
   },
   "topbar": {
     "transfers": "Transferências",
@@ -760,5 +761,22 @@
     "loading": "Carregando histórico…",
     "empty": "Nenhum dado registrado neste período",
     "note": "Amostras brutas: 24 horas; resumos por minuto: 30 dias. Dados vencidos são removidos automaticamente. Lacunas ficam vazias. O registro para ao sair do aplicativo ou suspender o computador."
+  },
+  "features": {
+    "scheduleToggle": "Executar por horário (janela de tempo)",
+    "scheduleStart": "Início da janela",
+    "scheduleEnd": "Fim da janela",
+    "scheduleDays": "Dias",
+    "scheduleNote": "O app precisa estar aberto para disparar a janela. Os horários seguem o relógio local do servidor: o processo inicia na abertura e é encerrado forçosamente no fechamento; fora da janela nada roda.",
+    "waitingWindow": "Aguardando janela",
+    "everyDay": "Todos os dias",
+    "stop": "Parar",
+    "d0": "Do",
+    "d1": "Se",
+    "d2": "Te",
+    "d3": "Qu",
+    "d4": "Qu",
+    "d5": "Se",
+    "d6": "Sá"
   }
 }

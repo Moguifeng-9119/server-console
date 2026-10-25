@@ -5,7 +5,8 @@
     "servers": "Servidores",
     "import": "Importar",
     "settings": "Ajustes",
-    "files": "Archivos"
+    "files": "Archivos",
+    "workcenter": "Tareas"
   },
   "topbar": {
     "transfers": "Transferencias",
@@ -760,5 +761,22 @@
     "loading": "Cargando historial…",
     "empty": "No hay datos registrados en este periodo",
     "note": "Muestras originales: 24 horas; resúmenes por minuto: 30 días. Los datos caducados se eliminan automáticamente. Los huecos quedan vacíos. El registro se detiene al cerrar la aplicación o suspender el equipo."
+  },
+  "features": {
+    "scheduleToggle": "Ejecutar con horario (ventana de tiempo)",
+    "scheduleStart": "Inicio de ventana",
+    "scheduleEnd": "Fin de ventana",
+    "scheduleDays": "Días",
+    "scheduleNote": "La app debe estar abierta para disparar la ventana. Los horarios siguen el reloj local del servidor: el proceso se inicia al abrir la ventana y se termina forzosamente al cerrarla; fuera de ella no corre nada.",
+    "waitingWindow": "Esperando ventana",
+    "everyDay": "Todos los días",
+    "stop": "Detener",
+    "d0": "Do",
+    "d1": "Lu",
+    "d2": "Ma",
+    "d3": "Mi",
+    "d4": "Ju",
+    "d5": "Vi",
+    "d6": "Sá"
   }
 }

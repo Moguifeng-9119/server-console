@@ -738,6 +738,10 @@ function registerIpc() {
   });
   workbench.init();
   ipcMain.handle('workbench:request', wrap((req) => workbench.request(req || {})));
+  // 定时计划 tick：每 15 秒检查时间窗（按各服务器本地时间）；无启用的计划时零开销
+  const scheduleTimer = setInterval(() => { void workbench.tickSchedules().catch(() => {}); }, 15000);
+  scheduleTimer.unref?.();
+  void workbench.tickSchedules().catch(() => {});
 
   // 端口转发实例（handler 与 init 都用这个闭包）
   forwardings = new ForwardingManager({

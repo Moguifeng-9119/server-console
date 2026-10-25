@@ -5,7 +5,8 @@
     "servers": "Server",
     "import": "Importieren",
     "settings": "Einstellungen",
-    "files": "Dateien"
+    "files": "Dateien",
+    "workcenter": "Aufgaben"
   },
   "topbar": {
     "transfers": "Übertragungen",
@@ -760,5 +761,22 @@
     "loading": "Verlauf wird geladen…",
     "empty": "Keine Aufzeichnungen in diesem Zeitraum",
     "note": "Rohdaten: 24 Stunden; Minutenübersichten: 30 Tage. Abgelaufene Daten werden automatisch gelöscht. Messlücken bleiben leer. Bei App-Ende oder Ruhezustand stoppt die Aufzeichnung."
+  },
+  "features": {
+    "scheduleToggle": "Zeitgesteuert ausführen (Zeitfenster)",
+    "scheduleStart": "Fensterbeginn",
+    "scheduleEnd": "Fensterende",
+    "scheduleDays": "Tage",
+    "scheduleNote": "Zum Auslösen des Fensters muss die App laufen. Die Zeiten folgen der Server-Uhr: Der Prozess startet bei Fensterbeginn und wird am Ende erzwungen beendet; außerhalb läuft nichts.",
+    "waitingWindow": "Wartet auf Fenster",
+    "everyDay": "Jeden Tag",
+    "stop": "Stopp",
+    "d0": "So",
+    "d1": "Mo",
+    "d2": "Di",
+    "d3": "Mi",
+    "d4": "Do",
+    "d5": "Fr",
+    "d6": "Sa"
   }
 }
