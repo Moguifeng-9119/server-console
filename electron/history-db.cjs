@@ -26,7 +26,11 @@ class HistoryDatabase {
         missing INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(channel,at)) WITHOUT ROWID;
       CREATE INDEX IF NOT EXISTS minutes_expiry ON minutes(at);
-      CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS usage_minutes (
+        day TEXT NOT NULL, server TEXT NOT NULL, user TEXT NOT NULL,
+        gpu_minutes REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY(day,server,user)) WITHOUT ROWID;`);
     this.channel = this.db.prepare('SELECT * FROM channels WHERE server=? AND device=? AND metric=?');
     this.create = this.db.prepare('INSERT OR IGNORE INTO channels(server,device,metric,label) VALUES(?,?,?,?)');
     this.insert = this.db.prepare('INSERT OR IGNORE INTO raw VALUES(?,?,?)');
@@ -37,6 +41,12 @@ class HistoryDatabase {
       high=CASE WHEN excluded.high IS NULL THEN high WHEN high IS NULL THEN excluded.high ELSE MAX(high,excluded.high) END,
       weighted=weighted+excluded.weighted, coverage=coverage+excluded.coverage, missing=missing+excluded.missing`);
     this.last = this.db.prepare('UPDATE channels SET last_at=?,last_value=?,label=? WHERE id=?');
+    this.usageMinute = this.db.prepare(`INSERT INTO usage_minutes(day,server,user,gpu_minutes) VALUES(?,?,?,?)
+      ON CONFLICT(day,server,user) DO UPDATE SET gpu_minutes=gpu_minutes+excluded.gpu_minutes`);
+    // usage 按用户聚合查询：rangeDays 内各用户总 GPU·分钟与分服务器明细
+    this.usageByUser = this.db.prepare(`SELECT user, SUM(gpu_minutes) AS total,
+      SUM(CASE WHEN server=? THEN gpu_minutes ELSE 0 END) AS thisServer
+      FROM usage_minutes WHERE day >= date('now', ?) GROUP BY user ORDER BY total DESC`);
     this.migrateRawBuckets();
   }
 
@@ -125,6 +135,32 @@ class HistoryDatabase {
       if (!live.has(String(c.device))) add(String(c.device), String(c.metric), String(c.label), null);
     }
     this.append(records);
+    this.ingestUsage(s, at);
+  }
+
+  // 按用户 GPU·时长：每张有进程占用的 GPU，把与上次快照的间隔分钟数均摊给卡上去重的用户集合
+  ingestUsage(s, at, previousAt = null) {
+    const prev = previousAt ?? this.usageLastAt?.get(s.id);
+    this.usageLastAt = this.usageLastAt || new Map();
+    this.usageLastAt.set(s.id, at);
+    if (prev == null || at <= prev || at - prev > 10 * MINUTE) return; // 首次/断链过大跳过，防伪造时长
+    const gpuMinutes = (at - prev) / MINUTE;
+    const day = new Date(at).toISOString().slice(0, 10);
+    this.db.exec('BEGIN');
+    try {
+      for (const g of s.gpus || []) {
+        const users = [...new Set((g.procs || []).map((p) => p.user).filter(Boolean))];
+        if (!users.length) continue;
+        const share = gpuMinutes / users.length;
+        for (const user of users.slice(0, 16)) this.usageMinute.run(day, s.id, user.slice(0, 64), share);
+      }
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+
+  usageByUserDays(server, rangeDays) {
+    return this.usageByUser.all(String(server), `-${Math.max(1, Math.min(365, rangeDays))} day`)
+      .map((r) => ({ user: String(r.user), totalMinutes: Number(r.total) || 0, thisServerMinutes: Number(r.thisServer) || 0 }));
   }
 
   gap(server, at = Date.now()) {

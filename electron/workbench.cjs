@@ -77,14 +77,14 @@ const SYSTEM_COMMAND = "printf '__SC_OS__\\n'; uname -s; printf '__SC_DF__\\n'; 
 
 /** Local persisted workspaces and explicitly requested remote tools. */
 class WorkbenchManager {
-  constructor({ directory, getConnection, getServers = () => [], notify = (_title, _body) => {}, onEvent = (_event) => {}, historyQuery = null, onResource = (_serverId, _value) => {}, resourceConcurrency = 4, now = Date.now }) {
-    this.file = path.join(directory, 'workbench.json'); this.getConnection = getConnection; this.getServers = getServers; this.notify = notify; this.onEvent = onEvent; this.historyQuery = historyQuery;
-    this.data = { version: 1, tasks: [], watches: [], rules: [], events: [], templates: [] }; this.previous = new Map(); this.snapshots = new Map(); this.progress = new Map(); this.running = new Set(); this.closed = false; this.taskPollAt = new Map();
+  constructor({ directory, getConnection, getServers = () => [], notify = (_title, _body) => {}, onEvent = (_event) => {}, historyQuery = null, usageQuery = null, onResource = (_serverId, _value) => {}, resourceConcurrency = 4, now = Date.now }) {
+    this.file = path.join(directory, 'workbench.json'); this.getConnection = getConnection; this.getServers = getServers; this.notify = notify; this.onEvent = onEvent; this.historyQuery = historyQuery; this.usageQuery = usageQuery;
+    this.data = { version: 1, tasks: [], watches: [], rules: [], events: [], templates: [], logs: [], env: [] }; this.previous = new Map(); this.snapshots = new Map(); this.progress = new Map(); this.running = new Set(); this.closed = false; this.taskPollAt = new Map();
     this.clockCache = new Map(); // serverId -> { at, date, minutes }（服务器本地时钟，10s 缓存）
     this.onResource = onResource; this.resourceNow = now; this.resourceConcurrency = Math.max(1, Math.min(16, Math.floor(Number(resourceConcurrency) || 4)));
     this.resourceIdentities = new Map(); this.resourceInFlight = new Map(); this.resourceFailures = new Map(); this.resourceQueue = []; this.resourceActive = 0; this.resourceBusyHosts = new Set();
   }
-  init() { if (fs.existsSync(this.file)) { const saved = JSON.parse(fs.readFileSync(this.file, 'utf8')); for (const key of ['tasks', 'watches', 'rules', 'events', 'templates']) if (Array.isArray(saved[key])) this.data[key] = saved[key]; } return this; }
+  init() { if (fs.existsSync(this.file)) { const saved = JSON.parse(fs.readFileSync(this.file, 'utf8')); for (const key of ['tasks', 'watches', 'rules', 'events', 'templates', 'logs', 'env']) if (Array.isArray(saved[key])) this.data[key] = saved[key]; } return this; }
   persist() { fs.mkdirSync(path.dirname(this.file), { recursive: true }); const tmp = this.file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(this.data), { mode: 0o600 }); fs.renameSync(tmp, this.file); }
   close() { this.closed = true; for (const job of this.resourceQueue.splice(0)) { job.reject(new Error('Workbench is closed')); this.resourceInFlight.delete(job.serverId); } this.persist(); }
   server(id) { if (!this.getServers().some((s) => s.id === id)) throw new Error('Server no longer exists'); return this.getConnection(id); }
@@ -173,11 +173,14 @@ class WorkbenchManager {
       if (observedAt - state.since >= watch.durationSeconds * 1000) { watch.enabled = false; watch.firedAt = at; this.event('gpu-available', snapshot.id, 'GPU available', `${gpu.name} · GPU ${gpu.index} · ${((gpu.memTotal - gpu.memUsed) / 1024).toFixed(1)} GiB free`, { watchId: watch.id }); }
     }
     for (const rule of this.data.rules.filter((r) => r.enabled && (!r.serverId || r.serverId === snapshot.id))) {
-      if (snapshot.lastLane && rule.metric !== 'offline' && snapshot.lastLane !== (rule.metric === 'cpuUsage' ? 'system' : 'gpu')) continue;
+      if (snapshot.lastLane && rule.metric !== 'offline' && snapshot.lastLane !== (rule.metric === 'cpuUsage' ? 'system' : 'gpu') && rule.metric !== 'occupiedIdle') continue;
       const key = 'rule:' + rule.id + ':' + snapshot.id;
       const state = this.progress.get(key) || { active: false, notified: 0, devices: new Map() };
       const gs = snapshot.gpus || [], lane = rule.metric === 'cpuUsage' ? 'system' : 'gpu';
-      let observations = rule.metric === 'offline' ? [{ id: 'status', value: snapshot.status === 'online' ? 0 : 1, at }] : rule.metric === 'cpuUsage' ? [{ id: 'cpu', value: snapshot.cpuUsage, at: laneAt('system') }] : gs.map((g) => ({ id: g.uuid || String(g.index), at: gpuAt(g), value: rule.metric === 'temperature' ? available(g, 'temp') ? g.temp : null : rule.metric === 'gpuUtil' ? available(g, 'util') ? g.util : null : available(g, 'memUsed') && available(g, 'memTotal') && g.memTotal > 0 ? g.memUsed / g.memTotal * 100 : null }));
+      let observations = rule.metric === 'offline' ? [{ id: 'status', value: snapshot.status === 'online' ? 0 : 1, at }] : rule.metric === 'cpuUsage' ? [{ id: 'cpu', value: snapshot.cpuUsage, at: laneAt('system') }] : rule.metric === 'occupiedIdle'
+        // 占用但空闲：util 低于 threshold 且显存占用高于 recovery（%），value = mem% 仅当 util 达标；附占用用户
+        ? gs.map((g) => { const utilOk = available(g, 'util') && g.util < rule.threshold; const memPct = available(g, 'memUsed') && available(g, 'memTotal') && g.memTotal > 0 ? g.memUsed / g.memTotal * 100 : null; return { id: g.uuid || String(g.index), at: gpuAt(g), value: utilOk && memPct != null && memPct > rule.recovery ? memPct : null, users: [...new Set((g.procs || []).map((p) => p.user).filter(Boolean))].slice(0, 4) }; })
+        : gs.map((g) => ({ id: g.uuid || String(g.index), at: gpuAt(g), value: rule.metric === 'temperature' ? available(g, 'temp') ? g.temp : null : rule.metric === 'gpuUtil' ? available(g, 'util') ? g.util : null : available(g, 'memUsed') && available(g, 'memTotal') && g.memTotal > 0 ? g.memUsed / g.memTotal * 100 : null }));
       const expectedCount = observations.length;
       if (rule.metric !== 'offline' && (snapshot.status !== 'online' || !freshAt(laneAt(lane)))) observations = [];
       observations = observations.filter((o) => typeof o.value === 'number' && Number.isFinite(o.value) && freshAt(o.at));
@@ -194,7 +197,9 @@ class WorkbenchManager {
       const recovered = values.length > 0 && values.length === expectedCount && values.every((v) => rule.direction === 'below' ? v >= rule.recovery : v <= rule.recovery);
       if (state.active && recovered) { state.active = false; this.event('rule-recovered', snapshot.id, rule.name + ' · recovered', 'The recovery threshold was reached.', { ruleId: rule.id }); }
       const sustained = observations.some((o) => { const d = state.devices.get(o.id); return hit(o.value) && d?.since != null && o.at - d.since >= rule.durationSeconds * 1000; });
-      if (!state.active && sustained && at - state.notified >= rule.cooldownSeconds * 1000 && !this.quiet(rule, at)) { state.active = true; state.notified = at; this.event('rule-triggered', snapshot.id, rule.name, `${rule.metric}: ${values.join(', ')}`, { ruleId: rule.id }); }
+      if (!state.active && sustained && at - state.notified >= rule.cooldownSeconds * 1000 && !this.quiet(rule, at)) { state.active = true; state.notified = at;
+        const idle = rule.metric === 'occupiedIdle' ? observations.map((o) => ({ card: gs.find((g) => (g.uuid || String(g.index)) === o.id)?.index, users: o.users })) : null;
+        this.event('rule-triggered', snapshot.id, rule.name, rule.metric === 'occupiedIdle' && idle ? `Occupied but idle: ${idle.filter((x) => x.card != null).map((x) => 'GPU ' + x.card + (x.users?.length ? ' (' + x.users.join(',') + ')' : '')).join(', ')}` : `${rule.metric}: ${values.join(', ')}`, { ruleId: rule.id }); }
       this.progress.set(key, state);
     }
   }
@@ -216,7 +221,8 @@ class WorkbenchManager {
     if (op === 'taskDelete') { const task = this.task(idOf(r.id)); if (['starting', 'running', 'unknown'].includes(task.status)) throw new Error('A live task must remain tracked'); this.data.tasks = this.data.tasks.filter((t) => t.id !== task.id); this.persist(); return true; }
     if (op === 'watchList' || op === 'ruleList' || op === 'templateList') return clone(this.data[op === 'watchList' ? 'watches' : op === 'ruleList' ? 'rules' : 'templates'].filter((t) => !sid || !t.serverId || t.serverId === sid));
     if (op === 'watchSave') { this.server(sid); return this.upsert('watches', { id: r.id, serverId: sid, model: text(r.model, 120), minFreeGiB: Math.max(0, finite(r.minFreeGiB)), durationSeconds: Math.max(0, Math.min(86400, finite(r.durationSeconds, 30))), enabled: r.enabled !== false }); }
-    if (op === 'ruleSave') { if (sid) this.server(sid); if (!['gpuUtil', 'temperature', 'memoryPercent', 'cpuUsage', 'offline'].includes(r.metric)) throw new Error('Invalid alert metric'); if (![r.threshold, r.recovery].every((v) => Number.isFinite(Number(v)))) throw new Error('Invalid alert threshold'); const direction = r.direction === 'below' ? 'below' : 'above'; if (direction === 'above' ? +r.recovery > +r.threshold : +r.recovery < +r.threshold) throw new Error('Recovery must provide hysteresis'); for (const key of ['quietStart', 'quietEnd']) if (r[key] && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(r[key])) throw new Error('Invalid quiet hours'); return this.upsert('rules', { id: r.id, serverId: sid, name: text(r.name || r.metric, 120), metric: r.metric, direction, threshold: +r.threshold, recovery: +r.recovery, durationSeconds: Math.max(0, finite(r.durationSeconds, 30)), cooldownSeconds: Math.max(0, finite(r.cooldownSeconds, 300)), quietStart: r.quietStart || '', quietEnd: r.quietEnd || '', enabled: r.enabled !== false }); }
+    if (op === 'ruleSave') { if (sid) this.server(sid); if (!['gpuUtil', 'temperature', 'memoryPercent', 'cpuUsage', 'offline', 'occupiedIdle'].includes(r.metric)) throw new Error('Invalid alert metric'); if (![r.threshold, r.recovery].every((v) => Number.isFinite(Number(v)))) throw new Error('Invalid alert threshold'); const direction = r.direction === 'below' ? 'below' : 'above'; // occupiedIdle 语义反转：threshold=util 上限、recovery=mem 下限，天然 recovery ≥ threshold
+if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'above' ? +r.recovery > +r.threshold : +r.recovery < +r.threshold) throw new Error('Recovery must provide hysteresis'); for (const key of ['quietStart', 'quietEnd']) if (r[key] && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(r[key])) throw new Error('Invalid quiet hours'); return this.upsert('rules', { id: r.id, serverId: sid, name: text(r.name || r.metric, 120), metric: r.metric, direction, threshold: +r.threshold, recovery: +r.recovery, durationSeconds: Math.max(0, finite(r.durationSeconds, 30)), cooldownSeconds: Math.max(0, finite(r.cooldownSeconds, 300)), quietStart: r.quietStart || '', quietEnd: r.quietEnd || '', enabled: r.enabled !== false }); }
     if (op === 'templateSave') { const command = text(r.command, 65536); if (!command.trim()) throw new Error('Enter a command template'); return this.upsert('templates', { id: r.id, name: text(r.name || 'Command', 120), command }); }
     if (op === 'templateRender') { const template = this.data.templates.find((t) => t.id === r.id); if (!template) throw new Error('Template not found'); return { command: template.command.replace(/\{\{([a-zA-Z_]\w*)\}\}/g, (_whole, key) => { if (!Object.hasOwn(r.parameters || {}, key)) throw new Error('Missing parameter: ' + key); return quote(text(r.parameters[key], 4096)); }) }; }
     if (['watchDelete', 'ruleDelete', 'templateDelete'].includes(op)) { const kind = op === 'watchDelete' ? 'watches' : op === 'ruleDelete' ? 'rules' : 'templates'; const id = idOf(r.id); this.data[kind] = this.data[kind].filter((t) => t.id !== id); for (const key of this.progress.keys()) if (key.includes(':' + id)) this.progress.delete(key); this.persist(); return true; }
@@ -224,6 +230,13 @@ class WorkbenchManager {
     if (op === 'containerLogs' || op === 'containerShell') { const engine = r.engine === 'podman' ? 'podman' : 'docker'; const id = String(r.containerId || ''); if (!/^[a-f0-9]{12,64}$/.test(id)) throw new Error('Invalid container ID'); if (op === 'containerShell') return { command: engine + ' exec -it ' + quote(id) + ' /bin/sh' }; return { text: await this.exec(sid, engine + ' logs --tail 300 --timestamps ' + quote(id) + ' 2>&1') }; }
     if (op === 'serviceTemplate') { const name = r.name === 'tensorboard' ? 'tensorboard' : r.name === 'web' ? 'web' : 'jupyter'; const remotePort = portOf(r.remotePort || (name === 'tensorboard' ? 6006 : 8888)); const localPort = portOf(r.localPort || remotePort); const command = name === 'jupyter' ? `jupyter lab --no-browser --ip=127.0.0.1 --port=${remotePort}` : name === 'tensorboard' ? `tensorboard --logdir=${quote(text(r.logDir || './runs'))} --host=127.0.0.1 --port=${remotePort}` : ''; return { name, serverId: sid, remoteHost: '127.0.0.1', remotePort, localPort, url: `http://127.0.0.1:${localPort}`, command }; }
     if (op === 'report') return this.report(sid, r.rangeMs);
+    if (op === 'envCollect') return this.envCollect(sid);
+    if (op === 'envList') return clone(this.data.env || []);
+    if (op === 'usageReport') return this.usageReport(Math.max(1, Math.min(365, finite(r.rangeDays, 30))));
+    if (op === 'logList') return clone(this.data.logs || []);
+    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [] }); }
+    if (op === 'logDelete') { this.data.logs = (this.data.logs || []).filter((l) => l.id !== idOf(r.id)); this.persist(); return true; }
+    if (op === 'logPoll') return this.pollLog(idOf(r.id));
     throw new Error('Unsupported workbench operation');
   }
   task(id) { const task = this.data.tasks.find((t) => t.id === id); if (!task) throw new Error('Task not found'); this.server(task.serverId); return task; }
@@ -364,8 +377,88 @@ class WorkbenchManager {
     const devices = base.devices.filter((d) => d.metric === 'util').slice(0, 64); const results = await Promise.all(devices.map((d) => this.historyQuery({ serverId: sid, device: d.device, metric: d.metric, rangeMs: range })));
     return { serverId: sid, start: base.start, end: base.end, generatedAt: Date.now(), devices: results.map((result, i) => { let integral = 0, coveredMs = 0, peak = null; for (const p of result.points) { if (typeof p.value === 'number' && p.coveredMs > 0) { integral += p.value * p.coveredMs; coveredMs += p.coveredMs; } if (typeof p.max === 'number') peak = peak === null ? p.max : Math.max(peak, p.max); } return { ...devices[i], average: coveredMs ? integral / coveredMs : null, peak, coveredMs, coveragePercent: Math.min(100, coveredMs / (result.end - result.start) * 100), busyEquivalentHours: integral / 100 / 3600000 }; }), tasks: this.data.tasks.filter((t) => t.serverId === sid && t.startedAt >= base.start).map((t) => ({ name: t.name, status: t.status, exitCode: t.exitCode ?? null, startedAt: t.startedAt, finishedAt: t.finishedAt || null })), note: 'Busy-equivalent hours integrate utilization over observed time; uncovered time and untracked jobs are unknown.' };
   }
+
+  // ===== 日志监控：tail + 正则命中 + loss 跟踪 =====
+  // 后缀比对：取与 lastLines 的最长公共后缀之后的行为"新增行"，避免文件轮转时误报全量
+  static newLines(prev, next) {
+    if (!prev || !prev.length || !next.length) return []; // 首次 poll 建基线，不算新增
+    const last = prev[prev.length - 1];
+    // 追加型日志：在 next 中定位 prev 尾块（自左向右取首个对齐点，重复行偏向多报），右侧即新增
+    for (let j = prev.length - 1; j < next.length; j += 1) {
+      if (next[j] !== last) continue;
+      let aligned = true;
+      for (let i = 1; i < prev.length; i += 1) if (prev[prev.length - 1 - i] !== next[j - i]) { aligned = false; break; }
+      if (aligned) return next.slice(j + 1);
+    }
+    return next.slice(); // 无对齐（轮转/清空/超窗）：全量视为新增
+  }
+
+  async pollLog(id) {
+    const log = (this.data.logs || []).find((l) => l.id === id);
+    if (!log) throw new Error('Log watcher not found');
+    this.server(log.serverId);
+    const output = await this.exec(log.serverId, 'tail -n 60 -- ' + quote(log.path), 15000);
+    const lines = output.split(/\r?\n/).filter((l) => l.length > 0).slice(-60);
+    const fresh = WorkbenchManager.newLines(log.lastLines || [], lines);
+    log.lastLines = lines;
+    if (fresh.length) {
+      const matchers = (log.patterns || []).map((p) => { try { return new RegExp(p); } catch { return null; } }).filter(Boolean);
+      const hits = fresh.filter((line) => matchers.some((re) => re.test(line)));
+      if (hits.length) {
+        log.lastHits = [...(log.lastHits || []), ...hits.map((line) => ({ line: line.slice(0, 500), at: Date.now() }))].slice(-20);
+        this.event('log-hit', log.serverId, log.name + ' · pattern matched', hits.slice(0, 3).join(' | ').slice(0, 400), { logId: log.id });
+      }
+      if (log.trackLoss) {
+        const LOSS = /loss[=:\s]+([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/i;
+        for (const line of fresh) {
+          const m = line.match(LOSS);
+          if (m) { const v = Number(m[1]); if (Number.isFinite(v)) { log.lossPoints = [...(log.lossPoints || []), v].slice(-120); break; } }
+        }
+      }
+      this.persist();
+    }
+    return clone(log);
+  }
+
+  async tickLogs() {
+    if (this.closed) return;
+    for (const log of (this.data.logs || []).filter((l) => l.enabled !== false)) {
+      const lock = 'log:' + log.id;
+      if (this.running.has(lock)) continue;
+      this.running.add(lock);
+      try { await this.pollLog(log.id); } catch { /* 服务器不可达：下轮重试 */ }
+      finally { this.running.delete(lock); }
+    }
+  }
+
+  // ===== 环境一致性 =====
+  async envCollect(sid) {
+    this.server(sid);
+    const out = await this.exec(sid, [
+      "printf '__SC_DRV__\\n'; nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1",
+      "printf '__SC_CUDA__\\n'; nvcc --version 2>/dev/null | grep -o 'release [0-9.]*' | head -1",
+      "printf '__SC_OS__\\n'; uname -r; . /etc/os-release 2>/dev/null && printf '%s\\n' \"$PRETTY_NAME\"",
+      "printf '__SC_PY__\\n'; python3 --version 2>&1 | head -1",
+      "printf '__SC_TORCH__\\n'; python3 -c 'import torch; print(torch.__version__, torch.version.cuda)' 2>/dev/null || printf 'not-installed\\n'",
+      'true',
+    ].join('; '), 30000);
+    const pick = (tag) => { const seg = out.split(tag + '\n')[1] || ''; return seg.split(/__SC_[A-Z]+__\n/)[0].split('\n').map((l) => l.trim()).filter(Boolean); };
+    const entry = { id: sid, serverId: sid, at: Date.now(),
+      driver: pick('__SC_DRV__')[0] || '', cuda: (pick('__SC_CUDA__')[0] || '').replace('release ', ''),
+      kernel: pick('__SC_OS__')[0] || '', os: pick('__SC_OS__').slice(1).join(' ') || '',
+      python: (pick('__SC_PY__')[0] || '').replace('Python ', ''), torch: pick('__SC_TORCH__')[0] || '' };
+    this.data.env = [...(this.data.env || []).filter((e) => e.serverId !== sid), entry];
+    this.persist();
+    return clone(entry);
+  }
+
+  // ===== 按用户 GPU·时长统计（来自历史聚合器的 usage_minutes） =====
+  usageReport(rangeDays = 30) {
+    if (!this.usageQuery) throw new Error('Usage accounting is unavailable');
+    return this.usageQuery(Math.max(1, Math.min(365, rangeDays)));
+  }
 }
 
+
+
 module.exports = { WorkbenchManager, parseSystem, quote, SYSTEM_COMMAND, windowState, parseClock, normalizeSchedule };
-
-

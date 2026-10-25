@@ -143,3 +143,24 @@ describe('persistent monitoring history', () => {
     expect(fs.readFileSync(path.join(directory, 'history.json'), 'utf8')).toBe('{');
   });
 });
+
+describe('usage_minutes accounting', () => {
+  const gpu = (over = {}) => ({ uuid: 'u1', index: 0, name: 'A100', util: 10, memUsed: 1 * 1024 ** 3, memTotal: 80 * 1024 ** 3, procs: [], ...over });
+  it('credits each distinct GPU user and splits shared cards evenly', () => {
+    const { db } = fixture(), at = Math.floor(Date.now() / 60000) * 60000;
+    const server = { id: 'host', collectedAt: at, gpus: [gpu({ procs: [{ user: 'alice' }, { user: 'bob' }] }), gpu({ uuid: 'u2', index: 1, name: 'A100', procs: [{ user: 'carol' }] })] };
+    db.snapshot(server); // 基线：不计时
+    expect(db.usageByUserDays('host', 30)).toEqual([]);
+    server.collectedAt = at + 60000;
+    db.snapshot(server); // 1 分钟，alice/bob 均摊 GPU0，carol 独占 GPU1
+    const rows = Object.fromEntries(db.usageByUserDays('host', 30).map((r) => [r.user, r.totalMinutes]));
+    expect(rows.alice).toBeCloseTo(0.5, 5);
+    expect(rows.bob).toBeCloseTo(0.5, 5);
+    expect(rows.carol).toBeCloseTo(1, 5);
+    // 断链超过 10 分钟 → 丢弃，防伪造时长
+    server.collectedAt = at + 31 * 60000;
+    db.snapshot(server);
+    const after = Object.fromEntries(db.usageByUserDays('host', 30).map((r) => [r.user, r.totalMinutes]));
+    expect(after.alice).toBeCloseTo(0.5, 5);
+  });
+});

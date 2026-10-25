@@ -15,6 +15,7 @@ parentPort.on('message', ({ id, method, payload }) => {
       case 'snapshot': data = db.snapshot(payload); break;
       case 'gap': data = db.gap(payload.server, payload.at); break;
       case 'query': data = db.query(payload); break;
+      case 'usage': data = db.usageByUserDays(payload.server, payload.rangeDays); break;
       case 'load': data = db.legacyLoad(); break;
       case 'save': data = db.legacySave(payload); break;
       case 'cleanup': data = db.cleanup(); break;

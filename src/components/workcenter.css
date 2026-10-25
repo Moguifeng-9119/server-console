@@ -41,3 +41,6 @@
 .day-picker { display: inline-flex; gap: 4px; }
 .day-picker button { min-width: 30px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elev); color: var(--text-dim); font-size: 11px; }
 .day-picker button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* ===== 环境对比 / 用量报表 ===== */
+.workcenter-table td.env-diff { color: var(--warn, #d97706); font-weight: 600; }

@@ -20,6 +20,7 @@ let intervalMs = 2000;
 let historyStore = null;
 let transfers = null;
 let forwardings = null;
+let workbench = null;
 let configWatchPath = '';
 let knownAliases = null; // 上次 config 的别名集合（null=尚未建立基线，首次不报删除）
 
@@ -52,6 +53,7 @@ async function collectServer(cfg) {
     const payload = { id: cfg.id, status: 'online', error: '', ...snap };
     void historyStore?.request('snapshot', payload).catch((e) => historyError(e));
     void transfers?.collectStaging({ serverId: cfg.id });
+    try { workbench?.consumeSnapshot(payload); } catch { /* 监视/规则求值失败不影响采集 */ }
     const json = JSON.stringify(snap);
     if (lastSnapJson.get(cfg.id) === json) return;
     lastSnapJson.set(cfg.id, json);
@@ -727,7 +729,7 @@ function registerIpc() {
 
   // ============ 运维工作台（任务/GPU 监视/告警规则/容器/模板，复用 WorkbenchManager） ============
   const { WorkbenchManager } = require('./workbench.cjs');
-  const workbench = new WorkbenchManager({
+  const workbenchLocal = new WorkbenchManager({
     directory: app.getPath('userData'),
     getConnection: getConn,
     getServers: () => servers,
@@ -735,13 +737,33 @@ function registerIpc() {
       if (Notification.isSupported()) new Notification({ title, body }).show();
     },
     onEvent: (event) => broadcast('workbench:event', event),
+    // 用量统计：跨服务器聚合 history worker 里的 usage_minutes
+    usageQuery: async (rangeDays) => {
+      const byUser = new Map();
+      await Promise.all(servers.map(async (cfg) => {
+        try {
+          const rows = await historyStore.request('usage', { server: cfg.id, rangeDays });
+          for (const row of rows) {
+            const cur = byUser.get(row.user) || { user: row.user, totalMinutes: 0, byServer: {} };
+            cur.totalMinutes += row.totalMinutes;
+            cur.byServer[cfg.name] = (cur.byServer[cfg.name] || 0) + row.totalMinutes;
+            byUser.set(row.user, cur);
+          }
+        } catch { /* 单服务器失败不影响整体报表 */ }
+      }));
+      return [...byUser.values()].sort((a, b) => b.totalMinutes - a.totalMinutes);
+    },
   });
+  workbench = workbenchLocal;
   workbench.init();
   ipcMain.handle('workbench:request', wrap((req) => workbench.request(req || {})));
   // 定时计划 tick：每 15 秒检查时间窗（按各服务器本地时间）；无启用的计划时零开销
   const scheduleTimer = setInterval(() => { void workbench.tickSchedules().catch(() => {}); }, 15000);
   scheduleTimer.unref?.();
   void workbench.tickSchedules().catch(() => {});
+  // 日志监控 tick：每 30 秒拉取启用的 watcher；无 watcher 时零开销
+  const logTimer = setInterval(() => { void workbench.tickLogs().catch(() => {}); }, 30000);
+  logTimer.unref?.();
 
   // 端口转发实例（handler 与 init 都用这个闭包）
   forwardings = new ForwardingManager({
