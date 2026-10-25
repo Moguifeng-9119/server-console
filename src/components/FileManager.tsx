@@ -391,11 +391,24 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
       return;
     }
     if (side === 'remote') {
-      // 双击文件：文本尝试在线查看
-      api?.sftpReadText(serverId, remoteFull(e), false).then((r) => {
-        if (r.ok) setViewer({ path: remoteFull(e), name: e.name, size: e.size });
-        else pushToast({ level: 'warn', title: t('files.textUnavailable'), detail: r.error });
-      });
+      const full = remoteFull(e);
+      // 双击文件：图片/CSV 在线预览，其余尝试文本查看
+      if (/\.(png|jpe?g|gif|webp|bmp)$/i.test(e.name)) {
+        api?.sftpReadBinary(serverId, full).then((r) => {
+          if (r.ok && r.data) setImage({ name: e.name, url: 'data:' + r.data.mime + ';base64,' + r.data.data, truncated: r.data.truncated });
+          else pushToast({ level: 'warn', title: t('files.readFail'), detail: r.error });
+        });
+      } else if (/\.csv$/i.test(e.name)) {
+        api?.sftpReadText(serverId, full, false).then((r) => {
+          if (r.ok && r.data) setCsv({ name: e.name, text: r.data.text, truncated: r.data.truncated });
+          else pushToast({ level: 'warn', title: t('files.readFail'), detail: r.error });
+        });
+      } else {
+        api?.sftpReadText(serverId, full, false).then((r) => {
+          if (r.ok) setViewer({ path: full, name: e.name, size: e.size });
+          else pushToast({ level: 'warn', title: t('files.textUnavailable'), detail: r.error });
+        });
+      }
     }
   };
 

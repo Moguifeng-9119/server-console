@@ -541,7 +541,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
             <div className="row" style={{ gap: 6, marginTop: 4, alignItems: 'center' }}>
               <span style={{ fontSize: 12 }}>{t('settings.statusToken')}:</span>
               <span className="mono faint ellipsis" style={{ flex: 1 }} title={statusPage.token}>{statusPage.token.slice(0, 8)}…</span>
-              <button className="btn mini" onClick={() => void copyStatus(statusPage.url)}>{t('settings.statusCopy')}</button>
+              <button className="btn mini" onClick={() => void copyStatus(statusPage.token)}>{t('settings.statusCopy')}</button>
             </div>
             <div className="note" style={{ marginTop: 6 }}>{t('settings.statusPrivacy')}</div>
           </>}
@@ -559,7 +559,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           {update && !update.available && update.checked && <div className="note" style={{ marginBottom: 6 }}>{t('settings.updateUpToDate')}</div>}
           {update?.error && <div role="alert" className="note" style={{ color: 'var(--warn)', marginBottom: 6 }}>{update.error}</div>}
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <button className="btn mini" disabled={!api} onClick={() => run(api ? api.checkUpdate() : undefined)}>{t('settings.updateNow')}</button>
+            <button className="btn mini" disabled={!api} onClick={() => (async () => { const r = await api?.checkUpdate(); if (r && r.ok && r.data) setUpdate({ available: r.data.isNew, version: r.data.latest.replace(/^v/, ''), checked: true }); else if (r && !r.ok) throw new Error(r.error || 'check failed'); })()}>{t('settings.updateNow')}</button>
             {update?.available && !update.downloaded && <button className="btn mini" disabled={!api || update.downloading} onClick={() => run(api?.updateDownload())}>{t('settings.updateDownload')}</button>}
             {update?.available && <button className="btn mini" onClick={() => void api?.updateInstall()}>{update.downloaded ? t('settings.updateInstallOnQuit') : t('settings.updateOpenPage')}</button>}
           </div>

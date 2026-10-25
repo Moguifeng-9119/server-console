@@ -34,9 +34,10 @@ export function ImagePreview({ name, url, truncated, onClose }: { name: string; 
   const { t } = useTranslation();
   const [fit, setFit] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
+  const openedAt = useRef(Date.now()); // 防双击第二下落在遮罩上把刚打开的预览关掉
   useDialogFocus(true, ref, onClose);
   return (
-    <div className="mask" onClick={onClose}>
+    <div className="mask" onClick={() => { if (Date.now() - openedAt.current > 400) onClose(); }}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={t('filePreview.imageTitle')} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 'min(1100px, 92vw)' }} ref={ref}>
         <h3>{name}</h3>
         {truncated && <p className="note">{t('filePreview.imageTruncated')}</p>}
@@ -56,11 +57,12 @@ export function ImagePreview({ name, url, truncated, onClose }: { name: string; 
 export function CsvPreview({ name, text, truncated, onClose }: { name: string; text: string; truncated: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
+  const openedAt = useRef(Date.now()); // 防双击第二下落在遮罩上把刚打开的预览关掉
   useDialogFocus(true, ref, onClose);
   const { rows, truncated: cutOff } = useMemo(() => parseCsv(text), [text]);
   const header = rows[0] || [];
   return (
-    <div className="mask" onClick={onClose}>
+    <div className="mask" onClick={() => { if (Date.now() - openedAt.current > 400) onClose(); }}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={t('filePreview.csvTitle')} onClick={(e) => e.stopPropagation()} style={{ width: 'min(1100px, 92vw)' }} ref={ref}>
         <h3>{name}</h3>
         {(truncated || cutOff) && <p className="note">{t('filePreview.rowsLimited', { n: rows.length - 1 })}</p>}

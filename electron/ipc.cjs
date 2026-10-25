@@ -457,6 +457,11 @@ function registerIpc() {
   );
 
   // ============ 并行命令：多服务器同时执行，输出按行缓冲节流广播 ============
+  const { CommandHistory } = require('./cmdhistory.cjs');
+  const cmdHistory = new CommandHistory({ file: path.join(app.getPath('userData'), 'command-history.json') }).init();
+  ipcMain.handle('cmdhistory:list', wrap((req) => cmdHistory.list(req && typeof req === 'object' ? req.query : '')));
+  ipcMain.handle('cmdhistory:delete', wrap(({ id }) => cmdHistory.remove(String(id || ''))));
+  ipcMain.handle('cmdhistory:clear', wrap(() => cmdHistory.clear()));
   const parallelRuns = new Map(); // runId -> { stop, remaining }
   ipcMain.handle(
     'parallel:run',
@@ -465,6 +470,7 @@ function registerIpc() {
       const command = String(cmd || '').trim();
       if (!command) throw new Error(lang.t('commandEmpty'));
       if (!ids.length) throw new Error(lang.t('serverSelect'));
+      const histState = { failures: 0, results: 0 };
       const buf = new Map(); // serverId -> 待发送文本
       let remaining = ids.length;
       const flush = setInterval(() => {
@@ -475,13 +481,18 @@ function registerIpc() {
           }
         }
       }, 250);
-      const finishOne = (serverId) => {
+      const finishOne = (serverId, failed = false) => {
         broadcast('parallel:data', { runId, serverId, done: true });
+        histState.results += 1;
+        if (failed) histState.failures += 1;
         remaining -= 1;
         if (remaining <= 0) {
           clearInterval(flush);
           parallelRuns.delete(runId);
           broadcast('parallel:done', { runId });
+          try {
+            cmdHistory.record({ command, servers: ids.map((sid) => servers.find((s) => s.id === sid)?.name || sid), source: 'parallel', ok: histState.failures === 0 && histState.results === ids.length });
+          } catch { /* 历史写入失败不影响执行结果 */ }
         }
       };
       const run = { stop: () => clearInterval(flush), remaining: ids.length, streams: new Set() };
@@ -502,7 +513,7 @@ function registerIpc() {
             finishOne(id);
           } catch (e) {
             buf.set(id, (buf.get(id) || '') + `[${lang.t('error')}] ${e.message}\n`);
-            finishOne(id);
+            finishOne(id, true);
           }
         })();
       }
@@ -1000,7 +1011,7 @@ module.exports = {
     transfers: (transfers ? transfers.list() : []).slice(0, 20).map((t) => ({
       name: t.name,
       kind: t.kind,
-      active: t.status === 'active' || t.status === 'queued' || t.status === 'verifying',
+      active: t.status === 'running' || t.status === 'queued',
       percent: t.size > 0 ? Math.min(100, (t.transferred / t.size) * 100) : 0,
       status: t.status,
     })),

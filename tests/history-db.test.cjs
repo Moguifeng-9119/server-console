@@ -131,7 +131,8 @@ describe('persistent monitoring history', () => {
   it('keeps minute extrema around the interpolated average', () => {
     const { db } = fixture(), at = Math.floor(Date.now() / 900000) * 900000;
     db.append([record(at - 10000, 0), record(at + 10000, 100)], at + 10000);
-    const result = db.query({ serverId: 'host', device: 'gpu:uuid', metric: 'util', rangeMs: 7 * DAY, end: at + 120000 });
+    // end 受 query 的 now+1min 校验约束，15 分钟对齐点附近运行时需夹紧（此前为时间相关 flaky）
+    const result = db.query({ serverId: 'host', device: 'gpu:uuid', metric: 'util', rangeMs: 7 * DAY, end: Math.min(at + 120000, Date.now() + 30000) });
     for (const p of result.points.filter((p) => p.value != null)) { expect(p.value).toBeGreaterThanOrEqual(p.min); expect(p.value).toBeLessThanOrEqual(p.max); }
   });
   it('reports a corrupt legacy file but continues recording new data', async () => {
