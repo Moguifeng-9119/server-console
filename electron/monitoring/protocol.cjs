@@ -53,6 +53,7 @@ function computeDelta(prev, next) {
   for (const key of Object.keys(next)) {
     const nextVal = next[key];
     const prevVal = prev[key];
+    if (nextVal === prevVal) continue;
 
     if (Array.isArray(nextVal) && Array.isArray(prevVal)) {
       if (JSON.stringify(nextVal) !== JSON.stringify(prevVal)) {

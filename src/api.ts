@@ -13,6 +13,8 @@ import type {
   SnapshotPayload,
   SshConfigInfo,
   SshHostEntry,
+  SyncPlan,
+  SyncRun,
   TerminalSessionInfo,
   TransferItem,
   TrustedHost,
@@ -159,6 +161,22 @@ interface Api {
     ignoreExisting?: boolean,
   ) => Promise<IpcResult<TransferItem[]>>;
   onTransferUpdate: (cb: (t: TransferItem) => void) => () => void;
+
+  // 目录同步（预览 → 确认应用）
+  syncPreview: (req: {
+    serverId: string;
+    localDir: string;
+    remoteDir: string;
+    direction: 'upload' | 'download';
+    exclude: string[];
+    deleteExtraneous: boolean;
+  }) => Promise<IpcResult<SyncPlan>>;
+  syncApply: (planId: string) => Promise<IpcResult<SyncRun>>;
+  syncList: () => Promise<SyncRun[]>;
+
+  // 运维工作台（统一请求通道）
+  workbenchRequest: <T>(req: { operation: string; serverId?: string } & Record<string, unknown>) => Promise<IpcResult<T>>;
+  onWorkbenchEvent: (cb: (event: { id: string; serverId: string; type: string; title: string; body?: string; at: number }) => void) => () => void;
 }
 
 declare global {
@@ -169,3 +187,5 @@ declare global {
 
 export const api = typeof window !== 'undefined' ? window.api : undefined;
 export const isElectron = Boolean(typeof window !== 'undefined' && window.api);
+
+export type { SyncPlan, SyncRun };

@@ -1,5 +1,5 @@
-import { useSyncExternalStore, useCallback } from 'react';
-import type { SnapshotPayload, ServerStatus, Gpu, ProcessItem } from '../types';
+import { useSyncExternalStore, useCallback, useMemo } from 'react';
+import type { SnapshotPayload, ServerStatus, Gpu, ProcessItem, Server } from '../types';
 import { createEmptyTelemetry, type ServerTelemetryState } from '../types/monitoring';
 
 type Listener = () => void;
@@ -37,9 +37,11 @@ export class TelemetryStore {
       swapUsed: snap.swapUsed ?? 0,
       swapTotal: snap.swapTotal ?? 0,
       collectedAt,
-      lastGpuAt: snap.gpus && snap.gpus.length > 0 ? collectedAt : prev.lastGpuAt,
-      lastSystemAt: collectedAt,
-      lastProcessAt: snap.processes && snap.processes.length > 0 ? collectedAt : prev.lastProcessAt,
+      laneTimestamps: snap.laneTimestamps,
+      monitoring: snap.monitoring,
+      lastGpuAt: snap.laneTimestamps?.gpu ?? (snap.lastLane && snap.lastLane !== 'gpu' ? prev.lastGpuAt : collectedAt),
+      lastSystemAt: snap.laneTimestamps?.system ?? (snap.lastLane && snap.lastLane !== 'system' ? prev.lastSystemAt : collectedAt),
+      lastProcessAt: snap.laneTimestamps?.processes ?? (snap.lastLane && snap.lastLane !== 'processes' ? prev.lastProcessAt : collectedAt),
     };
 
     this.states.set(snap.id, next);
@@ -83,8 +85,7 @@ export class TelemetryStore {
 
   clear() {
     this.states.clear();
-    this.serverListeners.clear();
-    this.globalListeners.clear();
+    for (const id of this.serverListeners.keys()) this.notifyServer(id);
   }
 
   private notifyServer(serverId: string) {
@@ -98,6 +99,14 @@ export class TelemetryStore {
       try { fn(); } catch { /* ignore subscriber error */ }
     }
   }
+}
+
+/** Fast telemetry subscribers retain the low-frequency fleet's identity and history. */
+export function useLiveServer(base: Server | undefined): Server | undefined {
+  const live = useServerTelemetry(base?.id || '');
+  return useMemo(() => !base || live.collectedAt == null ? base : ({
+    ...base, ...live, id: base.id, collectedAt: live.collectedAt,
+  }), [base, live]);
 }
 
 export const telemetryStore = new TelemetryStore();

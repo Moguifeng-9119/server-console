@@ -18,6 +18,10 @@ export interface Gpu {
   power: number | null;
   fan: number | null;
   procs: GpuProc[];
+  /** 驱动未上报的指标名（值是占位 0，不是真实读数） */
+  unavailableMetrics?: string[];
+  /** 本 GPU 数据的观测时间戳（GPU 通道独立采集时与服务器级 collectedAt 不同） */
+  observedAt?: number;
 }
 
 export interface ProcessItem {
@@ -94,6 +98,12 @@ export interface SnapshotPayload {
   memTotal: number;
   swapUsed: number;
   swapTotal: number;
+  /** 分通道采集时间戳（分层调度下 GPU/系统/进程独立采集，各自有独立新鲜度） */
+  laneTimestamps?: Partial<Record<string, number | undefined>>;
+  /** 最近一次采集的通道名（gpu / system / processes…） */
+  lastLane?: string;
+  /** 监控调度状态（分层调度与自适应速率的运行时信息） */
+  monitoring?: { effectiveIntervalMs?: number; lane?: string; [key: string]: unknown };
 }
 
 export interface AuditEntry {
@@ -241,4 +251,37 @@ export interface TerminalSessionInfo {
   termId: string;
   serverId: string;
   createdAt: number;
+}
+
+// ===== 目录同步（预览 → 确认应用） =====
+export interface SyncChange {
+  action: 'copy' | 'update' | 'delete';
+  path: string;
+  size: number;
+}
+
+export interface SyncPlan {
+  id: string;
+  serverId: string;
+  direction: 'upload' | 'download';
+  localDir: string;
+  remoteDir: string;
+  changes: SyncChange[];
+  unchanged: number;
+  skipped: string[];
+  deleteExtraneous: boolean;
+  createdAt: number;
+}
+
+export type SyncRunStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';
+
+export interface SyncRun {
+  id: string;
+  planId: string;
+  status: SyncRunStatus;
+  taskIds: string[];
+  deleted: number;
+  error?: string;
+  startedAt?: number;
+  finishedAt?: number;
 }

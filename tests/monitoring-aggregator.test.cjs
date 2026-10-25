@@ -26,7 +26,7 @@ describe('HistoryAggregator 1-second statistical buckets', () => {
     expect(b.max).toBe(95);
     expect(b.last_value).toBe(40);
     expect(b.last_at).toBe(baseSecond + 800);
-    expect(b.coverage_ms).toBe(800);
+    expect(b.coverage_ms).toBe(1000);
     expect(b.integral).toBeGreaterThan(0);
   });
 

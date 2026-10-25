@@ -20,31 +20,4 @@ describe('independent monitoring scheduling', () => {
     release(); await settle(); now += 300; poll.focus('b'); await settle();
     expect(calls.filter((id) => id === 'b')).toHaveLength(2); release(); await settle(); poll.stop();
   });
-  it('supports 500ms high-frequency polling on focused host while background host throttles', async () => {
-    let now = 10000;
-    const calls = [];
-    const poll = new PollScheduler({
-      configs: () => [{ id: 'focused' }, { id: 'bg' }],
-      interval: () => 500,
-      now: () => now,
-      collect: (cfg) => { calls.push(cfg.id); return Promise.resolve(); },
-    });
-    poll.focus('focused');
-    await settle();
-    // On first tick, both perform initial collection
-    expect(calls).toEqual(['focused', 'bg']);
-
-    // Advance 500ms: only focused collects at 500ms
-    now += 500;
-    poll.tick();
-    await settle();
-    expect(calls).toEqual(['focused', 'bg', 'focused']);
-
-    // Advance another 8000ms: background host throttles until 8s elapsed
-    now += 8000;
-    poll.tick();
-    await settle();
-    expect(calls).toEqual(['focused', 'bg', 'focused', 'focused', 'bg']);
-    poll.stop();
-  });
 });

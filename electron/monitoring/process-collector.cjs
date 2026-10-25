@@ -51,8 +51,9 @@ function parseProcesses(raw, gpuUuidMap = new Map()) {
 
   // Construct GPU procs map: uuid or index -> list of process info
   const gpuProcs = new Map();
+  const byPid = new Map(processes.map((p) => [p.pid, p]));
   for (const [pid, cards] of pidToGpu) {
-    const proc = processes.find((p) => p.pid === pid);
+    const proc = byPid.get(pid);
     const user = proc ? proc.user : undefined;
     const name = proc ? proc.command.split(/\s+/)[0].split('/').pop() : 'unknown';
     for (const card of cards) {
@@ -67,7 +68,8 @@ function parseProcesses(raw, gpuUuidMap = new Map()) {
 }
 
 async function pollProcesses(connection, gpuUuidMap = new Map(), timeoutMs = 8000) {
-  const { stdout } = await connection.exec(PROC_CMD, timeoutMs);
+  const { stdout, stderr, code, signal } = await connection.exec(PROC_CMD, timeoutMs);
+  if (signal || code !== undefined && code !== 0) throw new Error(stderr || `Process query failed (${signal || code})`);
   return parseProcesses(stdout, gpuUuidMap);
 }
 

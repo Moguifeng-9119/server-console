@@ -1,19 +1,5 @@
 # Changelog
 
-## 0.14.0 — 2026-10-12
-
-- High-frequency telemetry architecture with per-server `useSyncExternalStore` isolated subscriptions.
-- 60 FPS shared `requestAnimationFrame` exponential smoothing circular gauge engine (`GpuGauge`), updating SVG DOM directly without React re-renders.
-- Tiered multi-rate scheduler with independent lanes (`gpu` at 200ms/500ms, `system` at 1s, `processes` at 3s) and non-reentrancy protection.
-- 1-second statistical bucket history aggregator with peak preservation (min/max), trapezoidal integral, and SQLite batch writes (`raw_buckets`).
-- Persistent streaming via `nvidia-smi -lms` with incremental UTF-8 line decoding and idle watchdog.
-- Delta protocol encoding and `PublishBuffer` IPC coalescing.
-- AIMD adaptive rate control with congestion backoff and additive recovery.
-- 27 test files and 201 automated test cases passing at 100%.
-
-Local evidence: [0.14.0 validation ledger](docs/VALIDATION-0.14.0.md).
-
-
 ## 0.13.2 — 2026-10-07
 
 - Fix overview GPU grids to four columns at all supported widths.

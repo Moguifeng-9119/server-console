@@ -1,8 +1,9 @@
 import type { Gpu } from '../types';
 import type { ServerTelemetryState } from '../types/monitoring';
+import { freeGiB, gpuMetricAvailable, isFreshGpu, isFreshSample } from '../resources';
 
 export function freeGiBFromGpu(gpu: Gpu): number {
-  return Math.max(0, gpu.memTotal - gpu.memUsed) / 1024;
+  return freeGiB(gpu);
 }
 
 export function isFreshTelemetry(
@@ -11,9 +12,7 @@ export function isFreshTelemetry(
   refreshMs: number,
   now = Date.now(),
 ): boolean {
-  if (demo) return true;
-  if (!telemetry.collectedAt) return false;
-  return now - telemetry.collectedAt < Math.max(45000, refreshMs * 12);
+  return isFreshSample({ collectedAt: telemetry.collectedAt ?? undefined, laneTimestamps: telemetry.laneTimestamps }, demo, refreshMs, now);
 }
 
 export function gpuOwnersFromTelemetry(telemetry: ServerTelemetryState, gpu: Gpu): string[] {
@@ -38,12 +37,14 @@ export function matchingGpusFromTelemetry(
   serverName = '',
   serverHost = '',
   serverGroup = '',
+  now = Date.now(),
+  refreshMs = telemetry.monitoring?.effectiveIntervalMs ?? 2000,
 ): Gpu[] {
   if (telemetry.status !== 'online') return [];
   const q = query.trim().toLowerCase();
 
   return telemetry.gpus.filter((gpu) => {
-    if (gpu.memTotal <= 0 || freeGiBFromGpu(gpu) < Math.max(0, minGiB)) return false;
+    if (!isFreshGpu(gpu, refreshMs, now) || !gpuMetricAvailable(gpu, 'memTotal') || !gpuMetricAvailable(gpu, 'memUsed') || gpu.memTotal <= 0 || freeGiBFromGpu(gpu) < Math.max(0, minGiB)) return false;
     if (model && gpu.name !== model) return false;
     if (!q) return true;
 

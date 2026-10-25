@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import type { Server } from '../types';
 import { freeGiB, gpuOwners, matchingGpus, isFreshSample } from '../resources';
 import { Sparkline } from './Sparkline';
-import { GpuGauge } from './GpuGauge';
 
 type OpenServer = (id: string, tab?: 'gpu' | 'files' | 'term', gpuIndex?: number) => void;
 
@@ -55,115 +54,28 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
     </div>
     <p className="resource-note">{t('workbench.permissionNote')}</p>
     <div className="grid resource-grid">
-      {rows.map((s) => (
-        <ServerOverviewCard
-          key={s.id}
-          s={s}
-          online={s.status === 'online'}
-          fresh={isFresh(s)}
-          matches={eligible(s)}
-          colorOf={colorOf}
-          demo={demo}
-          onOpen={onOpen}
-          onHistory={onHistory}
-        />
-      ))}
+      {rows.map((s) => {
+        const online = s.status === 'online';
+        const fresh = isFresh(s);
+        const matches = eligible(s);
+        const avg = s.gpus.reduce((sum, g) => sum + g.util, 0) / (s.gpus.length || 1);
+        const name = [...new Set(s.gpus.map((g) => g.name.replace(/^NVIDIA /, '')))].join(' / ');
+        return <article className={`card resource-card ${online ? '' : 'unreachable'}`} key={s.id}>
+          <div className="card-head"><i className={`dot ${s.status}`} /><button className="server-name" onClick={() => onOpen(s.id)}>{s.name}</button><span className="badge">{online ? `${s.gpus.length} GPU` : t('overview.offline')}</span></div>
+          <div className="resource-host mono">{s.host}</div><div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
+          <div className="resource-kpis"><div><strong className="num">{online && fresh ? Math.max(0, ...s.gpus.map(freeGiB)).toFixed(1) : '—'}<small> GiB</small></strong><span>{t('workbench.largest')}</span></div><div><strong className="num" style={{ color: online ? colorOf(avg) : undefined }}>{online && fresh ? Math.round(avg) + '%' : '—'}</strong><span>{t('overview.avgUtil')}</span></div><div><strong className="num">{matches.length}</strong><span>{t('workbench.matches')}</span></div></div>
+          <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
+          <div className="resource-gpus">{s.gpus.map((g) => <button key={g.uuid || g.index} className={`resource-gpu ${matches.some((m) => m.index === g.index) ? 'matches' : ''}`} data-free-gib={online && fresh ? freeGiB(g) : undefined} onClick={() => onOpen(s.id, 'gpu', g.index)} disabled={!online || !fresh} title={gpuOwners(s, g).join(', ') || t('workbench.noProcesses')} aria-label={`GPU ${g.index} · ${t('monitor.util')} ${online && fresh ? g.util + '%' : '—'}`}>
+            <span className="gpu-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="42" className="gpu-ring-track" /><circle cx="50" cy="50" r="42" className="gpu-ring-value" pathLength="100" strokeDasharray={`${online && fresh ? Math.max(0, Math.min(100, g.util)) : 0} 100`} style={{ stroke: online && fresh ? colorOf(g.util) : 'var(--text-faint)' }} /></svg><span className="gpu-ring-label"><span>GPU {g.index}</span><strong className="num">{online && fresh ? Math.round(g.util) + '%' : '—'}</strong></span></span>
+            <span className="gpu-ring-memory mono">{online && fresh ? `${(g.memUsed / 1024).toFixed(1)} / ${(g.memTotal / 1024).toFixed(0)}` : '—'} GiB</span>
+            <span className="gpu-ring-temp">{t('monitor.temp')} {online && fresh && g.temp != null ? g.temp + '°C' : '—'}</span>
+            <span className="resource-owner">{fresh && online ? gpuOwners(s, g).join(', ') || t('workbench.noProcesses') : '—'}</span>
+          </button>)}</div>
+          <div className="resource-footer"><span>{demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}{online && !fresh && !demo && ` · ${t('workbench.stale')}`}</span><button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}><History size={13} />{t('monitor.title')}</button></div>
+          <div className="resource-actions"><button className="btn primary" onClick={() => onOpen(s.id, 'gpu')}><Activity size={14} />{t('workbench.inspect')}</button><button className="btn" onClick={() => onOpen(s.id, 'term')}><Terminal size={14} />{t('workbench.terminal')}</button><button className="btn" onClick={() => onOpen(s.id, 'files')}><FolderOpen size={14} />{t('nav.files')}</button></div>
+        </article>;
+      })}
     </div>
     {!rows.length && <div className="empty resource-empty"><Search size={28} /><h3>{t('workbench.noMatch')}</h3><p>{t('workbench.noMatchHint')}</p><button className="btn" onClick={reset}>{t('workbench.reset')}</button></div>}
   </>;
-}
-
-interface ServerOverviewCardProps {
-  s: Server;
-  online: boolean;
-  fresh: boolean;
-  matches: Server['gpus'];
-  colorOf: (n: number) => string;
-  demo: boolean;
-  onOpen: OpenServer;
-  onHistory: (s: Server) => void;
-}
-
-function ServerOverviewCard({
-  s,
-  online,
-  fresh,
-  matches,
-  colorOf,
-  demo,
-  onOpen,
-  onHistory,
-}: ServerOverviewCardProps) {
-  const { t } = useTranslation();
-  const avg = s.gpus.reduce((sum, g) => sum + g.util, 0) / (s.gpus.length || 1);
-  const name = [...new Set(s.gpus.map((g) => g.name.replace(/^NVIDIA /, '')))].join(' / ');
-
-  return (
-    <article className={`card resource-card ${online ? '' : 'unreachable'}`}>
-      <div className="card-head">
-        <i className={`dot ${s.status}`} />
-        <button className="server-name" onClick={() => onOpen(s.id)}>
-          {s.name}
-        </button>
-        <span className="badge">{online ? `${s.gpus.length} GPU` : t('overview.offline')}</span>
-      </div>
-      <div className="resource-host mono">{s.host}</div>
-      <div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
-      <div className="resource-kpis">
-        <div>
-          <strong className="num">{online && fresh ? Math.max(0, ...s.gpus.map(freeGiB)).toFixed(1) : '—'}<small> GiB</small></strong>
-          <span>{t('workbench.largest')}</span>
-        </div>
-        <div>
-          <strong className="num" style={{ color: online ? colorOf(avg) : undefined }}>{online && fresh ? Math.round(avg) + '%' : '—'}</strong>
-          <span>{t('overview.avgUtil')}</span>
-        </div>
-        <div>
-          <strong className="num">{matches.length}</strong>
-          <span>{t('workbench.matches')}</span>
-        </div>
-      </div>
-      <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
-      <div className="resource-gpus">
-        {s.gpus.map((g) => {
-          const isMatch = matches.some((m) => m.index === g.index);
-          const owners = gpuOwners(s, g);
-          return (
-            <GpuGauge
-              key={g.uuid || g.index}
-              id={`ov-${s.id}-${g.uuid || g.index}`}
-              gpu={g}
-              online={online}
-              fresh={fresh}
-              color={colorOf(g.util)}
-              isMatch={isMatch}
-              owners={owners}
-              freeGiBVal={online && fresh ? freeGiB(g) : undefined}
-              onClick={() => onOpen(s.id, 'gpu', g.index)}
-            />
-          );
-        })}
-      </div>
-      <div className="resource-footer">
-        <span>
-          {demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}
-          {online && !fresh && !demo && ` · ${t('workbench.stale')}`}
-        </span>
-        <button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}>
-          <History size={13} />{t('monitor.title')}
-        </button>
-      </div>
-      <div className="resource-actions">
-        <button className="btn primary" onClick={() => onOpen(s.id, 'gpu')}>
-          <Activity size={14} />{t('workbench.inspect')}
-        </button>
-        <button className="btn" onClick={() => onOpen(s.id, 'term')}>
-          <Terminal size={14} />{t('workbench.terminal')}
-        </button>
-        <button className="btn" onClick={() => onOpen(s.id, 'files')}>
-          <FolderOpen size={14} />{t('nav.files')}
-        </button>
-      </div>
-    </article>
-  );
 }

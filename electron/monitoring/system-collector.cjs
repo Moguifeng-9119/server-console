@@ -31,7 +31,8 @@ function parseSystem(raw, previousCpu = null) {
     const fields = cpuLine.split(/\s+/).slice(1).map((x) => num(x));
     if (fields.length >= 4) {
       const idle = (fields[3] || 0) + (fields[4] || 0);
-      const total = fields.reduce((sum, item) => sum + item, 0);
+      // guest and guest_nice are already included in user/nice counters.
+      const total = fields.slice(0, 8).reduce((sum, item) => sum + item, 0);
       if (previousCpu && total > previousCpu.total) {
         const deltaTotal = total - previousCpu.total;
         const deltaIdle = idle - previousCpu.idle;
@@ -54,7 +55,9 @@ function parseSystem(raw, previousCpu = null) {
 }
 
 async function pollSystem(connection, previousCpu = null, timeoutMs = 4000) {
-  const { stdout } = await connection.exec(SYS_CMD, timeoutMs);
+  const { stdout, stderr, code, signal } = await connection.exec(SYS_CMD, timeoutMs);
+  if (signal || code !== undefined && code !== 0) throw new Error(stderr || `System query failed (${signal || code})`);
+  if (!String(stdout).includes('__CPU__')) throw new Error('System query returned an unsupported response');
   return parseSystem(stdout, previousCpu);
 }
 

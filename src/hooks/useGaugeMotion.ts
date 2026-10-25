@@ -21,6 +21,7 @@ class MotionEngine {
       this.reducedMotion = mq.matches;
       mq.addEventListener?.('change', (e) => {
         this.reducedMotion = e.matches;
+        if (this.reducedMotion) { this.stop(); this.snapAll(); }
       });
 
       document.addEventListener('visibilitychange', () => {
@@ -37,7 +38,7 @@ class MotionEngine {
   public register(item: MotionItem) {
     this.items.set(item.id, item);
     this.applyValue(item, item.current);
-    this.ensureRunning();
+    if (Math.abs(item.target - item.current) > 0.01) this.ensureRunning();
   }
 
   public updateTarget(id: string, target: number) {
@@ -96,7 +97,8 @@ class MotionEngine {
     this.lastTime = now;
 
     // Discard huge dt (e.g. browser freeze or tab switch) by clamping dt to max 100ms
-    const dt = Math.min(Math.max(rawDt, 1), 100);
+    if (rawDt > 500) { this.snapAll(); this.rafId = null; return; }
+    const dt = Math.min(Math.max(rawDt, 1), 50);
     const factor = 1 - Math.exp(-dt / this.tau);
 
     for (const item of this.items.values()) {

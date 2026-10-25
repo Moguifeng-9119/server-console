@@ -26,18 +26,10 @@ class HistoryDatabase {
         missing INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(channel,at)) WITHOUT ROWID;
       CREATE INDEX IF NOT EXISTS minutes_expiry ON minutes(at);
-      CREATE TABLE IF NOT EXISTS raw_buckets (
-        channel INTEGER NOT NULL, bucket_at INTEGER NOT NULL,
-        integral REAL NOT NULL DEFAULT 0, coverage_ms INTEGER NOT NULL DEFAULT 0,
-        sample_count INTEGER NOT NULL DEFAULT 0, min REAL, max REAL,
-        last_value REAL, last_at INTEGER, missing INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY(channel,bucket_at)) WITHOUT ROWID;
-      CREATE INDEX IF NOT EXISTS raw_buckets_expiry ON raw_buckets(bucket_at);
       CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
     this.channel = this.db.prepare('SELECT * FROM channels WHERE server=? AND device=? AND metric=?');
     this.create = this.db.prepare('INSERT OR IGNORE INTO channels(server,device,metric,label) VALUES(?,?,?,?)');
     this.insert = this.db.prepare('INSERT OR IGNORE INTO raw VALUES(?,?,?)');
-    this.insertBucket = this.db.prepare('INSERT OR IGNORE INTO raw_buckets VALUES(?,?,?,?,?,?,?,?,?,?)');
     this.minute = this.db.prepare(`INSERT INTO minutes(channel,at,sum,count,low,high,weighted,coverage,missing)
       VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(channel,at) DO UPDATE SET
       sum=sum+excluded.sum, count=count+excluded.count,
@@ -45,6 +37,36 @@ class HistoryDatabase {
       high=CASE WHEN excluded.high IS NULL THEN high WHEN high IS NULL THEN excluded.high ELSE MAX(high,excluded.high) END,
       weighted=weighted+excluded.weighted, coverage=coverage+excluded.coverage, missing=missing+excluded.missing`);
     this.last = this.db.prepare('UPDATE channels SET last_at=?,last_value=?,label=? WHERE id=?');
+    this.migrateRawBuckets();
+  }
+
+  // 旧版 raw_buckets 表迁移：把 last_value/last_at 作为稀疏样本导入 raw。
+  // coverage_ms=0 的桶不制造时间覆盖（不把 0 integral 当作 0 值区间），
+  // 保留真实读数本身；查询端 coverage<80% 自然标记为 gap。
+  migrateRawBuckets() {
+    const has = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_buckets'").get();
+    if (!has) return;
+    if (this.db.prepare("SELECT value FROM metadata WHERE key='raw-buckets-import'").get()) return;
+    this.db.exec('BEGIN');
+    try {
+      const rows = this.db
+        .prepare('SELECT channel, bucket_at, last_value, last_at, missing, coverage_ms FROM raw_buckets')
+        .all();
+      const insert = this.db.prepare('INSERT OR REPLACE INTO raw(channel,at,value) VALUES(?,?,?)');
+      for (const r of rows) {
+        if (Number(r.missing)) continue;
+        const value = finite(Number(r.last_value));
+        if (value == null) continue; // 无真实读数的零覆盖桶不导入（不伪造 0）
+        const at = Number(r.last_at ?? r.bucket_at);
+        if (!Number.isSafeInteger(at) || at <= 0) continue;
+        insert.run(Number(r.channel), at, value);
+      }
+      this.db.prepare("INSERT INTO metadata VALUES('raw-buckets-import','done')").run();
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   /** @param {Array<{server:string,device:string,metric:string,label:string,at:number,value:number|null}>} records */
@@ -82,28 +104,6 @@ class HistoryDatabase {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
-  appendBuckets(buckets, now = Date.now()) {
-    this.db.exec('BEGIN');
-    try {
-      for (const b of buckets) {
-        if (!Number.isSafeInteger(b.bucket_at) || b.bucket_at <= 0 || b.bucket_at > now + MINUTE || b.bucket_at < now - RETENTION) continue;
-        this.create.run(b.server, b.device, b.metric, b.label);
-        const c = this.channel.get(b.server, b.device, b.metric);
-        const at = b.bucket_at;
-        const val = finite(b.last_value);
-        if (c.last_at != null && at <= Number(c.last_at)) continue;
-        if (at >= now - RAW_RETENTION) {
-          this.insert.run(Number(c.id), at, val);
-          this.insertBucket.run(Number(c.id), at, b.integral || 0, b.coverage_ms || 0, b.sample_count || 0, b.min, b.max, val, b.last_at || at, b.missing || 0);
-        }
-        const minuteAt = Math.floor(at / MINUTE) * MINUTE;
-        this.minute.run(Number(c.id), minuteAt, b.sum || 0, b.sample_count || (val == null ? 0 : 1), b.min ?? val, b.max ?? val, b.integral || 0, b.coverage_ms || 0, b.missing || (val == null ? 1 : 0));
-        this.last.run(b.last_at || at, val, b.label, Number(c.id));
-      }
-      this.db.exec('COMMIT');
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
-  }
-
   snapshot(s) {
     const at = s.collectedAt || Date.now();
     const records = [];
@@ -136,11 +136,10 @@ class HistoryDatabase {
     this.db.exec('BEGIN');
     try {
       this.db.prepare('DELETE FROM raw WHERE at < ?').run(now - RAW_RETENTION);
-      this.db.prepare('DELETE FROM raw_buckets WHERE bucket_at < ?').run(now - RAW_RETENTION);
       // Expire entire minute buckets; no sample beyond the absolute maximum
       // is retained in the oldest partial bucket.
       this.db.prepare('DELETE FROM minutes WHERE at < ?').run(now - RETENTION);
-      this.db.prepare('DELETE FROM channels WHERE last_at < ? AND id NOT IN (SELECT channel FROM minutes) AND id NOT IN (SELECT channel FROM raw) AND id NOT IN (SELECT channel FROM raw_buckets)').run(now - RETENTION);
+      this.db.prepare('DELETE FROM channels WHERE last_at < ? AND id NOT IN (SELECT channel FROM minutes) AND id NOT IN (SELECT channel FROM raw)').run(now - RETENTION);
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
     this.db.exec('PRAGMA incremental_vacuum; PRAGMA wal_checkpoint(TRUNCATE);');
@@ -249,7 +248,7 @@ class HistoryDatabase {
 
   stats() {
     const scalar = (sql) => Number(Object.values(this.db.prepare(sql).get())[0]);
-    return { rawRows: scalar('SELECT COUNT(*) FROM raw'), bucketRows: scalar('SELECT COUNT(*) FROM raw_buckets'), minuteRows: scalar('SELECT COUNT(*) FROM minutes'),
+    return { rawRows: scalar('SELECT COUNT(*) FROM raw'), minuteRows: scalar('SELECT COUNT(*) FROM minutes'),
       pageSize: scalar('PRAGMA page_size'), pages: scalar('PRAGMA page_count'), freePages: scalar('PRAGMA freelist_count') };
   }
   close() { this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); this.db.close(); }

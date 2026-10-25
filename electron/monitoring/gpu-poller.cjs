@@ -20,18 +20,22 @@ function parseGpuCsv(raw) {
 
   for (const line of raw.split('\n')) {
     const f = line.split(',').map((x) => x.trim());
-    if (f.length < 6) continue;
+    if (f.length !== 9 || !/^\d+$/.test(f[0]) || !f[1]) continue;
     const index = Math.floor(num(f[0]));
+    const metrics = Object.fromEntries(['util', 'memUsed', 'memTotal', 'temp', 'power', 'fan'].map((key, i) => [key, roundOrNull(f[i + 3])]));
     gpus.push({
       index,
       uuid: f[1] || `gpu-${index}`,
       name: f[2] || 'GPU',
-      util: Math.round(num(f[3])),
-      memUsed: Math.round(num(f[4])),
-      memTotal: Math.round(num(f[5])),
-      temp: roundOrNull(f[6]),
-      power: roundOrNull(f[7]),
-      fan: roundOrNull(f[8]),
+      // Numeric compatibility fields are paired with explicit availability;
+      // consumers must never treat these placeholders as observed zeros.
+      util: metrics.util ?? 0,
+      memUsed: metrics.memUsed ?? 0,
+      memTotal: metrics.memTotal ?? 0,
+      temp: metrics.temp,
+      power: metrics.power,
+      fan: metrics.fan,
+      unavailableMetrics: Object.keys(metrics).filter((key) => metrics[key] === null),
       procs: [],
     });
   }
@@ -40,7 +44,8 @@ function parseGpuCsv(raw) {
 }
 
 async function pollGpus(connection, timeoutMs = 4000) {
-  const { stdout } = await connection.exec(GPU_CMD, timeoutMs);
+  const { stdout, stderr, code, signal } = await connection.exec(GPU_CMD, timeoutMs);
+  if (signal || code !== undefined && code !== 0) throw new Error(stderr || `GPU query failed (${signal || code})`);
   return parseGpuCsv(stdout);
 }
 

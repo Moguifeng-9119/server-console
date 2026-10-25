@@ -13,7 +13,6 @@ parentPort.on('message', ({ id, method, payload }) => {
     let data;
     switch (method) {
       case 'snapshot': data = db.snapshot(payload); break;
-      case 'buckets': data = db.appendBuckets(payload); break;
       case 'gap': data = db.gap(payload.server, payload.at); break;
       case 'query': data = db.query(payload); break;
       case 'load': data = db.legacyLoad(); break;

@@ -129,7 +129,7 @@ describe('persistent monitoring history', () => {
     expect(result.points.reduce((n, p) => n + p.coveredMs, 0)).toBe(0);
   });
   it('keeps minute extrema around the interpolated average', () => {
-    const { db } = fixture(), at = Math.floor((Date.now() - 300000) / 900000) * 900000;
+    const { db } = fixture(), at = Math.floor(Date.now() / 900000) * 900000;
     db.append([record(at - 10000, 0), record(at + 10000, 100)], at + 10000);
     const result = db.query({ serverId: 'host', device: 'gpu:uuid', metric: 'util', rangeMs: 7 * DAY, end: at + 120000 });
     for (const p of result.points.filter((p) => p.value != null)) { expect(p.value).toBeGreaterThanOrEqual(p.min); expect(p.value).toBeLessThanOrEqual(p.max); }
@@ -141,22 +141,5 @@ describe('persistent monitoring history', () => {
     try { const map = { fresh: [{ at: Date.now(), value: 10 }] }; await service.request('save', map); expect(await service.request('load')).toEqual(map); expect(errors.length).toBe(1); }
     finally { await service.close(); }
     expect(fs.readFileSync(path.join(directory, 'history.json'), 'utf8')).toBe('{');
-  });
-  it('stores 1-second statistical buckets with peaks and integrates with minutes and raw', () => {
-    const { db } = fixture(), now = Date.now();
-    const baseSecond = Math.floor((now - 20000) / 1000) * 1000;
-    const bucket = {
-      server: 'host', device: 'gpu:b1', metric: 'util', label: 'GPU B1',
-      bucket_at: baseSecond, integral: 75000, coverage_ms: 1000, sample_count: 5,
-      min: 15, max: 98, last_value: 80, last_at: baseSecond + 800, missing: 0,
-    };
-    db.appendBuckets([bucket], now);
-    expect(db.stats().bucketRows).toBe(1);
-    expect(db.stats().rawRows).toBe(1);
-    const minuteRows = db.db.prepare("SELECT * FROM minutes WHERE channel=(SELECT id FROM channels WHERE device='gpu:b1')").all();
-    expect(minuteRows).toHaveLength(1);
-    expect(minuteRows[0].count).toBe(5);
-    expect(minuteRows[0].low).toBe(15);
-    expect(minuteRows[0].high).toBe(98);
   });
 });

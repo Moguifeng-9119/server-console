@@ -12,7 +12,6 @@ import type { AlertRecord, HistoryPoint, AuditEntry, Server, ServerConfig, Snaps
 import { api, isElectron } from './api';
 import i18n, { initializationWarning } from './i18n';
 import { appendSample, normalizeHistory } from './history';
-import { telemetryStore } from './telemetry/store';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'default' | 'comfy';
@@ -114,7 +113,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadPref('sc.thresholds', { warn: 50, high: 75, crit: 90 }, isThresholds),
   );
   const [refreshMs, setRefreshMsState] = useState<number>(() =>
-    loadPref('sc.refreshMs', 2000, (v) => [200, 500, 1000, 2000, 5000, 10000].includes(Number(v))),
+    loadPref('sc.refreshMs', 2000, (v) => [1000, 2000, 5000, 10000].includes(Number(v))),
   );
   const [alertsEnabled, setAlertsEnabledState] = useState<boolean>(() =>
     loadPref('sc.alertsEnabled', true, (v) => typeof v === 'boolean'),
@@ -219,14 +218,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!api || demo) return;
     const offSnap = api.onSnapshot((s) => {
-      telemetryStore.ingestSnapshot(s);
       const at = s.collectedAt || Date.now();
       setSnaps((prev) => ({ ...prev, [s.id]: { ...s, collectedAt: at } }));
       const value = s.gpus.length ? s.gpus.reduce((sum, g) => sum + g.util, 0) / s.gpus.length : null;
       setHistories((prev) => ({ ...prev, [s.id]: appendSample(prev[s.id] || [], { at, value }) }));
     });
     const offStatus = api.onStatus((st) => {
-      telemetryStore.updateStatus(st.id, st.status as SnapshotPayload['status'], st.error);
       setHistories((prev) => ({ ...prev, [st.id]: appendSample(prev[st.id] || [], { at: Date.now(), value: null }) }));
       setSnaps((prev) => {
         const cur = prev[st.id];
@@ -289,29 +286,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!demo) return;
     const timer = setInterval(() => {
       const m = mockRef.current;
-      if (m) {
-        setDemoServers((prev) => {
-          const next = prev.map(m.tick);
-          for (const s of next) {
-            telemetryStore.ingestSnapshot({
-              id: s.id,
-              status: s.status,
-              error: '',
-              gpus: s.gpus,
-              processes: s.processes,
-              cpuCores: s.cpuCores,
-              cpuUsage: s.cpuUsage,
-              collectedAt: s.collectedAt,
-              loadAvg: s.loadAvg,
-              memUsed: s.memUsed,
-              memTotal: s.memTotal,
-              swapUsed: s.swapUsed,
-              swapTotal: s.swapTotal,
-            });
-          }
-          return next;
-        });
-      }
+      if (m) setDemoServers((prev) => prev.map(m.tick));
     }, refreshMs);
     return () => clearInterval(timer);
   }, [demo, refreshMs]);

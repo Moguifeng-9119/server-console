@@ -1,4 +1,4 @@
-import type { Gpu, ProcessItem, ServerStatus } from '../types';
+import type { Gpu, ProcessItem, ServerStatus, SnapshotPayload } from '../types';
 
 export type MonitoringLane = 'gpu' | 'system' | 'processes' | 'metadata' | 'health';
 export type MonitoringKind = 'keyframe' | 'delta' | 'heartbeat' | 'gap' | 'controlAck';
@@ -33,6 +33,8 @@ export interface MonitoringCapabilities {
 }
 
 export interface ServerTelemetryState {
+  laneTimestamps?: SnapshotPayload['laneTimestamps'];
+  monitoring?: SnapshotPayload['monitoring'];
   serverId: string;
   status: ServerStatus;
   error?: string;

@@ -6,16 +6,14 @@ const PROBE_CMD = [
 
 const cache = new Map();
 
-async function probeCapabilities(connection, serverId) {
-  if (serverId && cache.has(serverId)) {
-    return cache.get(serverId);
-  }
+async function probeCapabilities(connection, _serverId) {
 
   const defaultCaps = {
     hasNvidiaSmi: false,
     loopMsSupported: false,
     pythonAvailable: false,
     minSupportedIntervalMs: 500,
+    legacyOnly: true,
   };
 
   try {
@@ -28,11 +26,13 @@ async function probeCapabilities(connection, serverId) {
       loopMsSupported: hasSmi, // nvidia-smi supports loop queries
       pythonAvailable: hasPy3,
       minSupportedIntervalMs: hasSmi ? 200 : 500,
+      legacyOnly: !/SMI:[01]/.test(stdout),
     };
 
-    if (serverId) cache.set(serverId, caps);
     return caps;
-  } catch {
+  } catch (error) {
+    // Authentication/transport errors must remain visible to the UI.
+    if (/auth|timed out|timeout|ECONN|closed/i.test(String(error))) throw error;
     return defaultCaps;
   }
 }

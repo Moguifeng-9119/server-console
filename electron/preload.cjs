@@ -201,4 +201,105 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('transfer:update', h);
     return () => ipcRenderer.removeListener('transfer:update', h);
   },
+
+  // 目录同步（预览 → 确认应用）
+  syncPreview: (req) => ipcRenderer.invoke('sync:preview', req),
+  syncApply: (planId) => ipcRenderer.invoke('sync:apply', planId),
+  syncList: () => ipcRenderer.invoke('sync:list'),
+
+  // 运维工作台（统一请求通道）
+  workbenchRequest: (req) => ipcRenderer.invoke('workbench:request', req),
+  onWorkbenchEvent: (cb) => {
+    const h = (_e, data) => cb(data);
+    ipcRenderer.on('workbench:event', h);
+    return () => ipcRenderer.removeListener('workbench:event', h);
+  },
 });
+
+// ===== 监控帧接收器（沙箱安全）：乱序/丢帧时请求一次全量重同步，防回退到旧 epoch =====
+// 契约（对应 tests/monitoring-frame-receiver.test.cjs）：
+// - fetchCurrent 在触发时同步调用（测试依赖其同步副作用）
+// - resync 成功后不清空队列，而是补放与基准连续的后缀
+// - 已离开的旧 epoch 帧（keyframe/delta）一律忽略；无基准的 delta 入队等 resync
+class FrameReceiver {
+  constructor({ fetchCurrent, emit }) {
+    this.fetchCurrent = fetchCurrent;
+    this.emit = emit;
+    this.states = new Map();
+  }
+
+  receive(frame) {
+    let entry = this.states.get(frame.serverId);
+    if (!entry) {
+      entry = { epoch: '', seq: 0, state: null, queue: [], resyncing: false, pastEpochs: new Set() };
+      this.states.set(frame.serverId, entry);
+    }
+    if (frame.epoch !== entry.epoch) {
+      const stale = entry.pastEpochs.has(frame.epoch);
+      if (frame.kind === 'keyframe') {
+        if (entry.state != null && stale) return; // 旧 epoch 的迟到 keyframe：忽略
+        if (entry.epoch) entry.pastEpochs.add(entry.epoch);
+        entry.epoch = frame.epoch;
+        entry.seq = frame.seq;
+        entry.state = frame.payload;
+        entry.queue = [];
+        this.emit(entry.state);
+        return;
+      }
+      // delta：无基准时入队等 resync；已离开的旧 epoch 忽略
+      if (entry.state != null && stale) return;
+      entry.queue.push(frame);
+      if (entry.queue.length > 200) entry.queue.shift();
+      this._resync(entry);
+      return;
+    }
+    if (frame.kind === 'keyframe') {
+      if (frame.seq >= entry.seq || entry.state == null) {
+        entry.seq = frame.seq;
+        entry.state = frame.payload;
+        this.emit(entry.state);
+      }
+      return;
+    }
+    if (frame.baseSeq === entry.seq) {
+      entry.state = entry.state == null ? frame.payload : Object.assign({}, entry.state, frame.payload);
+      entry.seq = frame.seq;
+      this.emit(entry.state);
+      this._drain(entry);
+      return;
+    }
+    entry.queue.push(frame);
+    if (entry.queue.length > 200) entry.queue.shift();
+    this._resync(entry);
+  }
+
+  _drain(entry) {
+    for (;;) {
+      const next = entry.queue.find((q) => q.baseSeq === entry.seq);
+      if (!next) break;
+      entry.queue.splice(entry.queue.indexOf(next), 1);
+      entry.state = Object.assign({}, entry.state, next.payload);
+      entry.seq = next.seq;
+      this.emit(entry.state);
+    }
+  }
+
+  _resync(entry) {
+    if (entry.resyncing) return;
+    entry.resyncing = true;
+    Promise.resolve(this.fetchCurrent())
+      .then((current) => {
+        entry.resyncing = false;
+        if (!current || current.snapshot == null) return; // 失败/空不重试，等下一个外部帧
+        if (current.epoch !== entry.epoch) {
+          if (entry.state != null) return; // 迟到的旧 resync：不回退
+          entry.epoch = current.epoch;
+        }
+        entry.state = current.snapshot;
+        entry.seq = current.seq;
+        this.emit(entry.state);
+        this._drain(entry); // resync 后补放连续后缀（不整体清空）
+      })
+      .catch(() => { entry.resyncing = false; });
+  }
+}

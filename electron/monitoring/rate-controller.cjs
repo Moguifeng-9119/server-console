@@ -21,7 +21,9 @@ class RateController {
   }
 
   setDesiredHz(hz) {
-    this.desiredHz = Math.max(this.minHz, Math.min(this.maxHz, Number(hz)));
+    const next = Math.max(this.minHz, Math.min(this.maxHz, Number(hz) || this.minHz));
+    if (next === this.desiredHz) return;
+    this.desiredHz = next;
     if (this.effectiveHz > this.desiredHz) {
       this.effectiveHz = this.desiredHz;
     }
