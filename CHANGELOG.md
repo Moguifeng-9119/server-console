@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.18.0 — 2026-10-26
+
+- Wire tiered GPU streaming, system and process collectors into production IPC, with bounded publishing and per-server telemetry subscriptions.
+- Preserve unsupported GPU values, lane timestamps, history peaks and missing intervals; expire usage summaries alongside monitoring retention.
+- Check remote command results and process-start identity for task/process termination. Preserve all application settings when switching languages.
+- Connect reports to SQLite history, service templates to actual SSH forwarding, and task/workspace shortcuts to the correct terminal and directory.
+- Add saved experiment workspaces, terminal search/split layouts, incremental training-log progress and resource-history comparisons with event markers and exports.
+- Add read-only Slurm inspection, connection diagnostics, credential-free configuration backup/import, and optional HTTPS webhook notifications.
+- Track save-and-upload success after transfer completion, discard paused pending changes, and bound directory scans while rejecting symlink escapes.
+- Add an explicitly started, token-authenticated headless SSH collector with persistent SQLite history. Desktop startup does not launch it.
+- Refresh ten README pages and release evidence; add checksums and isolated Windows installer-upgrade CI tooling.
+
+Validation and remaining platform boundaries: [0.18.0 ledger](docs/VALIDATION-0.18.0.md).
+
 ## 0.13.2 — 2026-10-07
 
 - Fix overview GPU grids to four columns at all supported widths.

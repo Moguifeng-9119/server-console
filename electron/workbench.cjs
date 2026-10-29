@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { StringDecoder } = require('node:string_decoder');
 
 const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
 const text = (value, max = 4096) => String(value ?? '').slice(0, max);
@@ -81,6 +82,7 @@ class WorkbenchManager {
     this.file = path.join(directory, 'workbench.json'); this.getConnection = getConnection; this.getServers = getServers; this.notify = notify; this.onEvent = onEvent; this.historyQuery = historyQuery; this.usageQuery = usageQuery;
     this.data = { version: 1, tasks: [], watches: [], rules: [], events: [], templates: [], logs: [], env: [] }; this.previous = new Map(); this.snapshots = new Map(); this.progress = new Map(); this.running = new Set(); this.closed = false; this.taskPollAt = new Map();
     this.clockCache = new Map(); // serverId -> { at, date, minutes }（服务器本地时钟，10s 缓存）
+    this.logInFlight = new Map();
     this.onResource = onResource; this.resourceNow = now; this.resourceConcurrency = Math.max(1, Math.min(16, Math.floor(Number(resourceConcurrency) || 4)));
     this.resourceIdentities = new Map(); this.resourceInFlight = new Map(); this.resourceFailures = new Map(); this.resourceQueue = []; this.resourceActive = 0; this.resourceBusyHosts = new Set();
   }
@@ -210,6 +212,7 @@ class WorkbenchManager {
     if (op === 'eventList') return clone(this.data.events.filter((e) => !sid || e.serverId === sid));
     if (op === 'system') return this.observeResources(sid, { maxAgeMs: 2000 });
     if (op === 'process') return this.processDetails(sid, pidOf(r.pid));
+    if (op === 'gpuDiagnostics') return this.gpuDiagnostics(sid);
     if (op === 'tmux' || op === 'tmux.list') { const result = await this.exec(sid, "if ! command -v tmux >/dev/null 2>&1; then printf '__UNSUPPORTED__'; elif tmux list-sessions -F '#{session_name}\\t#{session_windows}\\t#{session_attached}' 2>/dev/null; then :; else printf '__EMPTY__'; fi"); return { available: !result.includes('__UNSUPPORTED__'), sessions: result.split(/\r?\n/).filter((l) => l && !l.startsWith('__')).map((line) => { const [name, windows, attached] = line.split('\t'); return { name, windows: +windows, attached: +attached }; }) }; }
     if (op === 'tmux.attach') { const sessions = await this.request({ operation: 'tmux.list', serverId: sid }); if (!sessions.sessions.some((s) => s.name === r.name)) throw new Error('Session no longer exists'); return { command: 'tmux attach-session -t ' + quote(String(r.name)) }; }
     if (op === 'taskList') return clone(this.data.tasks.filter((t) => !sid || t.serverId === sid));
@@ -234,7 +237,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     if (op === 'envList') return clone(this.data.env || []);
     if (op === 'usageReport') return this.usageReport(Math.max(1, Math.min(365, finite(r.rangeDays, 30))));
     if (op === 'logList') return clone(this.data.logs || []);
-    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [] }); }
+    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [], progressPoints: existing?.progressPoints || [], cursor: existing?.serverId === sid && existing?.path === text(r.path, 4096).trim() ? existing.cursor : undefined }); }
     if (op === 'logDelete') { this.data.logs = (this.data.logs || []).filter((l) => l.id !== idOf(r.id)); this.persist(); return true; }
     if (op === 'logPoll') return this.pollLog(idOf(r.id));
     throw new Error('Unsupported workbench operation');
@@ -248,7 +251,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     const script = [
       '#!/bin/sh', 'SC_TASK_DIR=' + dir,
       'printf "%s\\n" "$$" >"$SC_TASK_DIR/runner.pid"',
-      'awk \'{print $22}\' /proc/$$/stat >"$SC_TASK_DIR/runner.start"',
+      'sed \'s/^.*) //\' /proc/$$/stat | awk \'{print $20}\' >"$SC_TASK_DIR/runner.start"',
       "trap 'rc=$?; trap - EXIT; printf \"%s\\n\" \"$rc\" >\"$SC_TASK_DIR/exit.tmp\"; mv \"$SC_TASK_DIR/exit.tmp\" \"$SC_TASK_DIR/exit.code\"; exit \"$rc\"' EXIT",
       'cd -- ' + cwd + ' || exit 125',
       task.gpu ? 'export CUDA_VISIBLE_DEVICES=' + quote(task.gpu) : '',
@@ -273,7 +276,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     const dir = taskPath(task.remoteId);
     const command = 'if test -f ' + dir + '/exit.code; then cat ' + dir + '/exit.code; ' +
       'elif test -s ' + dir + '/runner.pid && test -s ' + dir + '/runner.start; then pid=$(cat ' + dir + '/runner.pid); expected=$(cat ' + dir + '/runner.start); ' +
-      'case "$pid" in ""|*[!0-9]*) printf __UNKNOWN__;; *) current=$(awk \'{print $22}\' /proc/"$pid"/stat 2>/dev/null); ' +
+      'case "$pid" in ""|*[!0-9]*) printf __UNKNOWN__;; *) current=$(sed \'s/^.*) //\' /proc/"$pid"/stat 2>/dev/null | awk \'{print $20}\'); ' +
       'if test -n "$current" && test "$current" = "$expected"; then printf __PENDING__; else printf __UNKNOWN__; fi;; esac; ' +
       'else printf __STARTING__; fi';
     const output = (await this.exec(task.serverId, command)).trim();
@@ -285,15 +288,29 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     this.persist(); return clone(task);
   }
 
-  // 终止运行中的任务：tmux 会话优先杀；再按 runner.pid+runner.start 校验杀主进程（TERM→1s→KILL）
+  // Snapshot descendants, validate each process identity, then terminate children before the runner.
   async killTask(id, reason = 'Stopped') {
     const task = this.task(id);
     if (!task.remoteId || !['starting', 'running', 'unknown'].includes(task.status)) throw new Error('Task is not running');
     const dir = taskPath(task.remoteId);
-    const parts = [];
-    if (task.mode === 'tmux' && task.sessionName) parts.push('tmux kill-session -t ' + quote(task.sessionName) + ' 2>/dev/null || true');
-    parts.push('if test -s ' + dir + '/runner.pid; then pid=$(cat ' + dir + '/runner.pid); case "$pid" in ""|*[!0-9]*) ;; *) kill -TERM "$pid" 2>/dev/null || true; sleep 1; kill -KILL "$pid" 2>/dev/null || true;; esac; fi');
-    try { await this.exec(task.serverId, parts.join('; '), 15000); } catch { /* 尽力而为：状态仍标记停止 */ }
+    const command = [
+      'sc_dir=' + dir,
+      'sc_start() { sed \'s/^.*) //\' /proc/"$1"/stat 2>/dev/null | awk \'{print $20}\'; }',
+      'pid=$(cat "$sc_dir/runner.pid") && expected=$(cat "$sc_dir/runner.start") || exit 125',
+      'case "$pid:$expected" in *[!0-9:]*|:*|*:) printf "Invalid task identity" >&2; exit 125;; esac',
+      'test "$pid" -gt 1 && test "$(sc_start "$pid")" = "$expected" || { printf "Task identity changed or process exited" >&2; exit 125; }',
+      'targets=$(ps -eo pid=,ppid= | awk -v root="$pid" \'{p[$1]=$2} END {for (id in p) {n=id; for(i=0;i<1024 && n in p;i++){if(p[n]==root){print id;break} n=p[n]}}}\')',
+      'identities=""; for child in $targets "$pid"; do if test "$child" = "$pid"; then stamp="$expected"; else stamp=$(sc_start "$child"); fi; case "$stamp" in ""|*[!0-9]*) continue;; esac; identities="$identities $child:$stamp"; done',
+      'for item in $identities; do child=${item%:*}; stamp=${item#*:}; if test "$(sc_start "$child")" = "$stamp"; then kill -TERM "$child" 2>/dev/null || { test -z "$(sc_start "$child")" || exit 126; }; fi; done',
+      'sleep 1',
+      'for item in $identities; do child=${item%:*}; stamp=${item#*:}; if test "$(sc_start "$child")" = "$stamp"; then kill -KILL "$child" 2>/dev/null || { test -z "$(sc_start "$child")" || exit 126; }; fi; done',
+      'sleep 1',
+      'for item in $identities; do child=${item%:*}; stamp=${item#*:}; if test "$(sc_start "$child")" = "$stamp" && test "$(sed \'s/^.*) //\' /proc/"$child"/stat | cut -d \' \' -f1)" != Z; then printf "Task process is still running" >&2; exit 126; fi; done',
+      'printf __STOPPED__',
+    ].join('; ');
+    try { const result = (await this.exec(task.serverId, command, 15000)).trim(); if (result !== '__STOPPED__') throw new Error('Task stop was not acknowledged'); }
+    catch (error) { task.status = 'unknown'; task.error = String(error); this.persist(); throw error; }
+    delete task.error;
     task.status = 'stopped'; task.finishedAt = Date.now(); this.persist();
     this.event('task-stopped', task.serverId, task.name + ' · ' + reason, '', { taskId: task.id });
     return clone(task);
@@ -393,31 +410,86 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     return next.slice(); // 无对齐（轮转/清空/超窗）：全量视为新增
   }
 
-  async pollLog(id) {
-    const log = (this.data.logs || []).find((l) => l.id === id);
-    if (!log) throw new Error('Log watcher not found');
+  pollLog(id) {
+    if (this.logInFlight.has(id)) return this.logInFlight.get(id);
+    const request = this.readLog(id).finally(() => { if (this.logInFlight.get(id) === request) this.logInFlight.delete(id); });
+    this.logInFlight.set(id, request); return request;
+  }
+
+  async readLog(id) {
+    const original = (this.data.logs || []).find((l) => l.id === id);
+    if (!original) throw new Error('Log watcher not found');
+    const log = clone(original);
     this.server(log.serverId);
-    const output = await this.exec(log.serverId, 'tail -n 60 -- ' + quote(log.path), 15000);
-    const lines = output.split(/\r?\n/).filter((l) => l.length > 0).slice(-60);
-    const fresh = WorkbenchManager.newLines(log.lastLines || [], lines);
-    log.lastLines = lines;
-    if (fresh.length) {
-      const matchers = (log.patterns || []).map((p) => { try { return new RegExp(p); } catch { return null; } }).filter(Boolean);
+    const cursor = log.cursor?.path === log.path ? log.cursor : null;
+    const previousOffset = Number.isSafeInteger(cursor?.offset) ? cursor.offset : 0;
+    const command = [
+      'exec 3<' + quote(log.path) + ' || exit 1',
+      "meta=$(stat -Lc '%d:%i:%s' /proc/$$/fd/3) || exit 1",
+      'size=${meta##*:}; identity=${meta%:*}',
+      'start=' + previousOffset,
+      cursor ? 'if test "$identity" != ' + quote(cursor.identity) + ' || test "$size" -lt "$start"; then start=0; fi' : 'start=$((size > 262144 ? size - 262144 : 0))',
+      'count=$((size-start)); test "$count" -le 262144 || count=262144',
+      'printf "__SC_LOG__ %s %s %s %s\\n" "$identity" "$size" "$start" "$count"',
+      'dd bs=65536 skip="$start" count="$count" iflag=skip_bytes,count_bytes status=none <&3 | base64',
+    ].join('; ');
+    try {
+      const output = await this.exec(log.serverId, command, 15000);
+      if (!this.data.logs.includes(original) || this.closed) throw new Error('Log watcher changed during collection');
+      const header = output.match(/^__SC_LOG__ ([0-9]+:[0-9]+) ([0-9]+) ([0-9]+) ([0-9]+)\r?\n/);
+      if (!header) throw new Error('Unsupported incremental log response');
+      const identity = header[1], size = +header[2], start = +header[3], expected = +header[4];
+      if (![size, start, expected].every(Number.isSafeInteger) || expected > 262144 || start > size) throw new Error('Invalid log cursor');
+      const bytes = Buffer.from(output.slice(header[0].length).replace(/\s/g, ''), 'base64');
+      if (bytes.length !== expected) throw new Error('Log read incomplete; file may have changed during collection');
+      const continuous = cursor && cursor.identity === identity && start === cursor.offset;
+      const decoder = new StringDecoder('utf8');
+      const input = continuous && cursor.byteRemainder ? Buffer.concat([Buffer.from(cursor.byteRemainder, 'base64'), bytes]) : bytes;
+      const decoded = decoder.write(input);
+      let tail = input.length - 1;
+      while (tail >= Math.max(0, input.length - 4) && (input[tail] & 0xc0) === 0x80) tail--;
+      const lead = input[tail], expectedWidth = lead >= 0xf0 && lead <= 0xf4 ? 4 : lead >= 0xe0 && lead <= 0xef ? 3 : lead >= 0xc2 && lead <= 0xdf ? 2 : 1;
+      const remainderBytes = tail >= 0 && input.length - tail < expectedWidth ? input.subarray(tail).toString('base64') : '';
+      const content = (continuous ? cursor.partial || '' : '') + decoded;
+      const parts = content.split(/\r?\n/), partial = parts.pop() || '';
+      const fresh = cursor ? parts : [];
+      log.lastLines = [...(continuous ? log.lastLines || [] : []), ...parts].slice(-60).map((line) => line.slice(0, 65536));
+      log.cursor = { path: log.path, identity, offset: start + bytes.length, partial: partial.slice(-65536), byteRemainder: remainderBytes };
+      log.backlogBytes = Math.max(0, size - log.cursor.offset); log.lastPollAt = Date.now(); delete log.lastError;
+      const matchers = (log.patterns || []).map((p) => new RegExp(p));
       const hits = fresh.filter((line) => matchers.some((re) => re.test(line)));
       if (hits.length) {
         log.lastHits = [...(log.lastHits || []), ...hits.map((line) => ({ line: line.slice(0, 500), at: Date.now() }))].slice(-20);
-        this.event('log-hit', log.serverId, log.name + ' · pattern matched', hits.slice(0, 3).join(' | ').slice(0, 400), { logId: log.id });
       }
-      if (log.trackLoss) {
-        const LOSS = /loss[=:\s]+([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/i;
-        for (const line of fresh) {
-          const m = line.match(LOSS);
-          if (m) { const v = Number(m[1]); if (Number.isFinite(v)) { log.lossPoints = [...(log.lossPoints || []), v].slice(-120); break; } }
-        }
+      if (log.trackLoss) for (const line of fresh) {
+        const match = (name) => { const m = line.match(new RegExp('(?:^|[\\s,;])' + name + '[=:\\s]+([0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)', 'i')); return m && Number.isFinite(+m[1]) ? +m[1] : null; };
+        const loss = match('loss'), step = match('step'), epoch = match('epoch');
+        if (loss !== null) log.lossPoints = [...(log.lossPoints || []), loss].slice(-120);
+        if (loss !== null || step !== null || epoch !== null) log.progressPoints = [...(log.progressPoints || []), { at: Date.now(), loss, step, epoch }].slice(-120);
       }
-      this.persist();
+      const item = hits.length ? { id: crypto.randomUUID(), type: 'log-hit', serverId: log.serverId, title: log.name + ' · pattern matched', body: hits.slice(0, 3).join(' | ').slice(0, 400), at: Date.now(), logId: log.id } : null;
+      const previousLogs = this.data.logs, previousEvents = this.data.events;
+      this.data.logs = previousLogs.map((entry) => entry === original ? log : entry);
+      if (item) this.data.events = [item, ...previousEvents].slice(0, 1000);
+      try { this.persist(); }
+      catch (error) { this.data.logs = previousLogs; this.data.events = previousEvents; throw error; }
+      // Publish only after the cursor and its event are committed together.
+      // Delivery failures cannot roll back a cursor that is already on disk.
+      if (item) {
+        try { this.onEvent(item); } catch (error) { log.lastNotificationError = String(error); }
+        void Promise.resolve().then(() => this.notify(item.title, item.body)).catch((error) => {
+          log.lastNotificationError = String(error);
+          try { this.onEvent({ type: 'notification-error', error: String(error), at: Date.now() }); } catch { /* The persisted log-hit remains available in the event list. */ }
+        });
+      }
+      return clone(log);
+    } catch (error) {
+      if (this.data.logs.includes(original)) {
+        original.lastError = String(error); original.lastErrorAt = Date.now();
+        try { this.persist(); } catch { /* Keep the old cursor and the visible in-memory error for retry. */ }
+      }
+      throw error;
     }
-    return clone(log);
   }
 
   async tickLogs() {
@@ -426,7 +498,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       const lock = 'log:' + log.id;
       if (this.running.has(lock)) continue;
       this.running.add(lock);
-      try { await this.pollLog(log.id); } catch { /* 服务器不可达：下轮重试 */ }
+      try { await this.pollLog(log.id); } catch { /* pollLog persists the error for the next UI refresh. */ }
       finally { this.running.delete(lock); }
     }
   }
@@ -450,6 +522,25 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     this.data.env = [...(this.data.env || []).filter((e) => e.serverId !== sid), entry];
     this.persist();
     return clone(entry);
+  }
+
+  async gpuDiagnostics(sid) {
+    this.server(sid);
+    const fields = ['pstate', 'ecc.mode.current', 'ecc.errors.uncorrected.volatile.total', 'pcie.link.gen.current', 'pcie.link.width.current', 'mig.mode.current', 'clocks_throttle_reasons.active', 'clocks.current.sm', 'clocks.max.sm'];
+    const command = fields.map((field, index) => `printf '__SC_DIAG_${index}__\\n'; nvidia-smi --query-gpu=index,uuid,${field} --format=csv,noheader,nounits 2>/dev/null || printf '__UNSUPPORTED__\\n'`).join('; ') + "; printf '__SC_DIAG_LAYOUT__\\n'; nvidia-smi -L 2>/dev/null || true; printf '__SC_DIAG_NVLINK__\\n'; nvidia-smi nvlink --status 2>/dev/null || true";
+    const output = await this.exec(sid, command, 30000), devices = new Map();
+    for (const [index, field] of fields.entries()) {
+      const block = (output.split(`__SC_DIAG_${index}__\n`)[1] || '').split(/__SC_DIAG_/)[0];
+      for (const line of block.split(/\r?\n/)) {
+        const [gpuIndex, uuid, ...rest] = line.split(',').map((value) => value.trim());
+        if (!/^\d+$/.test(gpuIndex) || !uuid || !rest.length) continue;
+        if (!devices.has(uuid)) devices.set(uuid, { index: Number(gpuIndex), uuid, metrics: {} });
+        const value = rest.join(',').trim(), supported = value !== '' && !/n\/a|not.supported|unsupported/i.test(value);
+        devices.get(uuid).metrics[field] = { value: supported ? value : null, supported };
+      }
+    }
+    for (const device of devices.values()) for (const field of fields) device.metrics[field] ||= { value: null, supported: false };
+    return { at: Date.now(), available: devices.size > 0, devices: [...devices.values()], layout: (output.split('__SC_DIAG_LAYOUT__\n')[1] || '').split('__SC_DIAG_NVLINK__')[0].trim().slice(0, 65536), nvlink: (output.split('__SC_DIAG_NVLINK__\n')[1] || '').trim().slice(0, 65536) };
   }
 
   // ===== 按用户 GPU·时长统计（来自历史聚合器的 usage_minutes） =====

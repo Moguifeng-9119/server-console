@@ -165,3 +165,23 @@ describe('usage_minutes accounting', () => {
     expect(after.alice).toBeCloseTo(0.5, 5);
   });
 });
+
+describe('history observation integrity', () => {
+  it('does not credit a gap or a changed occupancy, and expires usage after30 days', () => {
+    const { db } = fixture(), at = Date.now() - 20000;
+    const snap = (time, user = 'alice') => ({ id: 'host', collectedAt: time, gpus: [{ uuid: 'u', procs: [{ user }] }] });
+    db.ingestUsage(snap(at), at); db.ingestUsage(snap(at + 2000), at + 2000); db.gap('host', at + 3000); db.ingestUsage(snap(at + 5000), at + 5000);
+    db.ingestUsage(snap(at + 7000, 'bob'), at + 7000);
+    expect(db.usageByUserDays('host', 30)[0].totalMinutes).toBeCloseTo(2 / 60);
+    db.db.prepare('INSERT INTO usage_minutes VALUES(?,?,?,?)').run('2000-01-01', 'host', 'old', 999); db.cleanup();
+    expect(db.db.prepare("SELECT COUNT(*) n FROM usage_minutes WHERE user='old'").get().n).toBe(0);
+  });
+  it('stores revised second buckets idempotently without losing subsecond peaks or coverage', () => {
+    const { db } = fixture(), at = Math.floor((Date.now()-10000)/1000)*1000;
+    const bucket = { server: 'host', device: 'gpu:u', metric: 'util', label: 'GPU0', bucket_at: at, integral: 50000, coverage_ms: 1000, sample_count: 10, sum: 500, min: 10, max: 95, last_value: 12, last_at: at+999, missing: 0, revision: 10 };
+    db.appendBuckets([bucket, bucket]); db.appendBuckets([{...bucket, integral: 60000, sum: 600, max: 99, revision: 11}]); db.appendBuckets([bucket]);
+    const row = db.db.prepare('SELECT * FROM minutes').get(); expect(row.coverage).toBe(1000); expect(row.weighted).toBe(60000); expect(row.sum).toBe(600);
+    const result = db.query({serverId: 'host', device: 'gpu:u', metric: 'util', rangeMs: 1800000, end: at+1000});
+    const point = result.points.find((p) => p.max === 99); expect(point.coveredMs).toBe(1000); expect(point.value).toBe(60);
+  });
+});

@@ -33,6 +33,8 @@ async function main() {
     assert.equal(await page.locator('.viewer-edit').inputValue(), 'unsaved-draft'); pass('dirty draft blocks keyboard and direct navigation');
     await page.locator('.viewer-dlg').getByRole('button', { name: 'Close', exact: true }).click(); await page.keyboard.press('Escape'); assert.equal(await page.locator('.viewer-dlg').count(), 1); pass('dirty close and Escape retain draft');
     page.once('dialog', (d) => d.dismiss()); await page.getByRole('button', { name: 'Head', exact: true }).click(); assert.equal(await page.locator('.viewer-edit').inputValue(), 'unsaved-draft'); pass('declining reload preserves text');
+    await page.getByRole('button', { name: 'Review changes', exact: true }).click();
+    assert((await page.locator('.viewer-dlg pre').innerText()).includes('+ unsaved-draft'));
     await page.getByRole('button', { name: 'Save to server', exact: true }).click(); assert(await page.locator('.viewer-edit').evaluate((el) => el.readOnly)); assert(await page.getByRole('button', { name: 'Head', exact: true }).isDisabled());
     await page.keyboard.press('Control+k'); assert.equal(await page.locator('.pal-item').count(), 0); await page.locator('.nav-server').nth(1).evaluate((el) => el.click()); assert.equal(await page.locator('.viewer-dlg').count(), 1); pass('save locks editing, reload and navigation');
     await page.evaluate(() => window.__fixture.finishWrite()); await page.waitForFunction(() => !document.querySelector('[data-unsaved=true]')); assert.equal(await page.evaluate(() => window.__fixture.lastWrite[2]), 'unsaved-draft');

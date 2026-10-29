@@ -75,7 +75,7 @@ class HistoryAggregator {
       // A partial stream row must not refresh the cached observations of other
       // cards. Advance the fleet mean only after every device advances.
       const fleetAt = cards.length ? Math.min(...cards.map((g) => g.observedAt || at)) : at;
-      add('all', 'util', 'All GPUs', utils.length ? utils.reduce((a, b) => a + b, 0) / utils.length : null, fleetAt);
+      add('all', 'util', 'All GPUs', utils.length && utils.length === cards.length ? utils.reduce((a, b) => a + b, 0) / utils.length : null, fleetAt);
       const live = new Set();
       for (const g of cards) {
         const device = 'gpu:' + (g.uuid || g.index), label = 'GPU ' + g.index + ' · ' + g.name;

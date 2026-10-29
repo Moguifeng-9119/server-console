@@ -5,7 +5,7 @@ import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
 import { formatBytes } from '../format';
 
-const EDIT_MAX = 1024 * 1024; // 超过 1MB 的文件只读
+const EDIT_MAX = 512 * 1024; // 超过 1MB 的文件只读
 
 // 远程文本查看/编辑：默认读开头，大文件可切换“最后 500 行”；小文件可编辑保存回传
 export function TextViewer({
@@ -25,6 +25,8 @@ export function TextViewer({
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [saved, setSaved] = useState('');
+  const [contentHash, setContentHash] = useState<string>();
+  const [truncated, setTruncated] = useState(false), [reviewing, setReviewing] = useState(false);
   const [tail, setTail] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -40,7 +42,7 @@ export function TextViewer({
     return () => window.removeEventListener('sc:blocked-navigation', blocked);
   }, [t]);
 
-  const editable = !tail && (size ?? 0) <= EDIT_MAX;
+  const editable = !tail && !truncated && (size ?? 0) <= EDIT_MAX;
 
   const load = (readTail: boolean) => {
     if (!api) return;
@@ -53,7 +55,7 @@ export function TextViewer({
       setLoading(false);
       if (r.ok && r.data) {
         setText(r.data.text);
-        setSaved(r.data.text);
+        setSaved(r.data.text); setContentHash(r.data.contentHash); setTruncated(r.data.truncated); setReviewing(false);
       } else setErr(r.error || t('textViewer.readFail'));
     });
   };
@@ -69,11 +71,11 @@ export function TextViewer({
     if (!api) return;
     const request = revision.current;
     setSaving(true);
-    const r = await api.sftpWriteText(serverId, rp, text);
+    const r = await api.sftpWriteText(serverId, rp, text, contentHash);
     if (request !== revision.current) return;
     setSaving(false);
     if (r.ok) {
-      setSaved(text);
+      setSaved(text); setReviewing(false); if (r.data && typeof r.data === 'object') setContentHash(r.data.contentHash);
       setDirty(false);
       pushToast({ level: 'info', title: t('textViewer.savedToast'), detail: rp });
     } else {
@@ -110,7 +112,7 @@ export function TextViewer({
               value={text}
               readOnly={saving}
               onChange={(e) => {
-                setText(e.target.value);
+                setText(e.target.value); setReviewing(false);
                 setDirty(e.target.value !== saved);
               }}
               spellCheck={false}
@@ -119,11 +121,12 @@ export function TextViewer({
             <pre className="mono">{text}</pre>
           )}
         </div>
+        {reviewing && <div className="body" style={{ maxHeight: 220, overflow: 'auto' }}><strong>{t('features.reviewChanges', { defaultValue: 'Review changes' })}</strong><pre className="mono">{lineChanges(saved, text)}</pre><p className="note">{t('features.conflictCheck', { defaultValue: 'The remote content fingerprint will be checked before replacement.' })}</p></div>}
         {err && dirty && <div role="alert" className="body" style={{ color: 'var(--warn)' }}>{err}</div>}
         <div className="foot">
           {editable && (
-            <button className="btn primary" disabled={!dirty || saving} onClick={save}>
-              {saving ? t('textViewer.saving') : dirty ? t('textViewer.saveToServer') : t('textViewer.saved')}
+            <button className="btn primary" disabled={!dirty || saving} onClick={() => { if (!reviewing) setReviewing(true); else void save(); }}>
+              {saving ? t('textViewer.saving') : dirty && !reviewing ? t('features.reviewChanges', { defaultValue: 'Review changes' }) : dirty ? t('textViewer.saveToServer') : t('textViewer.saved')}
             </button>
           )}
           <button className="btn" onClick={() => navigator.clipboard?.writeText(text)}>
@@ -136,4 +139,11 @@ export function TextViewer({
       </div>
     </div>
   );
+}
+
+function lineChanges(before: string, after: string) {
+  const a = before.split('\n'), b = after.split('\n'); let start = 0, tail = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  while (tail < a.length - start && tail < b.length - start && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+  return [...a.slice(start, a.length - tail).slice(0, 150).map((line) => '- ' + line), ...b.slice(start, b.length - tail).slice(0, 150).map((line) => '+ ' + line)].join('\n');
 }

@@ -43,7 +43,7 @@ export function GpuGauge({
     <button
       type="button"
       className={`resource-gpu ${isMatch ? 'matches' : ''}`}
-      data-free-gib={isAvailable && freeGiBVal != null ? freeGiBVal : undefined}
+      data-free-gib={isAvailable && freeGiBVal != null && Number.isFinite(freeGiBVal) ? freeGiBVal : undefined}
       onClick={onClick}
       disabled={!isAvailable}
       title={ownerText}
@@ -71,7 +71,7 @@ export function GpuGauge({
         {isAvailable && memoryKnown ? `${memUsedGiB} / ${memTotalGiB}` : '—'} GiB
       </span>
       <span className="gpu-ring-temp">
-        {t('monitor.temp')} {isAvailable && gpu.temp != null ? `${gpu.temp}°C` : '—'}
+        {t('monitor.temp')} {isAvailable && !gpu.unavailableMetrics?.includes('temp') && gpu.temp != null ? `${gpu.temp}°C` : '—'}
       </span>
       <span className="resource-owner">
         {isAvailable ? ownerText : '—'}

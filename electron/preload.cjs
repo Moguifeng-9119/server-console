@@ -34,8 +34,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // 采集与进程操作
   setInterval: (ms) => ipcRenderer.invoke('ssh:setInterval', ms),
+  setMonitoringHidden: (hidden) => ipcRenderer.invoke('ssh:visibility', hidden),
   setFocusedServer: (id) => ipcRenderer.invoke('ssh:set-focused', id),
-  kill: (id, pid, signal) => ipcRenderer.invoke('ssh:kill', { id, pid, signal }),
+  kill: (id, pid, signal, expectedStartTicks) => ipcRenderer.invoke('ssh:kill', { id, pid, signal, expectedStartTicks }),
   restartService: (id, service) => ipcRenderer.invoke('ssh:restartService', { id, service }),
   exec: (id, cmd) => ipcRenderer.invoke('ssh:exec', { id, cmd }),
   // 交互式认证（2FA/MFA）：主进程广播提示问题，渲染层弹框作答回传
@@ -125,8 +126,10 @@ contextBridge.exposeInMainWorld('api', {
   },
   onSnapshot: (cb) => {
     const h = (_e, data) => cb(data);
-    ipcRenderer.on('ssh:snapshot', h);
-    return () => ipcRenderer.removeListener('ssh:snapshot', h);
+    const receiver = new FrameReceiver({ fetchCurrent: (id) => ipcRenderer.invoke('ssh:snapshot-current', id), emit: cb });
+    const onFrame = (_event, frame) => receiver.receive(frame);
+    ipcRenderer.on('ssh:frame', onFrame); ipcRenderer.on('ssh:snapshot', h);
+    return () => { ipcRenderer.removeListener('ssh:snapshot', h); ipcRenderer.removeListener('ssh:frame', onFrame); };
   },
   onStatus: (cb) => {
     const h = (_e, data) => cb(data);
@@ -185,7 +188,7 @@ contextBridge.exposeInMainWorld('api', {
   sftpDelete: (id, p) => ipcRenderer.invoke('sftp:delete', { id, path: p }),
   sftpStat: (id, p) => ipcRenderer.invoke('sftp:stat', { id, path: p }),
   sftpReadText: (id, p, tail) => ipcRenderer.invoke('sftp:readText', { id, path: p, tail }),
-  sftpWriteText: (id, p, text) => ipcRenderer.invoke('sftp:writeText', { id, path: p, text }),
+  sftpWriteText: (id, p, text, expectedHash) => ipcRenderer.invoke('sftp:writeText', { id, path: p, text, expectedHash }),
   sftpReadBinary: (id, p) => ipcRenderer.invoke('sftp:readBinary', { id, path: p }),
   sftpSearch: (id, base, keyword) => ipcRenderer.invoke('sftp:search', { id, base, keyword }),
   sftpArchive: (id, cwd, names, archiveName) =>
@@ -235,90 +238,46 @@ contextBridge.exposeInMainWorld('api', {
   },
 });
 
-// ===== 监控帧接收器（沙箱安全）：乱序/丢帧时请求一次全量重同步，防回退到旧 epoch =====
-// 契约（对应 tests/monitoring-frame-receiver.test.cjs）：
-// - fetchCurrent 在触发时同步调用（测试依赖其同步副作用）
-// - resync 成功后不清空队列，而是补放与基准连续的后缀
-// - 已离开的旧 epoch 帧（keyframe/delta）一律忽略；无基准的 delta 入队等 resync
+// Sandboxed preload: only electron is required. Each server owns its resync generation.
 class FrameReceiver {
-  constructor({ fetchCurrent, emit }) {
-    this.fetchCurrent = fetchCurrent;
-    this.emit = emit;
-    this.states = new Map();
-  }
-
+  constructor({ fetchCurrent, emit }) { this.fetchCurrent = fetchCurrent; this.emit = emit; this.states = new Map(); }
   receive(frame) {
+    if (!frame || frame.version !== 1 || !Number.isSafeInteger(frame.seq) || frame.seq < 1 || !frame.serverId || !frame.epoch) return;
     let entry = this.states.get(frame.serverId);
-    if (!entry) {
-      entry = { epoch: '', seq: 0, state: null, queue: [], resyncing: false, pastEpochs: new Set() };
-      this.states.set(frame.serverId, entry);
-    }
-    if (frame.epoch !== entry.epoch) {
-      const stale = entry.pastEpochs.has(frame.epoch);
-      if (frame.kind === 'keyframe') {
-        if (entry.state != null && stale) return; // 旧 epoch 的迟到 keyframe：忽略
-        if (entry.epoch) entry.pastEpochs.add(entry.epoch);
-        entry.epoch = frame.epoch;
-        entry.seq = frame.seq;
-        entry.state = frame.payload;
-        entry.queue = [];
-        this.emit(entry.state);
-        return;
-      }
-      // delta：无基准时入队等 resync；已离开的旧 epoch 忽略
-      if (entry.state != null && stale) return;
-      entry.queue.push(frame);
-      if (entry.queue.length > 200) entry.queue.shift();
-      this._resync(entry);
-      return;
-    }
+    if (!entry) { entry = { id: frame.serverId, epoch: '', seq: 0, state: null, queue: [], resyncing: false, pastEpochs: new Set(), generation: 0 }; this.states.set(frame.serverId, entry); }
+    if (entry.pastEpochs.has(frame.epoch)) return;
     if (frame.kind === 'keyframe') {
-      if (frame.seq >= entry.seq || entry.state == null) {
-        entry.seq = frame.seq;
-        entry.state = frame.payload;
-        this.emit(entry.state);
-      }
-      return;
+      if (entry.epoch === frame.epoch && frame.seq < entry.seq) return;
+      if (entry.epoch && entry.epoch !== frame.epoch) { entry.pastEpochs.add(entry.epoch); if (entry.pastEpochs.size > 32) entry.pastEpochs.delete(entry.pastEpochs.values().next().value); }
+      entry.generation++; entry.resyncing = false; entry.epoch = frame.epoch; entry.seq = frame.seq; entry.state = frame.payload;
+      entry.queue = entry.queue.filter((item) => item.epoch === entry.epoch && item.seq > entry.seq);
+      this.emit(entry.state); this._drain(entry); return;
     }
-    if (frame.baseSeq === entry.seq) {
-      entry.state = entry.state == null ? frame.payload : Object.assign({}, entry.state, frame.payload);
-      entry.seq = frame.seq;
-      this.emit(entry.state);
-      this._drain(entry);
-      return;
+    if (frame.kind !== 'delta') return;
+    if (frame.epoch === entry.epoch && frame.seq <= entry.seq) return;
+    if (frame.epoch === entry.epoch && entry.state && frame.baseSeq === entry.seq) {
+      entry.state = Object.assign({}, entry.state, frame.payload); entry.seq = frame.seq; this.emit(entry.state); this._drain(entry); return;
     }
-    entry.queue.push(frame);
-    if (entry.queue.length > 200) entry.queue.shift();
-    this._resync(entry);
+    if (!entry.queue.some((item) => item.epoch === frame.epoch && item.seq === frame.seq)) entry.queue.push(frame);
+    if (entry.queue.length > 64) entry.queue.shift(); this._resync(entry, frame.epoch);
   }
-
   _drain(entry) {
     for (;;) {
-      const next = entry.queue.find((q) => q.baseSeq === entry.seq);
-      if (!next) break;
-      entry.queue.splice(entry.queue.indexOf(next), 1);
-      entry.state = Object.assign({}, entry.state, next.payload);
-      entry.seq = next.seq;
-      this.emit(entry.state);
+      entry.queue = entry.queue.filter((item) => !entry.pastEpochs.has(item.epoch) && (item.epoch !== entry.epoch || item.seq > entry.seq));
+      const index = entry.queue.findIndex((item) => item.epoch === entry.epoch && item.baseSeq === entry.seq);
+      if (index < 0) break;
+      const [next] = entry.queue.splice(index, 1); entry.state = Object.assign({}, entry.state, next.payload); entry.seq = next.seq; this.emit(entry.state);
     }
   }
-
-  _resync(entry) {
+  _resync(entry, requestedEpoch) {
     if (entry.resyncing) return;
-    entry.resyncing = true;
-    Promise.resolve(this.fetchCurrent())
-      .then((current) => {
-        entry.resyncing = false;
-        if (!current || current.snapshot == null) return; // 失败/空不重试，等下一个外部帧
-        if (current.epoch !== entry.epoch) {
-          if (entry.state != null) return; // 迟到的旧 resync：不回退
-          entry.epoch = current.epoch;
-        }
-        entry.state = current.snapshot;
-        entry.seq = current.seq;
-        this.emit(entry.state);
-        this._drain(entry); // resync 后补放连续后缀（不整体清空）
-      })
-      .catch(() => { entry.resyncing = false; });
+    entry.resyncing = true; const generation = ++entry.generation;
+    let call; try { call = this.fetchCurrent(entry.id); } catch { entry.resyncing = false; return; }
+    Promise.resolve(call).then((current) => {
+      if (generation !== entry.generation || !current?.snapshot || current.epoch !== requestedEpoch || entry.pastEpochs.has(current.epoch)) return;
+      if (entry.epoch === current.epoch && current.seq < entry.seq) return;
+      if (entry.epoch && entry.epoch !== current.epoch) entry.pastEpochs.add(entry.epoch);
+      entry.epoch = current.epoch; entry.state = current.snapshot; entry.seq = current.seq; this.emit(entry.state); this._drain(entry);
+    }).catch(() => {}).finally(() => { if (generation === entry.generation) entry.resyncing = false; });
   }
 }

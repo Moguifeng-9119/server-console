@@ -47,7 +47,19 @@ class HistoryDatabase {
     this.usageByUser = this.db.prepare(`SELECT user, SUM(gpu_minutes) AS total,
       SUM(CASE WHEN server=? THEN gpu_minutes ELSE 0 END) AS thisServer
       FROM usage_minutes WHERE day >= date('now', ?) GROUP BY user ORDER BY total DESC`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS raw_buckets (
+      channel INTEGER NOT NULL, bucket_at INTEGER NOT NULL, integral REAL NOT NULL DEFAULT 0,
+      coverage_ms INTEGER NOT NULL DEFAULT 0, sample_count INTEGER NOT NULL DEFAULT 0,
+      min REAL, max REAL, last_value REAL, last_at INTEGER, missing INTEGER NOT NULL DEFAULT 0,
+      sum REAL NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY(channel,bucket_at)) WITHOUT ROWID;
+      CREATE INDEX IF NOT EXISTS raw_buckets_expiry ON raw_buckets(bucket_at);`);
+    const columns = this.db.prepare('PRAGMA table_info(raw_buckets)').all().map((row) => String(row.name));
+    if (!columns.includes('sum')) { this.db.exec('ALTER TABLE raw_buckets ADD COLUMN sum REAL NOT NULL DEFAULT 0'); this.db.exec('UPDATE raw_buckets SET sum=COALESCE(last_value,0)*sample_count, missing=MAX(missing,1)'); }
+    if (!columns.includes('revision')) this.db.exec('ALTER TABLE raw_buckets ADD COLUMN revision INTEGER NOT NULL DEFAULT 0');
     this.migrateRawBuckets();
+    this.usageLastAt = new Map();
+    this.usageOccupancy = new Map();
   }
 
   // 旧版 raw_buckets 表迁移：把 last_value/last_at 作为稀疏样本导入 raw。
@@ -65,7 +77,7 @@ class HistoryDatabase {
       const insert = this.db.prepare('INSERT OR REPLACE INTO raw(channel,at,value) VALUES(?,?,?)');
       for (const r of rows) {
         if (Number(r.missing)) continue;
-        const value = finite(Number(r.last_value));
+        const value = finite(r.last_value);
         if (value == null) continue; // 无真实读数的零覆盖桶不导入（不伪造 0）
         const at = Number(r.last_at ?? r.bucket_at);
         if (!Number.isSafeInteger(at) || at <= 0) continue;
@@ -114,21 +126,49 @@ class HistoryDatabase {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
+  appendBuckets(buckets, now = Date.now()) {
+    const prior = this.db.prepare('SELECT * FROM raw_buckets WHERE channel=? AND bucket_at=?');
+    const upsert = this.db.prepare(`INSERT INTO raw_buckets(channel,bucket_at,integral,coverage_ms,sample_count,min,max,last_value,last_at,missing,sum,revision)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel,bucket_at) DO UPDATE SET integral=excluded.integral, coverage_ms=excluded.coverage_ms,
+      sample_count=excluded.sample_count,min=excluded.min,max=excluded.max,last_value=excluded.last_value,last_at=excluded.last_at,missing=excluded.missing,sum=excluded.sum,revision=excluded.revision`);
+    this.db.exec('BEGIN');
+    try {
+      for (const b of buckets) {
+        const at = b.bucket_at;
+        if (!Number.isSafeInteger(at) || at % 1000 || at < now - RAW_RETENTION || at > now + MINUTE) continue;
+        if (![b.integral, b.coverage_ms, b.sample_count, b.sum, b.revision, b.missing].every((value) => typeof value === 'number' && Number.isFinite(value))) throw new Error('Invalid history bucket');
+        if (b.coverage_ms < 0 || b.coverage_ms > 1000 || b.sample_count < 0 || b.missing < 0 || b.revision < 1) throw new Error('Invalid history bucket coverage');
+        this.create.run(b.server, b.device, b.metric, b.label);
+        const channel = this.channel.get(b.server, b.device, b.metric), channelId = Number(channel.id);
+        const old = prior.get(channelId, at);
+        if (old && Number(old.revision) >= b.revision) continue;
+        upsert.run(channelId, at, b.integral, b.coverage_ms, b.sample_count, finite(b.min), finite(b.max), finite(b.last_value), b.last_at, b.missing, b.sum, b.revision);
+        this.minute.run(channelId, Math.floor(at / MINUTE) * MINUTE,
+          b.sum - Number(old?.sum || 0), b.sample_count - Number(old?.sample_count || 0), finite(b.min), finite(b.max),
+          b.integral - Number(old?.integral || 0), b.coverage_ms - Number(old?.coverage_ms || 0), b.missing - Number(old?.missing || 0));
+        if (Number.isSafeInteger(b.last_at) && (channel.last_at == null || b.last_at >= Number(channel.last_at))) this.last.run(b.last_at, finite(b.last_value), b.label, channelId);
+      }
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+
   snapshot(s) {
     const at = s.collectedAt || Date.now();
+    if (s.status && s.status !== 'online') { this.gap(s.id, at); return; }
+    const available = (g, key) => !(g.unavailableMetrics || []).includes(key) && finite(g[key]) != null;
     const records = [];
     const add = (device, metric, label, value) => records.push({ server: s.id, device, metric, label, at, value: finite(value) });
-    add('all', 'util', 'All GPUs', s.gpus.length ? s.gpus.reduce((n, g) => n + g.util, 0) / s.gpus.length : null);
+    add('all', 'util', 'All GPUs', s.gpus.length && s.gpus.every((g) => available(g, 'util')) ? s.gpus.reduce((n, g) => n + g.util, 0) / s.gpus.length : null);
     add('system', 'cpu', 'System', s.cpuUsage);
     add('system', 'memory', 'System', s.memTotal ? s.memUsed / s.memTotal * 100 : null);
     for (const g of s.gpus) {
       const device = 'gpu:' + (g.uuid || g.index), label = `GPU ${g.index} · ${g.name}`;
-      add(device, 'util', label, g.util);
-      add(device, 'memory', label, g.memTotal ? g.memUsed / g.memTotal * 100 : null);
-      add(device, 'memoryUsed', label, g.memUsed);
-      add(device, 'memoryTotal', label, g.memTotal);
-      add(device, 'temp', label, g.temp);
-      add(device, 'power', label, g.power);
+      add(device, 'util', label, available(g, 'util') ? g.util : null);
+      add(device, 'memory', label, available(g, 'memTotal') && available(g, 'memUsed') && g.memTotal > 0 ? g.memUsed / g.memTotal * 100 : null);
+      add(device, 'memoryUsed', label, available(g, 'memUsed') ? g.memUsed : null);
+      add(device, 'memoryTotal', label, available(g, 'memTotal') ? g.memTotal : null);
+      add(device, 'temp', label, available(g, 'temp') ? g.temp : null);
+      add(device, 'power', label, available(g, 'power') ? g.power : null);
     }
     const live = new Set(s.gpus.map((g) => 'gpu:' + (g.uuid || g.index)));
     for (const c of this.db.prepare("SELECT device,metric,label FROM channels WHERE server=? AND device LIKE 'gpu:%'").all(s.id)) {
@@ -140,19 +180,28 @@ class HistoryDatabase {
 
   // 按用户 GPU·时长：每张有进程占用的 GPU，把与上次快照的间隔分钟数均摊给卡上去重的用户集合
   ingestUsage(s, at, previousAt = null) {
-    const prev = previousAt ?? this.usageLastAt?.get(s.id);
-    this.usageLastAt = this.usageLastAt || new Map();
+    if (s.status && s.status !== 'online') { this.usageLastAt.delete(s.id); this.usageOccupancy.delete(s.id); return; }
+    if (s.lastLane && !['legacy', 'processes'].includes(s.lastLane)) return;
+    const prev = previousAt ?? this.usageLastAt.get(s.id);
+    if (prev != null && at <= prev) return;
+    const prior = this.usageOccupancy.get(s.id);
+    const occupancy = new Map((s.gpus || []).map((g) => [g.uuid || String(g.index), [...new Set((g.procs || []).map((p) => p.user).filter(Boolean))].slice(0, 16)]));
     this.usageLastAt.set(s.id, at);
-    if (prev == null || at <= prev || at - prev > 10 * MINUTE) return; // 首次/断链过大跳过，防伪造时长
-    const gpuMinutes = (at - prev) / MINUTE;
-    const day = new Date(at).toISOString().slice(0, 10);
+    this.usageOccupancy.set(s.id, occupancy);
+    if (prev == null || !prior || at - prev > MINUTE) return;
     this.db.exec('BEGIN');
     try {
-      for (const g of s.gpus || []) {
-        const users = [...new Set((g.procs || []).map((p) => p.user).filter(Boolean))];
-        if (!users.length) continue;
-        const share = gpuMinutes / users.length;
-        for (const user of users.slice(0, 16)) this.usageMinute.run(day, s.id, user.slice(0, 64), share);
+      for (const [gpu, users] of occupancy) {
+        const before = prior.get(gpu);
+        // A changed occupancy has an unknown transition time; restart its baseline.
+        if (!users.length || !before || JSON.stringify([...users].sort()) !== JSON.stringify([...before].sort())) continue;
+        for (let start = prev; start < at;) {
+          const end = Math.min(at, Math.floor(start / DAY) * DAY + DAY);
+          const share = (end - start) / MINUTE / users.length;
+          const day = new Date(start).toISOString().slice(0, 10);
+          for (const user of users) this.usageMinute.run(day, s.id, String(user).slice(0, 64), share);
+          start = end;
+        }
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
@@ -164,6 +213,7 @@ class HistoryDatabase {
   }
 
   gap(server, at = Date.now()) {
+    this.usageLastAt.delete(server); this.usageOccupancy.delete(server);
     const channels = this.db.prepare('SELECT device,metric,label FROM channels WHERE server=?').all(server);
     this.append(channels.map((c) => ({ server, device: String(c.device), metric: String(c.metric), label: String(c.label), at, value: null })));
   }
@@ -172,9 +222,12 @@ class HistoryDatabase {
     this.db.exec('BEGIN');
     try {
       this.db.prepare('DELETE FROM raw WHERE at < ?').run(now - RAW_RETENTION);
+      this.db.prepare('DELETE FROM raw_buckets WHERE bucket_at < ?').run(now - RAW_RETENTION);
       // Expire entire minute buckets; no sample beyond the absolute maximum
       // is retained in the oldest partial bucket.
       this.db.prepare('DELETE FROM minutes WHERE at < ?').run(now - RETENTION);
+      // Daily accounting cannot split the oldest partial UTC day; expire it in full.
+      this.db.prepare('DELETE FROM usage_minutes WHERE day <= ?').run(new Date(now - RETENTION).toISOString().slice(0, 10));
       this.db.prepare('DELETE FROM channels WHERE last_at < ? AND id NOT IN (SELECT channel FROM minutes) AND id NOT IN (SELECT channel FROM raw)').run(now - RETENTION);
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
@@ -184,8 +237,7 @@ class HistoryDatabase {
 
   query({ serverId, device = 'all', metric = 'util', rangeMs, end = Date.now() }) {
     const now = Date.now(), rawCutoff = now - RAW_RETENTION;
-    const allowed = [1800000, 3600000, 43200000, DAY, 7 * DAY];
-    if (!allowed.includes(rangeMs) || !Number.isSafeInteger(end) || end > now + MINUTE) throw new Error('Invalid history range');
+    if ((!Number.isSafeInteger(rangeMs) || rangeMs < MINUTE || rangeMs > 7 * DAY) || !Number.isSafeInteger(end) || end > now + MINUTE) throw new Error('Invalid history range');
     const start = end - rangeMs;
     const rawWindow = rangeMs < DAY && start >= rawCutoff;
     const requestedStep = rangeMs <= 1800000 ? 5000 : rangeMs <= 3600000 ? 10000 : rangeMs <= 43200000 ? MINUTE : rangeMs <= DAY ? 120000 : 900000;
@@ -206,9 +258,21 @@ class HistoryDatabase {
     };
     if (c) {
       const collectRaw = (fromAt, toAt, includeEnd = true) => {
+        const seconds = this.db.prepare('SELECT * FROM raw_buckets WHERE channel=? AND bucket_at>=? AND bucket_at<=? ORDER BY bucket_at')
+          .all(Number(c.id), Math.floor(fromAt / 1000) * 1000, toAt);
+        const secondStarts = new Set(seconds.map((row) => Number(row.bucket_at)));
+        const overlapsSeconds = (start, end) => { for (let cursor = Math.floor(start / 1000) * 1000; cursor < end; cursor += 1000) if (secondStarts.has(cursor)) return true; return false; };
+        for (const row of seconds) {
+          const sourceAt = Number(row.bucket_at), from = Math.max(fromAt, sourceAt), to = Math.min(toAt, sourceAt + 1000);
+          if (to <= from) continue;
+          const b = get(from), fraction = Math.max(0, to - from) / 1000;
+          b.sum += Number(row.sum); b.count += Number(row.sample_count);
+          b.weighted += Number(row.integral) * fraction; b.coverage += Number(row.coverage_ms) * fraction;
+          b.missing ||= Number(row.missing) > 0; extrema(b, finite(row.min), finite(row.max));
+        }
         // Read the first successor too, so a trapezoid crossing the requested
         // boundary can be clipped rather than silently dropping its head.
-        const rows = this.db.prepare('SELECT at,value FROM raw WHERE channel=? AND at>=? AND at<=? ORDER BY at').all(Number(c.id), fromAt - MINUTE, toAt + MINUTE);
+        const rows = this.db.prepare('SELECT at,value FROM raw WHERE channel=? AND at>=? AND at<=? AND NOT EXISTS (SELECT 1 FROM raw_buckets b WHERE b.channel=raw.channel AND b.bucket_at=CAST(raw.at/1000 AS INTEGER)*1000) ORDER BY at').all(Number(c.id), fromAt - MINUTE, toAt + MINUTE);
         let previous = null;
         for (const row of rows) {
           const at = Number(row.at), value = finite(row.value);
@@ -216,7 +280,7 @@ class HistoryDatabase {
             const b = get(at); b.sum += value ?? 0; b.count += value == null ? 0 : 1;
             b.missing ||= value == null; extrema(b, value, value);
           }
-          if (previous && previous.value != null && value != null && at - previous.at <= MINUTE) {
+          if (previous && previous.value != null && value != null && at - previous.at <= MINUTE && !overlapsSeconds(previous.at, at)) {
             const duration = at - previous.at;
             for (let from = Math.max(fromAt, previous.at); from < Math.min(at, toAt);) {
               const b = get(from), to = Math.min(at, toAt, b.at + step);
@@ -259,7 +323,9 @@ class HistoryDatabase {
   legacyLoad() {
     const result = {};
     for (const c of this.db.prepare("SELECT id,server FROM channels WHERE device='all' AND metric='util'").all()) {
-      result[String(c.server)] = this.db.prepare('SELECT at,value FROM raw WHERE channel=? ORDER BY at DESC LIMIT 720').all(Number(c.id)).reverse().map((r) => ({ at: Number(r.at), value: finite(r.value) }));
+      result[String(c.server)] = this.db.prepare(`SELECT at,value FROM (SELECT at,value FROM raw WHERE channel=?
+        UNION ALL SELECT COALESCE(last_at,bucket_at) AS at,last_value AS value FROM raw_buckets WHERE channel=?) ORDER BY at DESC LIMIT 720`)
+        .all(Number(c.id), Number(c.id)).reverse().map((r) => ({ at: Number(r.at), value: finite(r.value) }));
     }
     return result;
   }

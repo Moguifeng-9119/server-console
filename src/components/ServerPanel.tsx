@@ -1,27 +1,30 @@
-import { memo, useEffect, useMemo, useState, useRef } from 'react';
+import { memo, useLayoutEffect, useEffect, useMemo, useState, useRef } from 'react';
 import { useStoreControls } from '../state';
 import { useTranslation } from 'react-i18next';
-import { freeGiB, gpuOwners, isFreshSample } from '../resources';
+import { freeGiB, gpuOwners, isFreshSample, gpuMetricAvailable } from '../resources';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { api } from '../api';
 import type { ProcessItem, Server } from '../types';
 import { ContextMenu } from './ContextMenu';
 import { HistoryPanel } from './HistoryPanel';
+import { useLiveServer } from '../telemetry/store';
 
 type SortKey = 'pid' | 'user' | 'cpu' | 'mem' | 'rssMb' | 'state' | 'command';
 
 function KpiStrip({ s }: { s: Server }) {
   const { colorOf } = useStoreControls();
   const { t } = useTranslation();
-  const avg = s.gpus.reduce((a, g) => a + g.util, 0) / (s.gpus.length || 1);
+  const knownUtil = s.gpus.filter((g) => gpuMetricAvailable(g, 'util'));
+  const knownMemory = s.gpus.filter((g) => gpuMetricAvailable(g, 'memUsed') && gpuMetricAvailable(g, 'memTotal'));
+  const avg = knownUtil.length ? knownUtil.reduce((a, g) => a + g.util, 0) / knownUtil.length : null;
   const vram =
-    (s.gpus.reduce((a, g) => a + g.memUsed, 0) / (s.gpus.reduce((a, g) => a + g.memTotal, 0) || 1)) * 100;
+    (knownMemory.reduce((a, g) => a + g.memUsed, 0) / (knownMemory.reduce((a, g) => a + g.memTotal, 0) || 1)) * 100;
   const zombies = s.processes.filter((p) => p.state === 'Z').length;
   const cells: Array<{ k: string; v: string; color?: string }> = [
     { k: t('kpi.processes'), v: String(s.processes.length) },
     { k: t('kpi.zombies'), v: String(zombies), color: zombies ? 'var(--crit)' : undefined },
-    { k: t('kpi.avgGpu'), v: `${Math.round(avg)}%`, color: colorOf(avg) },
-    { k: t('kpi.vram'), v: `${Math.round(vram)}%`, color: colorOf(vram) },
+    { k: t('kpi.avgGpu'), v: avg == null ? '—' : `${Math.round(avg)}%`, color: avg == null ? undefined : colorOf(avg) },
+    { k: t('kpi.vram'), v: knownMemory.length ? `${Math.round(vram)}%` : '—', color: knownMemory.length ? colorOf(vram) : undefined },
     { k: t('kpi.load'), v: s.loadAvg[0].toFixed(1) },
     { k: t('kpi.cpu', { cores: s.cpuCores }), v: s.cpuUsage == null ? 'N/A' : `${s.cpuUsage}%`, color: s.cpuUsage == null ? undefined : colorOf(s.cpuUsage) },
     { k: t('kpi.mem'), v: `${Math.round(s.memUsed)}/${Math.round(s.memTotal)}G`, color: colorOf((s.memUsed / s.memTotal) * 100) },
@@ -73,7 +76,9 @@ function GpuList({ s, onMenu, focusGpuIndex, actionable }: { s: Server; onMenu: 
       <p className="gpu-model-heading">{[...new Set(s.gpus.map((g) => g.name))].join(' / ')}</p>
       <div className={`gpu-list ${matrix ? 'matrix' : ''}`}>
       {s.gpus.map((g) => {
-        const memPct = (g.memUsed / g.memTotal) * 100;
+        const utilKnown = gpuMetricAvailable(g, 'util');
+        const memoryKnown = gpuMetricAvailable(g, 'memTotal') && gpuMetricAvailable(g, 'memUsed') && g.memTotal > 0;
+        const memPct = memoryKnown ? (g.memUsed / g.memTotal) * 100 : 0;
         return (
           <div className="gpu-card" key={g.index} data-gpu-index={g.index} data-focused={g.index === focusGpuIndex || undefined}>
             <div className="h">
@@ -83,25 +88,25 @@ function GpuList({ s, onMenu, focusGpuIndex, actionable }: { s: Server; onMenu: 
 
             <div className="metric-line">
               <span className="num" style={{ fontSize: 'calc(var(--fs-kpi) - 6px)', color: colorOf(g.util) }}>
-                {g.util}%
+                {utilKnown ? g.util + '%' : t('gpu.na')}
               </span>
               <span className="note">{t('gpu.util')}</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
-              <i style={{ width: `${g.util}%`, background: colorOf(g.util) }} />
+              <i style={{ width: `${utilKnown ? g.util + '%' : t('gpu.na')}`, background: colorOf(g.util) }} />
             </div>
 
             <div className="metric-line" style={{ marginTop: 10 }}>
               <span className="num" style={{ fontSize: 15, color: colorOf(memPct) }}>
-                {(g.memUsed / 1024).toFixed(1)} / {(g.memTotal / 1024).toFixed(0)} GiB
+                {memoryKnown ? `${(g.memUsed / 1024).toFixed(1)} / ${(g.memTotal / 1024).toFixed(0)} GiB` : t('gpu.na')}
               </span>
-              <span className="note">{t('gpu.vramPct', { v: memPct.toFixed(0) })}</span>
+              <span className="note">{memoryKnown ? t('gpu.vramPct', { v: memPct.toFixed(0) }) : t('gpu.na')}</span>
             </div>
             <div className="bar" style={{ marginTop: 6 }}>
               <i style={{ width: `${memPct}%`, background: colorOf(memPct) }} />
             </div>
 
-            <div className="gpu-free"><strong className="num">{freeGiB(g).toFixed(1)} GiB</strong><span>{t('workbench.freeMemory')}</span></div>
+            <div className="gpu-free"><strong className="num">{Number.isFinite(freeGiB(g)) ? freeGiB(g).toFixed(1) + ' GiB' : t('gpu.na')}</strong><span>{t('workbench.freeMemory')}</span></div>
             <div className="metrics">
               <div>
                 {t('gpu.temp')}<b style={g.temp == null ? undefined : { color: colorOf(g.temp) }}>{g.temp == null ? t('gpu.na') : `${g.temp}°C`}</b>
@@ -256,7 +261,7 @@ function ProcessTable({ s, onMenu, actionable }: { s: Server; onMenu: (pid: numb
 }
 
 export const ServerPanel = memo(function ServerPanel({
-  s,
+  s: base,
   onBack,
   tab,
   onTab,
@@ -270,20 +275,33 @@ export const ServerPanel = memo(function ServerPanel({
   sampleNow: number;
   focusGpuIndex?: number;
 }) {
+  const s = useLiveServer(base)!;
   const { kill, restartService, demo, refreshMs } = useStoreControls();
   const { t } = useTranslation();
-  const fresh = isFreshSample(s, demo, refreshMs, sampleNow);
-  const actionable = fresh && s.status === 'online';
+  const actionable = isFreshSample(s, demo, refreshMs, sampleNow, 'processes') && s.status === 'online';
   const hasSample = demo || !!s.collectedAt;
   useEffect(() => {
     if (tab === 'gpu' && hasSample && focusGpuIndex != null) document.querySelector(`[data-gpu-index="${focusGpuIndex}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [s.id, tab, hasSample, focusGpuIndex]);
   const [menu, setMenu] = useState<{ pid: number; x: number; y: number } | null>(null);
   const [confirm, setConfirm] = useState<{ pid: number; signal: 'TERM' | 'KILL' } | null>(null);
+  const [identity, setIdentity] = useState(''), [identityError, setIdentityError] = useState('');
+  const confirmPid = confirm?.pid;
+  useEffect(() => {
+    let disposed = false; setIdentity(''); setIdentityError('');
+    if (confirmPid == null) return;
+    if (demo) { setIdentity('demo'); return; }
+    void api?.workbenchRequest<{ startTicks?: string }>({ operation: 'process', serverId: s.id, pid: confirmPid }).then((result) => {
+      if (disposed) return; if (!result.ok || !result.data?.startTicks || !/^\d+$/.test(String(result.data.startTicks))) throw new Error(result.error || 'Process identity unavailable'); setIdentity(String(result.data.startTicks));
+    }).catch((error) => { if (!disposed) setIdentityError(String(error)); });
+    return () => { disposed = true; };
+  }, [confirmPid, s.id, demo]);
   const [restartAsk, setRestartAsk] = useState(false);
   const [svcName, setSvcName] = useState('docker');
   const [snippets, setSnippets] = useState<Array<{ id: string; name: string; cmd: string }>>([]);
   const [snipOut, setSnipOut] = useState<{ name: string; output: string; running: boolean } | null>(null);
+  const commandGeneration = useRef(0);
+  useLayoutEffect(() => { commandGeneration.current += 1; setMenu(null); setConfirm(null); setRestartAsk(false); setSnipOut(null); }, [s.id]);
   useEffect(() => {
     if (!actionable) { setMenu(null); setConfirm(null); setRestartAsk(false); }
   }, [actionable]);
@@ -295,13 +313,15 @@ export const ServerPanel = memo(function ServerPanel({
   const runSnippet = async (sn: { id: string; name: string; cmd: string }) => {
     if (!api) return;
     setSnipOut({ name: sn.name, output: t('server.running'), running: true });
-    const r = await api.exec(s.id, sn.cmd);
-    if (r.ok && r.data) {
-      const out = (r.data.stdout + (r.data.stderr ? `\n${r.data.stderr}` : '')).trim() || t('server.noOutput');
-      setSnipOut({ name: sn.name, output: out, running: false });
-    } else {
-      setSnipOut({ name: sn.name, output: r.error || t('server.execFail'), running: false });
-    }
+    const generation = ++commandGeneration.current;
+    try {
+      const r = await api.exec(s.id, sn.cmd);
+      if (generation !== commandGeneration.current) return;
+      if (r.ok && r.data) {
+        const out = (r.data.stdout + (r.data.stderr ? `\n${r.data.stderr}` : '')).trim() || t('server.noOutput');
+        setSnipOut({ name: sn.name, output: out, running: false });
+      } else setSnipOut({ name: sn.name, output: r.error || t('server.execFail'), running: false });
+    } catch (error) { if (generation === commandGeneration.current) setSnipOut({ name: sn.name, output: String(error), running: false }); }
   };
 
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -404,6 +424,7 @@ export const ServerPanel = memo(function ServerPanel({
           >
             {t('ctx.forceKill')}
           </button>
+          <button onClick={() => { window.dispatchEvent(new CustomEvent('sc:workbench', { detail: { serverId: s.id, pid: menu.pid } })); setMenu(null); }}>{t('features.processDetails', { defaultValue: 'Process details' })}</button>
           <div className="sep" />
           <button
             onClick={() => {
@@ -450,14 +471,17 @@ export const ServerPanel = memo(function ServerPanel({
               <br />
               <span style={{ color: 'var(--warn)' }}>{t('ctx.irreversible')}</span>
             </div>
+            {!identity && <p className="note" role="status">{identityError || t('features.verifyingProcess', { defaultValue: 'Verifying process identity…' })}</p>}
             <div className="foot">
               <button className="btn" onClick={() => setConfirm(null)}>
                 {t('ctx.cancel')}
               </button>
               <button
                 className="btn danger"
+                disabled={!identity || !actionable}
                 onClick={() => {
-                  kill(s.id, confirm.pid, confirm.signal);
+                  if (!identity) return;
+                  kill(s.id, confirm.pid, confirm.signal, demo ? undefined : identity);
                   setConfirm(null);
                 }}
               >

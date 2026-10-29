@@ -12,7 +12,11 @@ const hostkeys = require('./hostkeys.cjs');
 const { ForwardingManager } = require('./forwardings.cjs');
 const { TransferManager } = require('./transfer.cjs');
 const { HistoryStore } = require('./history-store.cjs');
-const { PollScheduler } = require('./poll-scheduler.cjs');
+const { TieredScheduler } = require('./monitoring/scheduler.cjs');
+const { HistoryAggregator } = require('./monitoring/history-aggregator.cjs');
+const { HistoryWriter } = require('./history-writer.cjs');
+const { TextEditor, digest } = require('./text-editor.cjs');
+const { createFrame, computeDelta } = require('./monitoring/protocol.cjs');
 
 const pool = new Pool();
 let servers = [];
@@ -21,18 +25,20 @@ let historyStore = null;
 let transfers = null;
 let forwardings = null;
 let workbench = null;
+let productivity = null;
+let devsync = null;
+let syncPlanner = null;
+let historyWriter = null;
+const aggregator = new HistoryAggregator();
+const published = new Map(), sequences = new Map(), resources = new Map(), stagingAt = new Map();
+const epoch = nodeCrypto.randomUUID();
+let historyTimer = null;
+const backgroundTimers = [];
 let configWatchPath = '';
 let knownAliases = null; // 上次 config 的别名集合（null=尚未建立基线，首次不报删除）
 
 function broadcast(channel, payload) {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send(channel, payload);
-}
-
-function statusOfError(e) {
-  const m = String(e && e.message);
-  if (/authentic/i.test(m)) return 'auth';
-  if (/timed out|timeout/i.test(m)) return 'timeout';
-  return 'offline';
 }
 
 function logError(tag, e) {
@@ -43,26 +49,53 @@ function logError(tag, e) {
   }
 }
 
-const lastSnapJson = new Map(); // serverId -> 上次快照 JSON（增量广播：内容无变化不重发）
-async function collectServer(cfg) {
-  const conn = pool.get(cfg);
-  if (conn.isBackedOff()) return;
-  try {
-    const snap = await conn.collect();
-    if (!servers.includes(cfg)) return;
-    const payload = { id: cfg.id, status: 'online', error: '', ...snap };
-    void historyStore?.request('snapshot', payload).catch((e) => historyError(e));
-    void transfers?.collectStaging({ serverId: cfg.id });
-    try { workbench?.consumeSnapshot(payload); } catch { /* 监视/规则求值失败不影响采集 */ }
-    const json = JSON.stringify(snap);
-    if (lastSnapJson.get(cfg.id) === json) return;
-    lastSnapJson.set(cfg.id, json);
-    broadcast('ssh:snapshot', payload);
-  } catch (e) {
-    if (!servers.includes(cfg)) return;
-    void historyStore?.request('gap', { server: cfg.id, at: Date.now() }).catch((error) => historyError(error));
-    broadcast('ssh:status', { id: cfg.id, status: statusOfError(e), error: e.message });
+function enqueueHistory(buckets) { if (historyWriter) void historyWriter.enqueue(buckets).catch(historyError); }
+function observe(snapshot) {
+  try { aggregator.ingestSnapshot(snapshot); } catch (error) { historyError(error); }
+  try { workbench?.consumeSnapshot(snapshot); } catch (error) { logError('workbench-observation', error); }
+  if (!snapshot.lastLane || snapshot.lastLane === 'processes' || snapshot.lastLane === 'legacy') {
+    void historyStore?.request('usageSnapshot', snapshot).catch(historyError);
   }
+  if (!snapshot.lastLane || snapshot.lastLane === 'system') {
+    void workbench?.observeResources(snapshot.id, { maxAgeMs: 5000 }).catch((error) => {
+      logError('resources', error);
+      const previous = resources.get(snapshot.id);
+      if (previous && Date.now() - previous.gapAt > 5000) {
+        previous.gapAt = Date.now();
+        for (const channel of previous.channels) aggregator.ingest({ ...channel, at: Date.now(), value: null });
+      }
+    });
+  }
+  if (Date.now() - (stagingAt.get(snapshot.id) || 0) > 30000) {
+    stagingAt.set(snapshot.id, Date.now()); void transfers?.collectStaging({ serverId: snapshot.id });
+  }
+}
+function publish(snapshot) {
+  const before = published.get(snapshot.id), seq = (sequences.get(snapshot.id) || 0) + 1;
+  const keyframe = !before || seq % 100 === 0;
+  const frame = createFrame({ serverId: snapshot.id, epoch, lane: snapshot.lastLane || 'gpu', seq,
+    kind: keyframe ? 'keyframe' : 'delta', payload: keyframe ? snapshot : computeDelta(before, snapshot) || {} });
+  frame.baseSeq = seq - 1; published.set(snapshot.id, snapshot); sequences.set(snapshot.id, seq);
+  broadcast('ssh:frame', frame);
+}
+function collectionStatus(status) {
+  const at = Date.now(), previous = workbench?.snapshots.get(status.id) || published.get(status.id);
+  enqueueHistory(aggregator.gap(status.id, at, status.status === 'online' ? status.lane : null));
+  if (status.status !== 'online') void historyStore?.request('gap', { server: status.id, at }).catch(historyError);
+  else if (status.lane === 'processes') void historyStore?.request('usageGap', { server: status.id }).catch(historyError);
+  workbench?.consumeSnapshot({ id: status.id, gpus: [], processes: [], cpuUsage: null, memUsed: 0, memTotal: 0, ...previous, ...status, collectedAt: at, lastLane: status.lane });
+  broadcast('ssh:status', status);
+}
+function recordResources(serverId, sample) {
+  const channels = [], add = (device, label, metric, value) => {
+    const channel = { server: serverId, device, label, metric }; channels.push(channel);
+    aggregator.ingest({ ...channel, at: sample.at, value });
+  };
+  for (const d of sample.disks) for (const metric of ['readBytesPerSecond', 'writeBytesPerSecond', 'busyPercent']) add('disk:' + d.device, d.device, metric, d[metric]);
+  for (const n of sample.networks) for (const metric of ['receiveBytesPerSecond', 'transmitBytesPerSecond']) add('network:' + n.device, n.device, metric, n[metric]);
+  for (const m of sample.filesystems) { add('mount:' + m.mount, m.mount, 'diskUsedPercent', m.percent); add('mount:' + m.mount, m.mount, 'availableBytes', m.available); }
+  for (const m of sample.inodes) add('mount:' + m.mount, m.mount, 'inodeUsedPercent', m.percent);
+  resources.set(serverId, { channels, gapAt: 0 });
 }
 let lastHistoryError = 0;
 function historyError(error) {
@@ -71,7 +104,8 @@ function historyError(error) {
     lastHistoryError = Date.now(); broadcast('history:error', { error: String(error) });
   }
 }
-const scheduler = new PollScheduler({ configs: () => servers, collect: collectServer, interval: () => intervalMs, onError: (e) => logError('poll', e) });
+const scheduler = new TieredScheduler({ configs: () => servers, getConnection: (cfg) => pool.get(cfg), interval: () => intervalMs,
+  onObservation: observe, onSnapshot: publish, onStatus: collectionStatus, onError: (error, _cfg, lane) => logError('monitor-' + lane, error) });
 function tick() { scheduler.tick(); }
 function start() { scheduler.start(); }
 
@@ -229,7 +263,7 @@ function registerIpc() {
   ipcMain.handle('servers:remove', (_e, id) => {
     persist(servers.filter((s) => s.id !== id));
     closeServerTerminals(id);
-    pool.remove(id);
+    pool.remove(id); scheduler.remove(id); published.delete(id); resources.delete(id); stagingAt.delete(id); enqueueHistory(aggregator.removeServer(id));
     return true;
   });
 
@@ -246,7 +280,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('ssh:setInterval', (_e, ms) => {
-    intervalMs = Math.max(1000, Number(ms) || 2000);
+    intervalMs = Math.max(200, Math.min(60000, Number(ms) || 2000));
     start();
     return intervalMs;
   });
@@ -256,9 +290,11 @@ function registerIpc() {
     return true;
   });
 
-  ipcMain.handle('ssh:kill', async (_e, { id, pid, signal }) => {
+  ipcMain.handle('ssh:snapshot-current', (_e, id) => ({ snapshot: published.get(id) || null, seq: sequences.get(id) || 0, epoch }));
+  ipcMain.handle('ssh:visibility', (_e, hidden) => { scheduler.setHidden(!!hidden); return true; });
+  ipcMain.handle('ssh:kill', async (_e, { id, pid, signal, expectedStartTicks }) => {
     try {
-      const res = await pool.get(getCfg(id)).kill(pid, signal);
+      const res = await pool.get(getCfg(id)).kill(pid, signal, expectedStartTicks);
       if (res.ok) setTimeout(tick, 300);
       return res;
     } catch (e) {
@@ -346,16 +382,17 @@ function registerIpc() {
       const sftp = await conn.sftp();
       const text = await new Promise((resolve, reject) => {
         const stream = sftp.createReadStream(p, { start: 0, end: MAX - 1 });
-        let buf = '';
-        stream.on('data', (d) => (buf += d.toString('utf8')));
+        const chunks = [];
+        stream.on('data', (d) => chunks.push(d));
         stream.on('end', () => {
+          const buf = Buffer.concat(chunks).toString('utf8');
           // 含 NUL 字节通常是二进制文件，不做文本预览
           if (buf.includes('\x00')) return reject(new Error(lang.t('binary')));
           resolve(buf);
         });
         stream.on('error', reject);
       });
-      return { text, truncated: st.size > MAX, size: st.size, mode: 'head' };
+      return { text, contentHash: st.size > MAX ? undefined : digest(Buffer.from(text, 'utf8')), truncated: st.size > MAX, size: st.size, mode: 'head' };
     }),
   );
 
@@ -379,18 +416,8 @@ function registerIpc() {
     }),
   );
 
-  // 远程文本保存：写临时文件后原子改名，避免写一半损坏原文件
-  ipcMain.handle(
-    'sftp:writeText',
-    wrap(async ({ id, path: p, text }) => {
-      const conn = await getConn(id);
-      const sftp = await conn.sftp();
-      const tmp = `${p}.sctmp`;
-      await new Promise((res, rej) => sftp.writeFile(tmp, Buffer.from(String(text), 'utf8'), (e) => (e ? rej(e) : res())));
-      await new Promise((res, rej) => sftp.rename(tmp, p, (e) => (e ? rej(e) : res())));
-      return true;
-    }),
-  );
+  const textEditor = new TextEditor({ getConnection: getConn });
+  ipcMain.handle('sftp:writeText', wrap((request) => textEditor.write(request)));
 
   // 文件搜索：远程 find（限制深度与条数）
   ipcMain.handle(
@@ -748,7 +775,7 @@ function registerIpc() {
 
   // ============ 目录同步（预览 → 确认应用，复用 SyncPlanner） ============
   const { SyncPlanner } = require('./sync-planner.cjs');
-  const syncPlanner = new SyncPlanner({
+  syncPlanner = new SyncPlanner({
     directory: app.getPath('userData'),
     getConnection: getConn,
     getServers: () => servers,
@@ -760,9 +787,10 @@ function registerIpc() {
 
   // ============ 保存即上传（Dev Sync，fs.watch + 去抖 + 复用 transfers 上传） ============
   const { DevSyncManager } = require('./devsync.cjs');
-  const devsync = new DevSyncManager({
+  devsync = new DevSyncManager({
     storeFile: path.join(app.getPath('userData'), 'syncpairs.json'),
     enqueue: (jobs) => transfers.addMany(jobs),
+    getTask: (id) => transfers.list().find((task) => task.id === id),
     getServers: () => servers,
   }).init();
   ipcMain.handle('devsync:list', wrap(() => devsync.list()));
@@ -777,10 +805,12 @@ function registerIpc() {
     directory: app.getPath('userData'),
     getConnection: getConn,
     getServers: () => servers,
+    historyQuery: (query) => historyStore.request('query', query),
+    onResource: recordResources,
     notify: (title, body) => {
       if (Notification.isSupported()) new Notification({ title, body }).show();
     },
-    onEvent: (event) => broadcast('workbench:event', event),
+    onEvent: (event) => { broadcast('workbench:event', event); void productivity?.dispatchEvent(event).catch((error) => logError('notification', error)); },
     // 用量统计：跨服务器聚合 history worker 里的 usage_minutes
     usageQuery: async (rangeDays) => {
       const byUser = new Map();
@@ -800,14 +830,72 @@ function registerIpc() {
   });
   workbench = workbenchLocal;
   workbench.init();
-  ipcMain.handle('workbench:request', wrap((req) => workbench.request(req || {})));
+  const { ProductivityManager } = require('./productivity.cjs');
+  productivity = new ProductivityManager({
+    directory: app.getPath('userData'), getServers: () => servers, getConnection: getConn,
+    exportState: () => ({ rules: workbench.data.rules, watches: workbench.data.watches, templates: workbench.data.templates }),
+    importState: async (state) => {
+      const next = servers.map((server) => ({ ...server }));
+      for (const imported of state.servers || []) {
+        const existing = next.find((item) => item.id === imported.id);
+        if (existing && (existing.host !== imported.host || (existing.port || 22) !== (imported.port || 22) || existing.username !== imported.username)) throw new Error('Backup endpoint differs from the existing server. Import into a separate configuration.');
+        const value = { ...imported, username: imported.username || 'root', authType: imported.authType === 'key' && imported.keyPath ? 'key' : 'password' };
+        const normalized = validateServerCfg(value);
+        if (existing) Object.assign(existing, value, normalized); else next.push({ ...value, ...normalized });
+      }
+      const prepared = {};
+      for (const kind of ['rules', 'watches', 'templates']) {
+        if (state[kind] === undefined) continue;
+        if (!Array.isArray(state[kind]) || state[kind].length > 500) throw new Error('Invalid backup collection: ' + kind);
+        const merged = new Map(workbench.data[kind].map((item) => [item.id, item]));
+        for (const item of state[kind]) {
+          if (!item || !/^[a-zA-Z0-9_-]{1,100}$/.test(item.id) || item.serverId && !next.some((server) => server.id === item.serverId)) throw new Error('Invalid backup item');
+          if (kind === 'templates' && (typeof item.command !== 'string' || item.command.length > 65536)) throw new Error('Invalid command template');
+          if (kind === 'rules' && (!['gpuUtil', 'temperature', 'memoryPercent', 'cpuUsage', 'offline', 'occupiedIdle'].includes(item.metric) || !Number.isFinite(item.threshold) || !Number.isFinite(item.recovery))) throw new Error('Invalid alert rule');
+          if (kind === 'watches' && (!Number.isFinite(item.minFreeGiB) || !Number.isFinite(item.durationSeconds))) throw new Error('Invalid GPU reminder');
+          merged.set(item.id, item);
+        }
+        if (merged.size > 500) throw new Error('Backup item limit exceeded');
+        prepared[kind] = [...merged.values()];
+      }
+      const previousServers = servers, previousData = workbench.data;
+      let serversWritten = false, workbenchWritten = false;
+      const rollback = async () => {
+        const errors = [];
+        if (serversWritten) { try { persist(previousServers); } catch (error) { errors.push(error); } }
+        workbench.data = previousData;
+        if (workbenchWritten) { try { workbench.persist(); } catch (error) { errors.push(error); } }
+        if (errors.length) throw new AggregateError(errors, 'Backup rollback failed; restore the saved configuration before continuing.');
+      };
+      try {
+        persist(next); serversWritten = true;
+        workbench.data = { ...previousData, ...prepared }; workbench.persist(); workbenchWritten = true;
+        return rollback;
+      } catch (error) {
+        try { await rollback(); } catch (rollbackError) { throw new AggregateError([error, rollbackError], 'Backup import and rollback failed'); }
+        throw error;
+      }
+    },
+  }).init();
+  ipcMain.handle('workbench:request', wrap(async (req) => {
+    if (req?.operation === 'serviceOpen') {
+      const template = await workbench.request({ ...req, operation: 'serviceTemplate' });
+      const existing = forwardings.list().find((rule) => rule.serverId === req.serverId && rule.localPort === template.localPort && rule.remoteHost === '127.0.0.1' && rule.remotePort === template.remotePort);
+      if (!existing || existing.status !== 'listening') await forwardings.upsert({ id: existing?.id, serverId: req.serverId, localPort: template.localPort, remoteHost: '127.0.0.1', remotePort: template.remotePort, enabled: true });
+      await require('electron').shell.openExternal(template.url); return template;
+    }
+    if (productivity && productivity.supports(req?.operation)) return productivity.request(req || {});
+    return workbench.request(req || {});
+  }));
   // 定时计划 tick：每 15 秒检查时间窗（按各服务器本地时间）；无启用的计划时零开销
   const scheduleTimer = setInterval(() => { void workbench.tickSchedules().catch(() => {}); }, 15000);
   scheduleTimer.unref?.();
+  backgroundTimers.push(scheduleTimer);
   void workbench.tickSchedules().catch(() => {});
   // 日志监控 tick：每 30 秒拉取启用的 watcher；无 watcher 时零开销
-  const logTimer = setInterval(() => { void workbench.tickLogs().catch(() => {}); }, 30000);
+  const logTimer = setInterval(() => { void workbench.tickLogs().catch(() => {}); }, 5000);
   logTimer.unref?.();
+  backgroundTimers.push(logTimer);
 
   // 端口转发实例（handler 与 init 都用这个闭包）
   forwardings = new ForwardingManager({
@@ -975,10 +1063,12 @@ function handleInteractive({ name, prompts }) {
   });
 }
 
-/** @type {any} */ let devsync = null;
 function init() {
   const userData = app.getPath('userData');
   historyStore = new HistoryStore(userData, historyError);
+  historyWriter = new HistoryWriter({ store: historyStore, onError: historyError });
+  historyTimer = setInterval(() => { enqueueHistory(aggregator.flush(Date.now() - 1000)); }, 1000);
+  historyTimer.unref?.();
   store.init({ dataDir: userData, safeStorage });
   audit.init(userData);
   hostkeys.init(userData);
@@ -988,6 +1078,14 @@ function init() {
   servers = store.load();
   registerIpc();
   start();
+  const healthTimer = setInterval(() => {
+    if (!workbench) return;
+    for (const cfg of servers) {
+      const last = workbench.snapshots.get(cfg.id);
+      if (last && last.status !== 'online') workbench.consumeSnapshot({ ...last, collectedAt: Date.now() });
+    }
+  }, 1000);
+  healthTimer.unref?.(); backgroundTimers.push(healthTimer);
   watchDefaultConfig();
   // 恢复启用的端口转发规则（异步，不阻塞启动）
   forwardings.startAll().catch((e) => logError('forwardings startAll', e));
@@ -998,24 +1096,27 @@ module.exports = {
   statusSnapshot: () => ({
     generatedAt: Date.now(),
     servers: servers.map((cfg) => {
-      const snap = workbench && workbench.snapshots ? workbench.snapshots.get(cfg.id) : null;
+      const snap = workbench?.snapshots.get(cfg.id);
+      const age = snap ? Date.now() - snap.collectedAt : Infinity;
+      const fresh = age < Math.max(15000, intervalMs * 8);
       return {
         name: cfg.name,
-        status: snap ? snap.status : (cfg.status || 'offline'),
+        status: snap && fresh ? snap.status : 'offline',
+        collectedAt: snap?.collectedAt || null,
         cpu: snap ? snap.cpuUsage ?? null : null,
         memUsed: snap ? snap.memUsed ?? null : null,
         memTotal: snap ? snap.memTotal ?? null : null,
-        gpus: (snap && snap.gpus ? snap.gpus : []).slice(0, 16).map((g) => ({ index: g.index, name: g.name, util: g.util ?? null, memUsed: g.memUsed ?? null, memTotal: g.memTotal ?? null, temp: g.temp ?? null })),
+        gpus: (snap && snap.gpus ? snap.gpus : []).slice(0, 16).map((g) => { const available = (key) => fresh && snap.status === 'online' && Date.now() - (g.observedAt || snap.collectedAt) < Math.max(15000, intervalMs * 8) && !g.unavailableMetrics?.includes(key) ? g[key] ?? null : null; return { index: g.index, name: g.name, util: available('util'), memUsed: available('memUsed'), memTotal: available('memTotal'), temp: available('temp') }; }),
       };
     }),
     transfers: (transfers ? transfers.list() : []).slice(0, 20).map((t) => ({
       name: t.name,
       kind: t.kind,
-      active: t.status === 'running' || t.status === 'queued',
+      active: ['running', 'queued', 'verifying', 'pending', 'starting'].includes(t.status),
       percent: t.size > 0 ? Math.min(100, (t.transferred / t.size) * 100) : 0,
       status: t.status,
     })),
-    events: ((workbench && workbench.data && workbench.data.events) || []).slice(-10).reverse().map((e) => ({ at: e.at, title: e.title, body: e.body || '' })),
+    events: ((workbench && workbench.data && workbench.data.events) || []).slice(0, 10).map((e) => ({ at: e.at, title: e.title, body: e.body || '' })),
   }),
   init, hasActiveTransfers: () => (transfers ? transfers.hasActive() : false),
-  shutdown: async () => { scheduler.stop(); try { devsync?.stopAll(); } catch { /* watcher already closed */ } await historyStore?.close(); } };
+  shutdown: async () => { scheduler.stop(); if (historyTimer) clearInterval(historyTimer); for (const timer of backgroundTimers) clearInterval(timer); devsync?.stopAll(); syncPlanner?.close(); productivity?.close(); workbench?.close(); enqueueHistory(aggregator.flushAll()); await historyWriter?.close(); await historyStore?.close(); } };

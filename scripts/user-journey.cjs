@@ -4,12 +4,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
-const net = require('node:net');
 const http = require('node:http');
 const { _electron } = require('playwright-core');
 const { createFakeSshd } = require('./fake-sshd.cjs');
 
-const listen = (server) => new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolve(server.address().port)); });
+const _listen = (server) => new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolve(server.address().port)); });
 async function waitUntil(predicate, message, ms = 8000) {
   const deadline = Date.now() + ms;
   while (!(await predicate())) {

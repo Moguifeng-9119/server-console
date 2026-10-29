@@ -67,12 +67,17 @@ jobs:
           gh run download "$PACKAGE_RUN" --pattern 'unsigned-desktop-*' --dir packages
           mapfile -t FILES < <(find packages -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) | sort)
           test "${#FILES[@]}" -eq 3
-          # GitHub rewrites spaces in asset names; checksum names must match downloads.
-          for FILE in "${FILES[@]}"; do cp "$FILE" "upload/$(basename "$FILE" | tr ' ' '-')"; done
-          cd upload
-          test "$(find . -type f | wc -l)" -eq 3
-          sha256sum *.exe *.dmg *.AppImage > SHA256SUMS.txt
-          cat SHA256SUMS.txt
+          # Keep filenames unchanged: update metadata must match uploaded assets.
+          while IFS= read -r -d '' FILE; do
+            NAME=$(basename "$FILE")
+            [[ "$NAME" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo 'Unsafe or space-containing asset filename'; exit 1; }
+            test ! -e "upload/$NAME" || { echo 'Duplicate release asset'; exit 1; }
+            cp "$FILE" "upload/$NAME"
+          done < <(find packages -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.blockmap' -o -name 'latest*.yml' \) -print0)
+          test -f upload/latest.yml
+          test -f "upload/ServerConsole-Setup-${RELEASE_TAG#v}.exe.blockmap"
+          node scripts/release-checksums.cjs upload "${RELEASE_TAG#v}"
+          cat upload/SHA256SUMS.txt
       - name: Create reviewable draft release without replacing an existing release
         shell: bash
         run: |

@@ -4,11 +4,12 @@ type SampleLike = { collectedAt?: number; laneTimestamps?: Partial<Record<string
 
 /** 指标在该 GPU 上可用（驱动有上报）；unavailableMetrics 中的为未知，占位 0 不算真实读数 */
 export function gpuMetricAvailable(gpu: Gpu, metric: keyof Gpu | string): boolean {
-  return !gpu.unavailableMetrics?.includes(String(metric));
+  const value = gpu[metric as keyof Gpu];
+  return !gpu.unavailableMetrics?.includes(String(metric)) && value != null && (typeof value !== 'number' || Number.isFinite(value));
 }
 
 export function freeGiB(gpu: Gpu): number {
-  if (!gpuMetricAvailable(gpu, 'memTotal') || !gpuMetricAvailable(gpu, 'memUsed')) return Number.NaN;
+  if (!gpuMetricAvailable(gpu, 'memTotal') || !gpuMetricAvailable(gpu, 'memUsed') || gpu.memTotal <= 0) return Number.NaN;
   return Math.max(0, gpu.memTotal - gpu.memUsed) / 1024;
 }
 

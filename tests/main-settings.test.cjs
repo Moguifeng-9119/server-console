@@ -62,3 +62,10 @@ describe('main-process language settings', () => {
     expect(result.error).toContain('HTTP 429');
   });
 });
+
+  it('preserves auto update and phone status credentials across language and close settings changes', () => {
+    const f = fixture(); const statusPage = { enabled: true, token: 'test-token', port: 8080 };
+    fs.writeFileSync(path.join(f.root, 'appsettings.json'), JSON.stringify({ closeAction: 'ask', language: 'en', updateAutoInstall: true, statusPage, futureSetting: 7 }));
+    f.control.loadAppSettings(); f.handlers.get('app:set-language')(null, 'de'); f.handlers.get('app:set-settings')(null, { closeAction: 'minimize' });
+    expect(JSON.parse(fs.readFileSync(path.join(f.root, 'appsettings.json'), 'utf8'))).toEqual({ closeAction: 'minimize', language: 'de', updateAutoInstall: true, statusPage, futureSetting: 7 });
+  });

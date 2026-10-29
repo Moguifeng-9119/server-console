@@ -46,7 +46,8 @@ interface Api {
   testServer: (cfg: Partial<ServerConfig> & { password?: string; passphrase?: string }) => Promise<{ ok: boolean; error?: string; gpus?: number; processes?: number }>;
   setInterval: (ms: number) => Promise<number>;
   setFocusedServer: (id: string | null) => Promise<boolean>;
-  kill: (id: string, pid: number, signal: 'TERM' | 'KILL') => Promise<{ ok: boolean; error?: string }>;
+  setMonitoringHidden: (hidden: boolean) => Promise<boolean>;
+  kill: (id: string, pid: number, signal: 'TERM' | 'KILL', expectedStartTicks?: string) => Promise<{ ok: boolean; error?: string }>;
   restartService: (id: string, service: string) => Promise<{ ok: boolean; error?: string }>;
   exec: (id: string, cmd: string) => Promise<IpcResult<{ stdout: string; stderr: string }>>;
   onKeyboardInteractive: (cb: (data: { reqId: string; title: string; prompts: string[] }) => void) => () => void;
@@ -139,8 +140,8 @@ interface Api {
   sftpRename: (id: string, from: string, to: string) => Promise<IpcResult<boolean>>;
   sftpDelete: (id: string, p: string) => Promise<IpcResult<boolean>>;
   sftpStat: (id: string, p: string) => Promise<IpcResult<{ size: number; type: string }>>;
-  sftpReadText: (id: string, p: string, tail?: boolean) => Promise<IpcResult<{ text: string; truncated: boolean; mode: string; size?: number }>>;
-  sftpWriteText: (id: string, p: string, text: string) => Promise<IpcResult<boolean>>;
+  sftpReadText: (id: string, p: string, tail?: boolean) => Promise<IpcResult<{ text: string; contentHash?: string; truncated: boolean; mode: string; size?: number }>>;
+  sftpWriteText: (id: string, p: string, text: string, expectedHash?: string) => Promise<IpcResult<boolean | { saved: boolean; contentHash: string }>>;
   sftpReadBinary: (id: string, p: string) => Promise<IpcResult<{ data: string; mime: string; truncated: boolean; size: number }>>;
   sftpSearch: (id: string, base: string, keyword: string) => Promise<IpcResult<{ base: string; paths: string[] }>>;
   sftpArchive: (id: string, cwd: string, names: string[], archiveName: string) => Promise<IpcResult<{ name: string }>>;

@@ -1,45 +1,41 @@
 # ServerConsole
 
-**여유 GPU 메모리를 찾고 사용자를 확인한 뒤, 한 데스크톱에서 모니터링·터미널·파일을 엽니다.**
+**GPU 여유 메모리와 사용자를 확인하고 한 데스크톱에서 실험, 터미널, 파일을 엽니다.**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[데스크톱 다운로드](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [문제 신고](https://github.com/Moguifeng-9119/server-console/issues)
+[다운로드](https://github.com/Moguifeng-9119/server-console/releases/latest) · [Issues](https://github.com/Moguifeng-9119/server-console/issues) · [Changelog](CHANGELOG.md)
 
-**0.13.1:** GPU별 원형 게이지, 캐시를 이용한 즉시 서버 전환, 유지되는 파일 화면과 쉽게 찾을 수 있는 모니터링 기록을 추가했습니다. 30분·1시간·12시간·1일·1주를 선택할 수 있습니다. SQLite는 원시 데이터를 24시간, 분 단위 요약을 30일 후 자동 정리합니다. 앱이 실행되는 동안 수집합니다. `ServerConsole-Setup-0.13.1.exe`를 설치하세요. [검증과 용량](docs/VALIDATION-0.13.1.md)
+![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-**Windows 배포 파일은 서명되지 않았으며 SmartScreen 경고가 나타날 수 있습니다. Release의 SHA-256 파일과 비교하세요.**
+## 0.18.0 변경 사항
 
-![GPU 작업 공간: 모의 데이터](assets/screenshots/workbench-en.png)
+- GPU·시스템·프로세스 계층 수집을 실제 스케줄러에 연결했습니다. 알 수 없는 값과 누락 구간을 보존하며 GPU 계기판은 한 줄에 4개입니다.
 
-**0.12.0 변경 사항**
+- 실험 작업 공간에 서버, 디렉터리, GPU, tmux, 로그, 서비스를 저장합니다. 터미널 검색, 분할 레이아웃, 파일 바로가기로 작업 맥락을 유지합니다.
 
-작업 소유 임시 파일의 영구 기록, 복구 및 재연결 시 정리를 추가했습니다. SHA-256 검증 진행률, 이전 작업 안내, 파일·중계 키보드 조작, 미저장 텍스트 보호, ESLint/Hooks 검사를 추가했습니다. 10개 언어 모두 702개 키를 갖추며 기계 번역을 활용한 나머지 문구의 원어민 검토는 아직 필요합니다.
+- 작업 종료 코드와 중지 결과가 실제 실행을 반영합니다. 시작 식별자로 PID 재사용을 검사하며 오프라인 상태를 알림 규칙과 모바일 요약에 전달합니다.
 
-0.12.2는 실제 Linux 서버 두 대에서 16 MiB 업로드와 rsync, 메인 프로세스 강제 종료 후 복구, 접두부 검증 진행률, 소유한 임시 키와 디렉터리 정리를 확인했습니다. 아래 0.11.1 수치는 과거 결과입니다. 최신 범위는 [0.12.2](docs/VALIDATION-0.12.2.md).
+- 기록 범위는 30분, 1시간, 12시간, 1일, 1주입니다. GPU 비교, 디스크·네트워크, 내보내기와 이벤트 표시를 지원합니다. 원본 24시간, 분 집계 30일 후 자동 정리합니다.
 
-![27-second simulated workflow](assets/demo/workflow.gif)
+- 작업 카드, 증분 학습 로그, GPU 가용 알림, 규칙, 컨테이너, 서비스 터널을 제공합니다. Slurm 작업·상세·로그는 읽기 전용이며 호스트 지원이 필요합니다.
 
-<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+- 동기화 전 변경과 제외 규칙을 검토합니다. 저장 후 업로드는 대기·업로드·성공·실패를 구별하며 완료 후에만 성공 시간을 갱신합니다.
 
-스크린샷은 v0.12.0의 모의 데이터입니다. v0.12.0은 Windows x64 포터블, Linux x86_64 AppImage, macOS 유니버설 DMG와 SHA-256 파일을 제공합니다. 패키지는 서명되지 않았고 macOS 공증도 없습니다. [검증 기록](docs/VALIDATION-0.12.2.md)을 확인하세요.
+- 진단과 자격 증명 없는 설정 백업으로 복구·이전을 돕습니다. HTTPS Webhook은 기본 비활성입니다. 별도 실행하는 헤드리스 수집기는 데스크톱 종료 후에도 기록을 저장합니다.
 
-[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
-
-## 어떤 작업을 위한 도구인가요?
-
-ServerConsole은 공유 **Linux / NVIDIA GPU 서버**를 위한 개인용 데스크톱 도구입니다. SSH로 자원 탐색, 터미널, 두 패널 SFTP, 서버 간 전송을 통합하며 원격 모니터링 에이전트가 필요하지 않습니다.
-
-- GPU별 여유 GiB, 모델, 사용자로 검색하고 여유 메모리 순으로 정렬합니다. 모니터링·터미널·파일을 바로 엽니다.
-- GPU와 프로세스, 한 PID의 여러 GPU 연결, Linux CPU 시간 차이, 실제 수집 시각과 누락 구간을 확인합니다.
-- 전송 대기열, 검증된 재개, 재시작 복구, rsync 직접 전송 또는 SFTP 중계를 제공합니다.
-- SSH config 가져오기, 그룹, ProxyJump, 빠른 명령, 포트 포워딩을 지원합니다. 활성/복구 알림과 닫을 수 있는 안내 최대 두 개를 표시하며, 데모는 외부 이상 알림을 보내지 않습니다.
-
-팀 계정, 자원 예약, 클러스터 스케줄링, AMD/Intel GPU 지표, 완전한 NVML 진단은 제공하지 않습니다. 여유 메모리는 관측값이며 예약이나 독점 사용 권한을 뜻하지 않습니다.
+[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## 시작하기
 
-[릴리스](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1)에서 운영체제에 맞는 패키지를 받으세요. 서버 관리에서 연결을 테스트하고 추가하거나 SSH config를 가져옵니다. GPU 지표에는 원격 nvidia-smi, 시스템 지표에는 Linux /proc가 필요합니다. 소스 실행에는 Node.js 22와 npm을 사용합니다.
+Release에 첨부된 패키지를 선택하세요. Windows는 서명되지 않아 SmartScreen 경고가 표시될 수 있습니다. 해당 버전의 SHA-256과 대조하세요. macOS/Linux는 실제 워크플로와 공개 첨부 파일 기준입니다.
+
+SSH를 추가하거나 가져오고 지문을 확인한 뒤 개요 또는 작업대를 엽니다. GPU는 nvidia-smi, 시스템은 Linux /proc가 필요합니다. 여유 메모리는 예약이 아닙니다.
+
+[Detailed usage and recovery](docs/USER-GUIDE.md) · [Security](SECURITY.md) · [Headless collector](docs/HEADLESS-MONITOR.md)
+
+## 개발
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -48,33 +44,13 @@ npm ci
 npm run dev
 ```
 
-브라우저는 모의 데이터임을 표시하는 데모입니다. 실제 SSH, 인증 정보, 터미널, SFTP에는 데스크톱 프로세스가 필요합니다.
+브라우저는 표시된 모의 데모입니다. 실제 SSH, 터미널, SFTP는 Electron 데스크톱이 필요합니다.
 
 ```sh
 npm run electron:dev
 ```
 
-카드당 필요한 여유 GiB를 입력하고 모델이나 사용자를 검색한 후 모니터링·터미널·파일을 엽니다. 설정은 외관, 모니터링, 보안, 작업 흐름, 활동/도움말로 나뉩니다. Ctrl/Cmd+K로 명령 팔레트를 열며, 주요 대화상자는 Tab, Shift+Tab, Escape와 포커스 복원을 지원합니다.
-
-## 전송과 인증 정보
-
-- 임의의 기존 대상 파일을 재개용 데이터로 쓰지 않습니다. SFTP 작업은 전용 임시 파일을 사용하고 전체 기존 접두 부분을 SHA-256으로 비교한 뒤 재개합니다.
-- 대상 교체 전 바이트 수와 원본 크기/수정 시간을 확인하고 겹치는 대상 경로를 순차 처리합니다. 실패 시 재시도 데이터를 보존합니다. 취소/제거의 정리가 실패하면 복구 기록을 보존하고 오류를 알립니다.
-- 선택적 MD5 검사는 개별 파일 교체 전에 실행하며 디렉터리나 중계를 MD5 검증 완료로 표시하지 않습니다.
-- 직접 전송에는 양쪽 rsync와 원본에서 대상으로 연결 가능한 네트워크가 필요합니다. 임시 SSH 키와 신뢰한 지문을 사용하며, 불가능하면 단계적 SFTP 중계로 전환합니다. 바로 덮어쓰는 tar/scp 대체 경로는 비활성화되었습니다.
-- 안전한 OS 키 저장소가 있으면 비밀번호와 개인 키 암호를 암호화합니다. 없거나 Linux basic_text이면 새 비밀 정보는 세션 메모리에만 남고 재시작 후 다시 입력해야 합니다. 보안 설정은 실제 방식을 표시하며 개인 키는 기존 경로에 남습니다.
-
-크기와 수정 시간은 동시에 변경되는 원본을 잠그지 않습니다. [보안](SECURITY.md)을 참고하세요. 실제 서버 간 rsync와 충돌 후 정리는 격리된 테스트를 통과했습니다.
-
-## 검증한 범위
-
-v0.11.1은 Windows, Linux, macOS 각각에서 타입 검사, 회귀 테스트 84개, SFTP 스모크, 빌드, 브라우저 검사 22개를 통과했습니다. 패키징된 앱은 각 OS에서 네이티브 검사 16개를 통과했습니다: 실제 IPC, 로컬 SSH shell, 크기 변경, 포워딩, 인증 후 재시작을 확인합니다. Windows DPAPI는 실제 검사했지만 macOS 자동화는 MockKeychain이며 실제 Keychain 검증은 아닙니다. Linux는 안전한 키 저장소가 없을 때 세션 전용 정책을 확인합니다. macOS 실행은 arm64에서 이루어졌고 Intel은 실행하지 않았습니다.
-
-실제 GPU/MIG, 완전한 원격 PTY, 운영 환경 rsync/네트워크 성능, 실제 macOS/Linux 키 저장소, 설치 프로그램과 업데이트는 추가 검증이 필요합니다. 로컬 모의 SSH 세션 10/30개 벤치마크는 실제 클러스터 성능이나 절감률을 보장하지 않습니다. [검증](docs/VALIDATION-0.11.1.md)과 [측정 방법](docs/BENCHMARKS.md)을 확인하세요.
-
-## 개발과 빌드
-
-React, TypeScript, Electron, Vite, ssh2의 정확한 버전은 [package.json](package.json)과 잠금 파일에 있습니다. 검사 명령:
+React 18 · TypeScript · Electron · Vite · ssh2 · SQLite. [package.json](package.json) · [Architecture](docs/ARCHITECTURE.md)
 
 ```sh
 npm run lint
@@ -82,16 +58,20 @@ npm run typecheck
 npm test
 npm run smoke
 npm run build
-npx playwright-core install chromium
 npm run test:ui
 npm run test:workflow
-npm run benchmark
 ```
 
-SC_ELECTRON_PATH를 현재 압축 해제된 앱 실행 파일로 지정한 뒤 npm run e2e:terminal을 실행합니다. dist:win:lite, dist:win:nsis, dist:linux, dist:mac은 자동 공개를 끕니다. [패키지 CI](.github/workflows/package.yml)는 네이티브 검사 후 서명되지 않은 결과물을 업로드합니다. ESLint 및 React-Hooks가 설정되어 있으며 CI에서 npm run lint를 실행합니다.
+## 검증 범위
 
-## 언어와 기여
+최신 기록에서 명령, 결과와 미검증 항목을 확인하세요. 실제 Linux 2대에서 GPU 스트림, 3계층 수집, 자원 카운터, 종료 코드 7의 전용 작업을 확인했습니다. 대규모 환경, 100GB 전송, Slurm/MIG, 모든 설치 프로그램을 검증한 것은 아닙니다.
 
-README와 UI 리소스는 10개 언어를 지원하며 필요한 언어만 불러옵니다. 모든 문구의 원어민 검토는 아직 완료되지 않았습니다. [LOCALIZATION](docs/LOCALIZATION.md).
+[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
-[구조](docs/ARCHITECTURE.md) · [기여 안내](CONTRIBUTING.md) · [로드맵](docs/ROADMAP.md) · [변경 기록](CHANGELOG.md) · [MIT 라이선스](LICENSE)
+## 언어와 가이드
+
+앱과 README는 10개 언어를 제공합니다. 기계 보조 번역은 원어민 검토가 필요합니다. 원격 출력은 원문을 유지하며 아래 이미지는 이전 버전의 모의 화면입니다.
+
+![GPU overview — historical simulated example](assets/screenshots/gpu-even-0.13.1-en.png)
+
+[Localization](docs/LOCALIZATION.md) · [Contributing](CONTRIBUTING.md) · [MIT](LICENSE)

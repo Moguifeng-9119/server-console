@@ -1,45 +1,41 @@
 # ServerConsole
 
-**Encuentra una GPU con memoria libre suficiente, identifica quién la usa y abre terminal o archivos en el mismo escritorio.**
+**Encuentra una GPU con memoria libre suficiente y abre tus experimentos, terminal y archivos desde un escritorio.**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[Descargar](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [Informar de un problema](https://github.com/Moguifeng-9119/server-console/issues)
+[Descargar](https://github.com/Moguifeng-9119/server-console/releases/latest) · [Issues](https://github.com/Moguifeng-9119/server-console/issues) · [Changelog](CHANGELOG.md)
 
-**0.13.1:** indicadores circulares por GPU, cambio inmediato con datos en caché, paneles de archivos conservados e historial visible de 30 minutos, 1 hora, 12 horas, 1 día y 1 semana. SQLite elimina automáticamente muestras originales a las 24 horas y resúmenes por minuto a los 30 días. La aplicación debe estar abierta para recopilar datos. Instala `ServerConsole-Setup-0.13.1.exe`. [Validación y capacidad](docs/VALIDATION-0.13.1.md)
+![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-**Los archivos Windows no están firmados. SmartScreen puede advertir. Compare el SHA-256 con el archivo de la versión.**
+## Novedades de 0.18.0
 
-![Recursos GPU: datos simulados](assets/screenshots/workbench-en.png)
+- La recogida por niveles de GPU, sistema y procesos está conectada al planificador real. Conserva valores desconocidos, marcas temporales y lagunas. La vista general mantiene cuatro indicadores GPU por fila.
 
-**Novedades de 0.12.0**
+- Los espacios de experimento guardan servidor, directorio, GPU, tmux, registros y servicios. La búsqueda y división del terminal y los accesos a archivos conservan el contexto.
 
-Registro persistente para recuperar y limpiar archivos temporales propios; progreso visible de SHA-256 y explicación de tareas antiguas. Se añadieron controles de archivos y retransmisión por teclado, protección del texto sin guardar y ESLint/Hooks. Los diez idiomas tienen 702 claves; aún falta la revisión nativa de todos los borradores asistidos por traducción automática.
+- Los códigos de salida y resultados de parada reflejan la ejecución remota. Se comprueba la identidad de inicio del proceso frente a PID reutilizados. El estado sin conexión llega a alertas y resumen móvil.
 
-0.12.2 validó cargas de 16 MiB y rsync en dos servidores Linux reales, recuperación tras terminar todo el proceso principal, progreso del prefijo y limpieza de claves/directorios propios. Las cifras 0.11.1 siguientes son históricas. Alcance actual: [0.12.2](docs/VALIDATION-0.12.2.md).
+- Historial de 30 minutos, 1 hora, 12 horas, 1 día y 1 semana, comparación GPU, disco/red, exportaciones y eventos. Los datos originales caducan a las 24 horas y los resúmenes al cabo de 30 días.
 
-![27-second simulated workflow](assets/demo/workflow.gif)
+- Incluye tareas, registros incrementales, avisos de GPU disponible, reglas, contenedores y túneles. Slurm ofrece trabajos, detalles y registros de solo lectura cuando el servidor lo admite.
 
-<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+- Revisa cambios y exclusiones antes de sincronizar. La subida al guardar distingue cola, transferencia, éxito y fallo; registra el éxito tras completar la transferencia.
 
-Las capturas muestran v0.12.0 con datos simulados. v0.12.0 ofrece Windows x64 portátil, AppImage Linux x86_64 y DMG universal macOS con sumas SHA-256. Los paquetes no están firmados; macOS no está notarizado.
+- Diagnóstico y copias de configuración sin credenciales para recuperar y migrar. Webhooks HTTPS opcionales, desactivados por defecto. El recolector sin interfaz se inicia aparte para guardar historial con el escritorio cerrado.
 
-[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
-
-## Funciones
-
-Una herramienta personal para servidores compartidos **Linux / NVIDIA GPU**, mediante SSH sin agente de monitorización remoto.
-
-- Filtrar GiB libres por GPU, modelo y usuario, ordenar por memoria libre y abrir directamente monitorización, terminal o archivos.
-- Consultar procesos, varias GPU por PID, CPU Linux por diferencias de contadores, actualidad e historial con marcas de tiempo y huecos.
-- Colas de transferencia, reanudación verificada, recuperación tras reiniciar, rsync directo o retransmisión SFTP; importar SSH config, grupos, ProxyJump, comandos y reenvío de puertos.
-- Alertas activas/resueltas y como máximo dos avisos descartables; la demo no envía alertas externas.
-
-No incluye cuentas de equipo, reservas, planificación de clústeres, telemetría AMD/Intel GPU ni diagnóstico NVML completo. Memoria libre no equivale a reserva.
+[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Primeros pasos
 
-Descarga tu paquete, prueba y añade un servidor o importa SSH config. GPU requiere nvidia-smi remoto; sistema usa Linux /proc. Para el código necesitas Node.js 22 y npm:
+Elige un paquete adjunto en Releases. Windows no está firmado y puede mostrar SmartScreen. Comprueba SHA-256 con el archivo del mismo lanzamiento. macOS/Linux dependen de sus flujos y archivos publicados.
+
+Añade o importa SSH, verifica la huella y abre la vista general o el área de trabajo. GPU requiere nvidia-smi y sistema Linux /proc. La memoria libre no constituye una reserva.
+
+[Detailed usage and recovery](docs/USER-GUIDE.md) · [Security](SECURITY.md) · [Headless collector](docs/HEADLESS-MONITOR.md)
+
+## Desarrollo
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -48,33 +44,13 @@ npm ci
 npm run dev
 ```
 
-El navegador es una simulación identificada. SSH, credenciales, terminal y SFTP reales requieren el proceso de escritorio:
+El navegador es una demostración simulada identificada. SSH, terminal y SFTP reales requieren Electron.
 
 ```sh
 npm run electron:dev
 ```
 
-Indica los GiB libres por tarjeta, modelo o usuario. Los ajustes están agrupados. Ctrl/Cmd+K abre la paleta; los diálogos principales admiten Tab, Shift+Tab, Escape y restauración del foco.
-
-## Transferencias y credenciales
-
-- Un destino arbitrario no se usa como prefijo de reanudación: archivos temporales propios y comparación SHA-256 de todo el prefijo.
-- SFTP verifica bytes y tamaño/fecha de la fuente antes de sustituir, serializa destinos solapados y conserva datos al fallar. Si falla la limpieza al cancelar/eliminar, mantiene el registro de recuperación y comunica el error.
-- MD5 opcional se verifica antes de sustituir archivos individuales; directorios y retransmisiones no se presentan como verificados por MD5.
-- El envío directo exige rsync en ambas máquinas y acceso de origen a destino, con clave SSH temporal y huella confiable; si no, SFTP con archivos de preparación. Alternativas tar/scp que sobrescribían directamente desactivadas.
-- Un almacén seguro del sistema cifra contraseñas y frases secretas. Si falta o es Linux basic_text, las nuevas credenciales quedan solo en la sesión y se reintroducen tras reiniciar. Los ajustes muestran el modo real; las claves privadas mantienen su ruta.
-
-Tamaño/fecha no bloquean una fuente modificada en paralelo. Consulte [seguridad](SECURITY.md); rsync real y limpieza tras un fallo pasaron pruebas aisladas.
-
-## Validación
-
-v0.11.1 pasó en cada sistema Windows/Linux/macOS tipado, 84 pruebas de regresión, smoke SFTP, compilación y 22 comprobaciones de navegador. Cada aplicación empaquetada pasó 16 comprobaciones nativas: IPC, shell SSH local, tamaño, reenvío y reinicio autenticado.
-
-Windows DPAPI se probó realmente. macOS usa MockKeychain, sin validar Keychain real; ejecución en arm64, no Intel. Linux comprueba credenciales de sesión sin almacén seguro. GPU/MIG físicas, PTY remoto completo, rsync/red en producción, almacenes macOS/Linux reales, instaladores y actualizaciones requieren pruebas. El benchmark de 10/30 sesiones SSH simuladas no demuestra rendimiento de clúster ni ahorro porcentual.
-
-## Desarrollo
-
-React, TypeScript, Electron, Vite y ssh2; versiones exactas en [package.json](package.json) y archivo de bloqueo. Comprobaciones:
+React 18 · TypeScript · Electron · Vite · ssh2 · SQLite. [package.json](package.json) · [Architecture](docs/ARCHITECTURE.md)
 
 ```sh
 npm run lint
@@ -82,16 +58,20 @@ npm run typecheck
 npm test
 npm run smoke
 npm run build
-npx playwright-core install chromium
 npm run test:ui
 npm run test:workflow
-npm run benchmark
 ```
 
-Define SC_ELECTRON_PATH con el ejecutable actual desempaquetado y ejecuta npm run e2e:terminal. dist:win:lite, dist:win:nsis, dist:linux y dist:mac desactivan publicación automática. El [CI de paquetes](.github/workflows/package.yml) valida antes de subir. ESLint y React-Hooks están configurados; npm run lint se ejecuta en CI.
+## Validación y alcance
 
-## Idiomas y colaboración
+El registro actual recoge comandos, resultados y pruebas pendientes. Dos servidores Linux reales verificaron flujo GPU, tres niveles, contadores y una tarea propia con salida 7. No acredita flotas, transferencias de 100GB, Slurm/MIG reales ni todos los instaladores.
 
-README en diez idiomas; la interfaz tiene diez archivos completos de claves y carga idiomas bajo demanda. La revisión nativa de todos los textos sigue pendiente. [LOCALIZATION](docs/LOCALIZATION.md).
+[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
-[Evidencias](docs/VALIDATION-0.11.1.md) · [Metodología](docs/BENCHMARKS.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Contribuir](CONTRIBUTING.md) · [Hoja de ruta](docs/ROADMAP.md) · [Cambios](CHANGELOG.md) · [Licencia MIT](LICENSE)
+## Idiomas y guías
+
+Aplicación y README en diez idiomas. Las traducciones asistidas requieren revisión nativa. La salida remota conserva su idioma. Las imágenes son ejemplos simulados de versiones anteriores.
+
+![GPU overview — historical simulated example](assets/screenshots/gpu-even-0.13.1-en.png)
+
+[Localization](docs/LOCALIZATION.md) · [Contributing](CONTRIBUTING.md) · [MIT](LICENSE)

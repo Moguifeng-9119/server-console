@@ -91,7 +91,7 @@ class TieredScheduler {
         if (state.stream?.active && state.stream.intervalMs !== gpuInterval && now - state.streamChangedAt >= 30000) { state.stream.stop(); state.stream = null; }
         if (!state.stream?.active && now >= state.retryStreamAt && conn.client && typeof conn.connect === 'function') {
           const stream = new StreamChannel({ connection: conn, intervalMs: gpuInterval, idleTimeoutMs: Math.max(6000, gpuInterval * 4), now: this.now,
-            onGpus: (gpus) => { if (!this.valid(cfg, state)) return; this.mergeGpus(state, gpus, false); this.publish(cfg, state, 'gpu'); },
+            onGpus: (gpus) => { if (!this.valid(cfg, state)) return; state.controller.observePressure(); this.mergeGpus(state, gpus, false); this.publish(cfg, state, 'gpu'); },
             onError: (error) => { if (!this.valid(cfg, state)) return; state.retryStreamAt = this.now() + 30000; state.stream = null; state.controller.observePressure({ error }); this.onError(error, cfg, 'stream'); } });
           state.stream = stream; state.streamChangedAt = now; void stream.start();
         }

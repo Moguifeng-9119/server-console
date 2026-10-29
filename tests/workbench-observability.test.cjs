@@ -56,7 +56,7 @@ describe('log watchers', () => {
     const base = ['epoch 1', 'errok: NaN loss=0.5', 'all good'];
     let polls = 0;
     const { m, events } = manager({
-      handle: { 'tail -n 60': () => { polls += 1; const lines = polls === 1 ? base : [...base, 'error: boom', 'done loss=0.25']; return { stdout: lines.join('\n') + '\n', stderr: '', code: 0 }; } },
+      handle: { '__SC_LOG__': () => { polls += 1; const baseline = base.join('\n') + '\n'; const added = 'error: boom\ndone loss=0.25\n'; const content = polls === 1 ? baseline : polls === 2 ? added : ''; const start = polls === 1 ? 0 : Buffer.byteLength(baseline) + (polls > 2 ? Buffer.byteLength(added) : 0); return { stdout: `__SC_LOG__ 8:42 ${Buffer.byteLength(baseline) + (polls > 1 ? Buffer.byteLength(added) : 0)} ${start} ${Buffer.byteLength(content)}\n${Buffer.from(content).toString('base64')}`, stderr: '', code: 0 }; } },
     });
     await m.request({ operation: 'logSave', serverId: 's1', name: 'train', path: '/a.log', patterns: ['^error', 'loss='], trackLoss: true });
     const first = await m.request({ operation: 'logPoll', serverId: 's1', id: m.data.logs[0].id });

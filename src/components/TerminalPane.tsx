@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, X, Columns2, Rows2, Square, Pencil, RefreshCw } from 'lucide-react';
 import { api } from '../api';
 import { useStoreControls } from '../state';
 import { useTranslation } from 'react-i18next';
 import type { TerminalSessionInfo } from '../types';
+import { takeTerminalCommand } from '../workbench-navigation';
+import './workcenter.css';
 
 type TerminalDebug = { dbg: { dataEvents: number; wrote: number }; dump: () => string };
 const debugWindow = window as unknown as { __scTerm?: TerminalDebug; __scTerms?: Record<string, TerminalDebug> };
@@ -33,14 +35,23 @@ export function TerminalPane({
   termId,
   onClosed,
   active,
+  selected = active,
+  onSelect,
+  onReady,
 }: {
   termId: string;
   onClosed: (termId: string) => void;
   active: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+  onReady?: (termId: string) => void;
 }) {
+  const readyCallback = useRef(onReady); readyCallback.current = onReady;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const selectedRef = useRef(selected), selectCallback = useRef(onSelect);
+  selectedRef.current = selected; selectCallback.current = onSelect;
   const activateRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState('');
   const { t } = useTranslation();
@@ -129,6 +140,7 @@ export function TerminalPane({
       pending.forEach(({ data, sequence }) => { if (sequence > lastSequence) { lastSequence = sequence; write(data); } });
       pending.length = 0;
       replayReady = true;
+      readyCallback.current?.(termId);
 
       term.onData((data) => void a.terminalWrite(termId, data));
 
@@ -192,10 +204,11 @@ export function TerminalPane({
       activateRef.current = () => {
         if (!activeRef.current || disposed) return;
         onResize();
+        if (!selectedRef.current) return;
         term?.focus();
         debugWindow.__scTerm = debugWindow.__scTerms?.[termId];
       };
-      host.addEventListener('mousedown', () => activateRef.current?.());
+      host.addEventListener('mousedown', () => { selectedRef.current = true; selectCallback.current?.(); activateRef.current?.(); });
 
       // e2e 测试钩子：canvas 渲染下 DOM 读不到文本，暴露缓冲区读取器
       debugWindow.__scTerms ||= {};
@@ -247,12 +260,12 @@ export function TerminalPane({
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [active]);
+  }, [active, selected]);
 
   return (
     <div
       ref={hostRef}
-      className="term-host"
+      className="term-host term-pane"
       data-term-id={termId}
       style={{ display: active ? 'block' : 'none' }}
     >
@@ -291,6 +304,21 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
   const [creating, setCreating] = useState(false);
   const revision = useRef(0);
   const mounted = useRef(false);
+  const [layout, setLayout] = useState<'single' | 'columns' | 'rows'>(() => { try { const value = localStorage.getItem('sc.term.layout.' + serverId); return value === 'columns' || value === 'rows' ? value : 'single'; } catch { return 'single'; } });
+  const [names, setNames] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('sc.term.names.' + serverId) || '{}'); } catch { return {}; } });
+  const [renaming, setRenaming] = useState(''), [draftName, setDraftName] = useState('');
+  const [tmux, setTmux] = useState<{ available: boolean; sessions: Array<{ name: string; windows: number; attached: number }> } | null>(null);
+  const [tmuxBusy, setTmuxBusy] = useState(false), [tmuxSelected, setTmuxSelected] = useState('');
+  const [commandRevision, setCommandRevision] = useState(0);
+  const ready = useRef(new Set<string>()), pendingWrites = useRef(new Map<string, string>());
+  const visibleRef = useRef(visible); visibleRef.current = visible;
+  const label = (key: string, fallback: string) => t('features.' + key, { defaultValue: fallback });
+  const changeLayout = (next: typeof layout) => { setLayout(next); try { localStorage.setItem('sc.term.layout.' + serverId, next); } catch { /* layout stays available for this session */ } };
+  const rename = () => { const value = draftName.trim().slice(0, 80); const next = { ...names }; if (value) next[renaming] = value; else delete next[renaming]; setNames(next); setRenaming(''); try { localStorage.setItem('sc.term.names.' + serverId, JSON.stringify(next)); } catch { /* keep in memory */ } };
+  const flushCommand = (termId: string) => { const command = pendingWrites.current.get(termId); if (!command || !visibleRef.current || !ready.current.has(termId) || !api) return; pendingWrites.current.delete(termId); void api.terminalWrite(termId, command + '\r').catch((error) => pushToast({ level: 'error', title: t('terminal.openFail'), detail: String(error) })); };
+  const terminalReady = (termId: string) => { ready.current.add(termId); flushCommand(termId); };
+  useEffect(() => { const listener = (event: Event) => { if ((event as CustomEvent<{ serverId: string }>).detail?.serverId === serverId) setCommandRevision((n) => n + 1); }; window.addEventListener('sc:terminal-command', listener); return () => window.removeEventListener('sc:terminal-command', listener); }, [serverId]);
+
 
   const applySessions = useCallback((list: TerminalSessionInfo[]) => {
     const own = list.filter((s) => s.serverId === serverId);
@@ -327,7 +355,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
     };
   }, [refresh, applySessions]);
 
-  const create = () => {
+  const create = (command?: string) => {
     if (!api || pendingCreate.current) return;
     pendingCreate.current = true;
     setCreating(true);
@@ -336,6 +364,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
       .then((r) => {
         if (!mounted.current) return;
         if (r.ok && r.data) {
+          if (command) pendingWrites.current.set(r.data, command);
           setActive(r.data);
           refresh();
         } else {
@@ -348,6 +377,27 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
         pushToast({ level: 'error', title: t('terminal.openFail'), detail: e instanceof Error ? e.message : String(e) });
         autoCreated.current = false;
       }).finally(() => { pendingCreate.current = false; if (mounted.current) setCreating(false); });
+  };
+
+  useEffect(() => {
+    if (!visible || !loaded || pendingCreate.current) return;
+    for (const termId of pendingWrites.current.keys()) flushCommand(termId);
+    const command = takeTerminalCommand(serverId);
+    if (command) { autoCreated.current = true; create(command); }
+    // The create guard serializes terminal ownership; the revision is only an arrival signal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, loaded, commandRevision, creating, serverId]);
+  const discoverTmux = async () => {
+    if (!api || tmuxBusy) return; setTmuxBusy(true);
+    try { const result = await api.workbenchRequest<{ available: boolean; sessions: Array<{ name: string; windows: number; attached: number }> }>({ operation: 'tmux.list', serverId }); if (!mounted.current) return; if (!result.ok || !result.data) throw new Error(result.error); setTmux(result.data); setTmuxSelected(result.data.sessions[0]?.name || ''); }
+    catch (error) { if (mounted.current) pushToast({ level: 'error', title: 'tmux', detail: String(error) }); }
+    finally { if (mounted.current) setTmuxBusy(false); }
+  };
+  const attachTmux = async () => {
+    if (!api || !tmuxSelected || pendingCreate.current || tmuxBusy) return; setTmuxBusy(true);
+    try { const result = await api.workbenchRequest<{ command: string }>({ operation: 'tmux.attach', serverId, name: tmuxSelected }); if (!mounted.current) return; if (!result.ok || !result.data) throw new Error(result.error); create(result.data.command); }
+    catch (error) { if (mounted.current) pushToast({ level: 'error', title: 'tmux', detail: String(error) }); }
+    finally { if (mounted.current) setTmuxBusy(false); }
   };
 
   // 首次进入自动创建一个会话；失败（如服务器离线）允许重试
@@ -382,7 +432,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             title={t('terminal.switchHint')}
           >
             <i className="term-dot" aria-hidden="true" />
-            <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => setActive(s.termId)}>{t('terminal.termN', { n: i + 1 })}</button>
+            <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => setActive(s.termId)}>{names[s.termId] || t('terminal.termN', { n: i + 1 })}</button><button className="term-chip-x" title={label('rename', 'Rename')} aria-label={label('rename', 'Rename')} onClick={() => { setDraftName(names[s.termId] || ''); setRenaming(s.termId); }}><Pencil size={10} /></button>
             <button
               className="term-chip-x"
               title={t('terminal.closeSession')}
@@ -396,22 +446,27 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             </button>
           </div>
         ))}
-        <button className="term-chip add" title={t('terminal.newSession')} onClick={create} disabled={creating}>
+        <button className="term-chip add" title={t('terminal.newSession')} onClick={() => create()} disabled={creating}>
           <Plus size={13} />
         </button>
-        <span style={{ flex: 1 }} />
+        <span style={{ flex: 1 }} /><div className="term-tools">{([['single', Square], ['columns', Columns2], ['rows', Rows2]] as const).map(([kind, Icon]) => <button key={kind} className={`btn mini ${layout === kind ? 'on' : ''}`} aria-pressed={layout === kind} title={label('layout' + kind, kind)} aria-label={label('layout' + kind, kind)} onClick={() => changeLayout(kind)}><Icon size={13} /></button>)}<button className="btn mini" disabled={tmuxBusy} onClick={() => void discoverTmux()}><RefreshCw size={12} />tmux</button></div>
       </div>
-      {sessions.map((s) => (
+      {renaming && <form className="terminal-search" onSubmit={(e) => { e.preventDefault(); rename(); }}><input autoFocus aria-label={label('rename', 'Rename')} maxLength={80} value={draftName} onChange={(e) => setDraftName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(''); }} /><button className="btn mini">{label('save', 'Save')}</button><button className="btn mini" type="button" onClick={() => setRenaming('')}>{t('settings.close')}</button></form>}
+      {tmux && <div className="terminal-search"><span>{tmux.available ? label('tmuxSessions', 'Remote tmux sessions') : label('tmuxUnavailable', 'tmux is not installed')}</span>{tmux.sessions.length ? <><select aria-label={label('tmuxSessions', 'Remote tmux sessions')} value={tmuxSelected} onChange={(e) => setTmuxSelected(e.target.value)}>{tmux.sessions.map((session) => <option key={session.name} value={session.name}>{session.name} · {session.windows}</option>)}</select><button className="btn mini" disabled={tmuxBusy || creating} onClick={() => void attachTmux()}>{label('attach', 'Attach')}</button></> : tmux.available && <span>{label('noSessions', 'No sessions')}</span>}<button className="btn mini" onClick={() => setTmux(null)}>{t('settings.close')}</button></div>}
+      <div className={`terminal-split ${layout}`}>{sessions.map((s) => (
             <TerminalPane
               key={s.termId}
               termId={s.termId}
-              active={visible && s.termId === active}
+              active={visible && (s.termId === active || layout !== 'single' && s.termId === sessions.find((session) => session.termId !== active)?.termId)}
+              selected={visible && s.termId === active}
+              onSelect={() => setActive(s.termId)}
+              onReady={terminalReady}
               onClosed={(tid) => {
                 refresh();
                 setActive((a) => (a === tid ? '' : a));
               }}
             />
-          ))}
+          ))}</div>
       {!active && (
         <div className="term-empty">{loaded ? t('terminal.clickPlus') : t('terminal.loadingSessions')}</div>
       )}

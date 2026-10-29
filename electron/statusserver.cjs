@@ -28,11 +28,11 @@ class StatusServer {
           if (!this.safeEqual(url.searchParams.get('token'), this.token)) { res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }); res.end('Forbidden'); return; }
           if (url.pathname === '/status.json') {
             const body = JSON.stringify(this.getSummary());
-            res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+            res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' });
             res.end(body);
             return;
           }
-          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' });
           res.end(StatusServer.page(url.searchParams.get('token') || ''));
         } catch (error) {
           this.log('statuspage-handler', String((error && error.message) || error));
@@ -58,7 +58,7 @@ class StatusServer {
   lanAddresses(port = this.port) {
     const ips = [];
     for (const list of Object.values(os.networkInterfaces())) for (const ni of list || []) if (ni.family === 'IPv4' && !ni.internal) ips.push(ni.address);
-    return { urls: ips.map((ip) => `http://${ip}:${port}/?token=${this.token}`), localhost: `http://127.0.0.1:${port}/?token=${this.token}` };
+    return { urls: [...new Set(ips)].filter((ip) => !ip.startsWith('169.254.')).map((ip) => `http://${ip}:${port}/?token=${this.token}`), localhost: `http://127.0.0.1:${port}/?token=${this.token}` };
   }
 
   // 单文件内联页面：无构建步骤，深色移动端优先，5 秒轮询
@@ -98,7 +98,7 @@ h2 { font-size: 13px; color: #aab6c8; margin-bottom: 6px; }
 const TOKEN = ${tokenJson};
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pct = (a, b) => (b > 0 ? Math.round(a / b * 100) : 0);
-const gb = (n) => n == null ? '—' : (n / 1073741824).toFixed(1) + ' GiB';
+const gb = (n) => n == null ? '—' : (n / 1024).toFixed(1) + ' GiB';
 function render(d) {
   document.getElementById('sub').textContent = 'updated ' + new Date(d.generatedAt).toLocaleTimeString();
   const root = document.getElementById('root');
@@ -107,8 +107,8 @@ function render(d) {
     parts.push('<div class="card' + (s.status !== 'online' ? ' offline' : '') + '"><div class="srv-head"><i class="dot ' + esc(s.status) + '"></i><b>' + esc(s.name) + '</b><span class="cpu">' + (s.cpu == null ? '' : 'CPU ' + s.cpu.toFixed(0) + '%') + (s.memTotal ? ' · RAM ' + pct(s.memUsed || 0, s.memTotal) + '%' : '') + '</span></div>');
     if (s.status !== 'online') parts.push('<div class="empty">offline</div>');
     for (const g of s.gpus || []) {
-      const up = pct(g.util || 0, 100), mp = pct(g.memUsed || 0, g.memTotal || 0);
-      parts.push('<div class="gpu"><div class="name"><span>GPU ' + esc(g.index) + ' · ' + esc(g.name) + '</span><span>' + (g.temp != null ? g.temp + '°C · ' : '') + up + '%</span></div>' +
+      const known = g.util != null, up = known ? Math.max(0, Math.min(100, g.util)) : 0, mp = pct(g.memUsed, g.memTotal);
+      parts.push('<div class="gpu"><div class="name"><span>GPU ' + esc(g.index) + ' · ' + esc(g.name) + '</span><span>' + (g.temp != null ? g.temp + '°C · ' : '') + (known ? up + '%' : '—') + '</span></div>' +
         '<div class="bar' + (up > 90 ? ' hot' : '') + '"><i style="width:' + up + '%"></i></div>' +
         '<div class="bar mem"><i style="width:' + mp + '%"></i></div>' +
         '<div class="meta">' + gb(g.memUsed) + ' / ' + gb(g.memTotal) + '</div></div>');

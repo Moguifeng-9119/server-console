@@ -1,5 +1,11 @@
 # Usage and recovery guide
 
+For v0.18 experiment workspaces, task/log workflows, Slurm, diagnostics,
+configuration migration and optional notifications, see the
+[workbench guide](WORKBENCH-GUIDE.md). The
+[current validation ledger](VALIDATION-0.18.0.md) distinguishes implemented tools,
+real-host acceptance and pending platform coverage.
+
 ## Monitoring history (0.13.0)
 
 Use **History** on an overview card, or the **History** tab within a server. Choose 30 minutes, 1 hour, 12 hours, 1 day or 1 week, then a GPU/system and metric. Hover the chart for timestamps and values. Missing observations remain gaps. Stale live panels retain cached values with their sample age and disable process actions.

@@ -11,6 +11,8 @@ import { ContextMenu } from './ContextMenu';
 import { TextViewer } from './TextViewer';
 import { ImagePreview, CsvPreview } from './FilePreview';
 import { RelayDialog } from './ServerRelay';
+import { SyncDialog } from './SyncDialog';
+import { takeFilesPath } from '../workbench-navigation';
 
 interface PaneState {
   cwd: string;
@@ -95,6 +97,8 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
   const [viewer, setViewer] = useState<{ path: string; name: string; size: number } | null>(null);
   const [image, setImage] = useState<{ name: string; url: string; truncated: boolean } | null>(null);
   const [csv, setCsv] = useState<{ name: string; text: string; truncated: boolean } | null>(null);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const remoteRevision = useRef(0), localRevision = useRef(0), explicitDirectory = useRef(false);
   const [relay, setRelay] = useState<{ sel: FileEntry[] } | null>(null);
 
   const [menu, setMenu] = useState<{ x: number; y: number; side: 'local' | 'remote'; entry: FileEntry } | null>(null);
@@ -107,7 +111,7 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
     void api.localHome().then((home) => { if (!disposed) return loadLocal(home); })
       .catch((e) => { if (!disposed) setLocal((p) => ({ ...p, loading: false, err: msg(e) })); });
     void api.sftpHome(serverId).then((hr) => {
-      if (disposed) return;
+      if (disposed || explicitDirectory.current) return;
       if (hr.ok && hr.data) return loadRemote(hr.data);
       setRemote((p) => ({ ...p, loading: false, err: hr.error || t('files.sftpUnavailable') }));
     }).catch((e) => { if (!disposed) setRemote((p) => ({ ...p, loading: false, err: msg(e) })); });
@@ -118,9 +122,11 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
   // ---------- 加载 ----------
   const loadLocal = async (dir?: string) => {
     if (!api) return;
+    const request = ++localRevision.current;
     const target = dir ?? local.cwd;
     setLocal((p) => ({ ...p, loading: true, err: '' }));
     const r: IpcResult<DirListing> = await api.localList(target);
+    if (request !== localRevision.current) return;
     setLocal((p) =>
       r.ok && r.data
         ? { cwd: r.data.path, entries: r.data.entries, loading: false, err: '', selected: {} }
@@ -130,16 +136,31 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
 
   const loadRemote = async (dir?: string) => {
     if (!api) return;
+    const request = ++remoteRevision.current;
     const target = dir ?? remote.cwd;
     setRemote((p) => ({ ...p, loading: true, err: '' }));
     setResults(null);
     const r = await api.sftpList(serverId, target);
+    if (request !== remoteRevision.current) return;
     setRemote((p) =>
       r.ok && r.data
         ? { cwd: r.data.path, entries: r.data.entries, loading: false, err: '', selected: {} }
         : { ...p, loading: false, err: r.error || t('files.readFail') },
     );
   };
+
+  useEffect(() => {
+    const navigate = (event?: Event) => {
+      if (event && (event as CustomEvent<{ serverId: string }>).detail?.serverId !== serverId) return;
+      const directory = takeFilesPath(serverId);
+      if (directory) { explicitDirectory.current = true; void loadRemote(directory); }
+    };
+    const requests = remoteRevision, localRequests = localRevision;
+    navigate(); window.addEventListener('sc:files-path', navigate);
+    return () => { requests.current++; localRequests.current++; window.removeEventListener('sc:files-path', navigate); };
+    // Navigation requests carry a server ID and consume a single queued path.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId]);
 
   // ---------- 选中 ----------
   // 单击=单选、Ctrl/Cmd=加减选、Shift=从锚点范围选；Esc 清空、Ctrl+A 全选（见下方全局键盘）
@@ -418,6 +439,7 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
   return (
     <div className="fm">
       <div className="fm-toolbar">
+        <button className="btn" disabled={!local.cwd || !remote.cwd} onClick={() => setSyncOpen(true)}>{t('features.syncPreview', { defaultValue: 'Sync preview' })}</button>
         <input
           className="mini"
           placeholder={t('files.searchPh')}
@@ -650,6 +672,7 @@ function FileManagerImpl({ serverId, active = true }: { serverId: string; active
         </div>
       )}
 
+      {active && syncOpen && <SyncDialog serverId={serverId} localDir={local.cwd} remoteDir={remote.cwd} onClose={() => setSyncOpen(false)} />}
       {active && viewer && <TextViewer serverId={serverId} path={viewer.path} name={viewer.name} size={viewer.size} onClose={() => setViewer(null)} />}
 
       {active && image && <ImagePreview name={image.name} url={image.url} truncated={image.truncated} onClose={() => setImage(null)} />}

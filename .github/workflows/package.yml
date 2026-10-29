@@ -26,6 +26,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run smoke
@@ -36,9 +37,14 @@ jobs:
       - name: Native package checks (Windows/macOS)
         if: runner.os != 'Linux'
         run: node scripts/native-ci.cjs
+      - name: Isolated Windows NSIS install and upgrade
+        if: runner.os == 'Windows'
+        run: node scripts/install-upgrade-check.cjs
       - name: Native package checks (Linux with virtual display)
         if: runner.os == 'Linux'
         run: xvfb-run -a node scripts/native-ci.cjs
+      - name: Verify update metadata and write SHA-256 checksums
+        run: node scripts/release-checksums.cjs release
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -46,6 +52,7 @@ jobs:
           path: |
             test-artifacts/terminal
             test-artifacts/window-layout
+            test-artifacts/install-upgrade
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
@@ -54,4 +61,8 @@ jobs:
             release/*.exe
             release/*.dmg
             release/*.AppImage
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
+            release/SHA256SUMS.txt
           if-no-files-found: error

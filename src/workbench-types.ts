@@ -21,7 +21,12 @@ export interface SystemResources {
 }
 export interface ContainerList { available: boolean; engine: string; statsError?: string; stats: Array<Record<string, string>>; containers: Array<{ id: string; name: string; image: string; status: string; ports: unknown }> }
 export interface CommandTemplate { id: string; name: string; command: string }
-export interface LogWatcher { id: string; serverId: string; name: string; path: string; patterns: string[]; trackLoss: boolean; enabled: boolean; lastLines?: string[]; lastHits?: Array<{ line: string; at: number }>; lossPoints?: number[] }
+export interface LogWatcher { id: string; serverId: string; name: string; path: string; patterns: string[]; trackLoss: boolean; enabled: boolean; lastLines?: string[]; lastHits?: Array<{ line: string; at: number }>; lossPoints?: number[]; backlogBytes?: number; lastPollAt?: number; lastError?: string; lastErrorAt?: number; progressPoints?: Array<{ at: number; loss?: number; step?: number; epoch?: number }> }
 export interface EnvEntry { id: string; serverId: string; at: number; driver: string; cuda: string; kernel: string; os: string; python: string; torch: string }
 export interface UsageRow { user: string; totalMinutes: number; byServer: Record<string, number> }
 export interface ResourceReport { start: number; end: number; note: string; devices: Array<{ device: string; label: string; metric: string; average: number | null; peak: number | null; coveredMs: number; coveragePercent: number; busyEquivalentHours: number }>; tasks: Array<WorkspaceTask> }
+
+export interface ExperimentWorkspace { id: string; serverId: string; name: string; cwd: string; gpu?: string; taskId?: string; sessionName?: string; logPath?: string; remotePort?: number; localPort?: number }
+export interface SlurmResult { available: boolean; jobs?: Array<{ id: string; [key: string]: string }>;  output?: string }
+
+export interface GpuDiagnostics { at: number; available: boolean; devices: Array<{ index: number; uuid: string; metrics: Record<string, { value: string | null; supported: boolean }> }>; layout: string; nvlink?: string }

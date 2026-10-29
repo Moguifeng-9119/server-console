@@ -78,9 +78,10 @@ function parseSnapshot(out, previousCpu = null) {
       index,
       uuid: f[1],
       name: f[2] || 'GPU',
-      util: Math.round(num(f[3])),
-      memUsed: Math.round(num(f[4])),
-      memTotal: Math.round(num(f[5])),
+      util: roundOrNull(f[3]) ?? 0,
+      memUsed: roundOrNull(f[4]) ?? 0,
+      memTotal: roundOrNull(f[5]) ?? 0,
+      unavailableMetrics: ['util', 'memUsed', 'memTotal', 'temp', 'power', 'fan'].filter((_key, i) => numOrNull(f[i + 3]) == null),
       temp: roundOrNull(f[6]),
       power: roundOrNull(f[7]),
       fan: roundOrNull(f[8]),
@@ -420,12 +421,14 @@ class Connection {
     return snap;
   }
 
-  async kill(pid, signal) {
+  async kill(pid, signal, expectedStartTicks = undefined) {
     if (!Number.isSafeInteger(Number(pid)) || Number(pid) <= 0 || !['TERM', 'KILL'].includes(signal)) {
       return { ok: false, error: lang.t('invalidConfig', { detail: 'PID / signal' }) };
     }
     const flag = signal === 'KILL' ? '-9' : '-15';
-    const { stdout, stderr, code, signal: exitSignal } = await this.exec(`LC_ALL=C kill ${flag} ${Number(pid)}`, 8000);
+    if (expectedStartTicks !== undefined && !/^[0-9]+$/.test(String(expectedStartTicks))) return { ok: false, error: 'Invalid process start identity' };
+    const guard = expectedStartTicks === undefined ? '' : `current=$(sed 's/^.*) //' /proc/${Number(pid)}/stat 2>/dev/null | awk '{print $20}'); test -n "$current" && test "$current" = ${shq(expectedStartTicks)} || { printf 'Process identity changed or process exited' >&2; exit 125; }; `;
+    const { stdout, stderr, code, signal: exitSignal } = await this.exec(`${guard}LC_ALL=C kill ${flag} ${Number(pid)}`, 8000);
     if (code !== 0 || exitSignal) {
       const error = /no such process/i.test(stderr) ? lang.t('processMissing')
         : /not permitted|permission denied/i.test(stderr) ? lang.t('permission')

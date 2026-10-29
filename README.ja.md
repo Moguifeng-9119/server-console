@@ -1,45 +1,41 @@
 # ServerConsole
 
-**必要な空き GPU メモリを探し、利用者を確認し、同じデスクトップから監視・ターミナル・ファイル管理を開けます。**
+**空き GPU メモリと利用者を確認し、同じデスクトップから実験・端末・ファイルを開けます。**
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Русский](README.ru.md) | [Português (Brasil)](README.pt-BR.md)
 
-[デスクトップ版をダウンロード](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1) · [問題を報告](https://github.com/Moguifeng-9119/server-console/issues)
+[ダウンロード](https://github.com/Moguifeng-9119/server-console/releases/latest) · [Issues](https://github.com/Moguifeng-9119/server-console/issues) · [Changelog](CHANGELOG.md)
 
-**0.13.1：**GPU ごとの円形メーター、キャッシュを使った即時切り替え、保持されるファイル画面、見つけやすい履歴画面を追加。30 分・1 時間・12 時間・1 日・1 週間を選べます。SQLite は生データを 24 時間、分単位の集計を 30 日で自動削除します。収集はアプリ起動中に行います。`ServerConsole-Setup-0.13.1.exe` をインストールしてください。[検証と容量](docs/VALIDATION-0.13.1.md)
+![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
+![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-**Windows 配布ファイルは未署名です。SmartScreen が警告する場合があります。Release の SHA-256 と照合してください。**
+## 0.18.0 の更新
 
-![GPU リソース画面：模擬データ](assets/screenshots/workbench-en.png)
+- GPU・システム・プロセスの段階的収集を実際のスケジューラーに接続。未取得値は不明のまま保持し、時刻と欠測を記録します。GPU メーターは各行4個です。
 
-**0.12.0 の更新**
+- 実験ワークスペースにサーバー、ディレクトリ、GPU、tmux、ログ、サービスを保存。端末検索、分割画面、ファイルへの移動で作業状況を保持します。
 
-タスク所有の一時ファイルを永続記録し、復元と再接続時の削除を追加しました。SHA-256 検証の進捗、旧タスクの説明、ファイル・中継のキーボード操作、未保存テキストの保護、ESLint/Hooks 検査を追加しました。全 10 言語は 702 キーを備えます。機械翻訳を併用した残りの文章は母語話者による確認が必要です。
+- タスク終了コードと停止結果を実際の処理に合わせ、プロセス開始識別子で PID 再利用を確認。オフライン状態を通知ルールとモバイル要約へ反映します。
 
-0.12.2 は実 Linux サーバー2台で 16 MiB のアップロードと rsync、主プロセスの強制終了後の復元、既存データの検証進捗、所有する鍵と一時ディレクトリの削除を確認しました。以下の 0.11.1 数値は過去の結果です。最新の範囲は [0.12.2](docs/VALIDATION-0.12.2.md)。
+- 履歴は30分・1時間・12時間・1日・1週間。GPU 比較、ディスク・ネットワーク、エクスポート、イベント表示に対応。生データ24時間、分集計30日で自動削除します。
 
-![27-second simulated workflow](assets/demo/workflow.gif)
+- タスク、増分学習ログ、GPU 空き通知、ルール、コンテナー、サービス転送を利用できます。Slurm はジョブ・詳細・ログの読み取り専用で、ホストの対応が必要です。
 
-<p><img src="assets/screenshots/relay-en.png" alt="Simulated server relay" width="49%"> <img src="assets/screenshots/transfer-en.png" alt="Simulated resume verification" width="49%"></p>
+- 同期の変更と除外を適用前に確認。保存時アップロードは待機・転送中・成功・失敗を区別し、完了後に成功時刻を更新します。
 
-画像は v0.12.0 の模擬データです。v0.12.0 は Windows x64 ポータブル版、Linux x86_64 AppImage、macOS ユニバーサル DMG と SHA-256 ファイルを提供します。パッケージは未署名、macOS は未公証です。[検証記録](docs/VALIDATION-0.12.2.md)に対象範囲を示しています。
+- 診断と認証情報を含まない設定バックアップで移行を支援。HTTPS Webhook は初期無効。別途起動するヘッドレス収集器はデスクトップ終了後も履歴を保存します。
 
-[Detailed usage and recovery (English)](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
-
-## できること
-
-ServerConsole は共有 **Linux / NVIDIA GPU サーバー**を使う個人向けデスクトップツールです。SSH を介してリソース検索、ターミナル、2 ペイン SFTP、サーバー間転送をまとめます。リモートに監視エージェントを導入する必要はありません。
-
-- GPU ごとの空き GiB、モデル、利用者で絞り込み、空きの多い順に表示。監視・ターミナル・ファイルを直接開く。
-- GPU とプロセス、同じ PID の複数 GPU、Linux CPU 時間カウンター、実際の取得時刻を確認。
-- 転送キュー、検証付き再開、再起動後の復元、rsync 直接転送または SFTP 中継。
-- SSH config 読み込み、グループ、ProxyJump、コマンド、ポート転送、発生中・復旧済みの通知。閉じられるトーストは最大 2 件で、デモでは外部に異常通知しません。
-
-チームアカウント、GPU 予約、クラスタースケジューラー、AMD/Intel GPU、完全な NVML 診断は提供していません。空きメモリは観測値で、予約や占有権を意味しません。
+[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## はじめに
 
-[リリース](https://github.com/Moguifeng-9119/server-console/releases/tag/v0.13.1)から対象 OS のファイルを取得します。サーバー管理で接続を試して追加するか、SSH config を読み込みます。GPU 指標にはリモートの nvidia-smi、システム指標には Linux /proc が必要です。ソースからの起動には Node.js 22 と npm を使います。
+Release に添付されたパッケージを選択。Windows は未署名で SmartScreen 警告が出る場合があります。同じリリースの SHA-256 を確認してください。macOS/Linux は実際のワークフローと公開成果物で判断します。
+
+SSH 接続を追加・読み込みし、指紋を確認して概要またはワークベンチを開きます。GPU は nvidia-smi、システムは Linux /proc が必要。空きメモリは予約ではありません。
+
+[Detailed usage and recovery](docs/USER-GUIDE.md) · [Security](SECURITY.md) · [Headless collector](docs/HEADLESS-MONITOR.md)
+
+## 開発
 
 ```sh
 git clone https://github.com/Moguifeng-9119/server-console.git
@@ -48,33 +44,13 @@ npm ci
 npm run dev
 ```
 
-ブラウザーは模擬データのデモです。実際の SSH、認証情報、ターミナル、SFTP にはデスクトッププロセスを起動します。
+ブラウザーは明示された模擬デモです。実 SSH、端末、SFTP は Electron デスクトップで動作します。
 
 ```sh
 npm run electron:dev
 ```
 
-GPU 1 枚に必要な空き GiB を指定し、モデルや利用者を選んで監視・ターミナル・ファイルを開きます。設定は外観、監視、安全、作業、記録・ヘルプに分類されています。Ctrl/Cmd+K はコマンドパレット、主要ダイアログは Tab、Shift+Tab、Escape とフォーカス復元に対応します。
-
-## 転送と認証情報
-
-- 既存の任意の転送先を再開用データとして扱いません。アップロード、ダウンロード、ローカル中継はタスク専用の一時ファイルを使い、SHA-256 で既存部分全体を比較して再開します。
-- SFTP はバイト数と送信元のサイズ・更新時刻を確認してから転送先を置換し、重なるパスを直列化します。失敗時は再試行用データを保持し、取消・削除時の清掃に失敗すると復元記録を保持してエラーを表示します。
-- 任意の MD5 検証は単一ファイルの置換前に実施。ディレクトリや中継を MD5 検証済みとは表示しません。
-- 直接転送には両側の rsync と送信元から転送先への接続が必要です。一時 SSH 鍵と信頼済み指紋を使い、利用できなければ段階的 SFTP 中継に切り替えます。直接上書きする tar/scp の代替経路は無効です。
-- 安全な OS キーストアが使える場合にパスワードとパスフレーズを暗号化します。利用不可または Linux basic_text の場合、新しい認証情報はセッション内だけに保持し、再起動後に再入力します。安全設定は実際の保存方式を表示し、秘密鍵は元のパスに残します。
-
-サイズと時刻は同時に書き換わるソースをロックしません。[セキュリティ](SECURITY.md)を参照。実サーバー間 rsync とクラッシュ後の削除は隔離テストで確認済みです。
-
-## 検証済みの範囲
-
-v0.11.1 は Windows・Linux・macOS でそれぞれ型検査、84 件の回帰テスト、SFTP スモーク、ビルド、22 件のブラウザー検査を通過しました。パッケージ化したアプリは各 OS で 16 件のネイティブ検査に通過：実 IPC、ローカル SSH shell、サイズ変更、転送、認証付き再起動を確認。Windows DPAPI は実測済み；macOS 自動化は MockKeychain を使用し、実 Keychain は未検証です。Linux CI はキーストアがない場合のセッション限定保存を確認します。macOS の実行は arm64 で、Intel は未実行です。
-
-実 GPU/MIG、実リモート PTY、運用環境での rsync とネットワーク性能、実 macOS/Linux キーストア、インストーラー・更新は別途検証が必要です。ベンチマークはローカルの模擬 SSH 10/30 セッションで、実クラスター性能や削減率を保証しません。[検証](docs/VALIDATION-0.11.1.md)・[測定方法](docs/BENCHMARKS.md)を参照してください。
-
-## 開発とビルド
-
-React、TypeScript、Electron、Vite、ssh2 の正確な版は [package.json](package.json)とロックファイルに記載しています。検査コマンド：
+React 18 · TypeScript · Electron · Vite · ssh2 · SQLite. [package.json](package.json) · [Architecture](docs/ARCHITECTURE.md)
 
 ```sh
 npm run lint
@@ -82,16 +58,20 @@ npm run typecheck
 npm test
 npm run smoke
 npm run build
-npx playwright-core install chromium
 npm run test:ui
 npm run test:workflow
-npm run benchmark
 ```
 
-SC_ELECTRON_PATH に現在の展開済み実行ファイルを指定し、npm run e2e:terminal で検査できます。dist:win:lite、dist:win:nsis、dist:linux、dist:mac は自動公開を無効にしています。[パッケージ CI](.github/workflows/package.yml)はネイティブ検査後に未署名の成果物をアップロードします。ESLint と React-Hooks を設定済みです。CI で npm run lint を実行します。
+## 検証範囲
 
-## 言語と貢献
+最新台帳にコマンド、結果、未検証項目を記録。実 Linux 2台で GPU ストリーム、3収集層、資源カウンター、終了コード7の専用タスクを確認しました。大規模運用、100GB 転送、Slurm/MIG、全 OS インストーラーの保証ではありません。
 
-README は 10 言語。画面も 10 言語のキーを揃え、必要な言語だけ読み込みます。すべての文章の母語話者による確認は未完了です。 [LOCALIZATION](docs/LOCALIZATION.md).
+[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
-[構成](docs/ARCHITECTURE.md) · [貢献ガイド](CONTRIBUTING.md) · [ロードマップ](docs/ROADMAP.md) · [変更履歴](CHANGELOG.md) · [MIT ライセンス](LICENSE)
+## 言語とガイド
+
+アプリと README は10言語。機械支援翻訳は母語確認が必要です。リモート出力は原語のまま。以下は旧版の模擬画像です。
+
+![GPU overview — historical simulated example](assets/screenshots/gpu-even-0.13.1-en.png)
+
+[Localization](docs/LOCALIZATION.md) · [Contributing](CONTRIBUTING.md) · [MIT](LICENSE)

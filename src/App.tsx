@@ -20,6 +20,7 @@ import { ParallelCommand } from './components/ParallelCommand';
 import { HistoryDialog } from './components/HistoryDialog';
 import { CommandPalette, type PaletteAction } from './components/CommandPalette';
 import { WorkCenter } from './components/WorkCenter';
+import { queueTerminalCommand, queueFilesPath } from './workbench-navigation';
 import { useTransfers } from './transfers';
 import type { SetStateAction } from 'react';
 
@@ -47,7 +48,7 @@ function loadView(): { kind: 'overview' } | { kind: 'parallel' } | { kind: 'work
 }
 
 export default function App() {
-  const { servers, theme, setTheme, toasts, dismissToast, alertRecords, demo, configs, sampleNow, refreshMs } = useStore();
+  const { pushToast, servers, theme, setTheme, toasts, dismissToast, alertRecords, demo, configs, sampleNow, refreshMs } = useStore();
   const { t } = useTranslation();
   const tClose = t('settings.close');
   const tf = useTransfers();
@@ -69,12 +70,16 @@ export default function App() {
   const [quitAsk, setQuitAsk] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [historyView, setHistoryView] = useState<Server | null>(null);
+  const [workbenchContext, setWorkbenchContext] = useState<{ serverId?: string; pid?: number }>({});
+  useEffect(() => { const open = (event: Event) => { const detail = (event as CustomEvent<{ serverId: string; pid?: number }>).detail; if (document.querySelector('[data-unsaved="true"]')) return; setWorkbenchContext(detail); setView({ kind: 'workcenter' }); }; window.addEventListener('sc:workbench', open); return () => window.removeEventListener('sc:workbench', open); }, [setView]);
+  useEffect(() => api?.onWorkbenchEvent?.((event) => pushToast({ level: 'info', title: event.title, detail: event.body })), [pushToast]);
 
   // 页面/标签持久化
   useEffect(() => {
     localStorage.setItem(LS_VIEW, JSON.stringify(view));
     if (view.kind === 'server') serverTabs.current[view.id] = view.tab;
   }, [view]);
+  useEffect(() => { const update = () => { void api?.setMonitoringHidden?.(document.hidden); }; update(); document.addEventListener('visibilitychange', update); return () => document.removeEventListener('visibilitychange', update); }, []);
   const focusedId = view.kind === 'server' ? view.id : null;
   useEffect(() => { void api?.setFocusedServer(focusedId); }, [focusedId]);
 
@@ -334,12 +339,14 @@ export default function App() {
           ) : view.kind === 'workcenter' ? (
             <WorkCenter
               servers={servers}
+              initialServerId={workbenchContext.serverId}
+              initialProcessId={workbenchContext.pid}
               onTerminal={(serverId, command) => {
                 openServer(serverId, 'term');
-                if (command) setTimeout(() => window.dispatchEvent(new CustomEvent('sc:terminal-command', { detail: command })), 400);
+                if (command && !document.querySelector('[data-unsaved="true"]')) queueTerminalCommand(serverId, command);
               }}
-              onFiles={(serverId) => openServer(serverId, 'files')}
-              onForward={async () => setSettingsOpen(true)}
+              onFiles={(serverId, directory) => { openServer(serverId, 'files'); if (directory && !document.querySelector('[data-unsaved="true"]')) queueFilesPath(serverId, directory); }}
+              onForward={async (serverId, template) => { const result = await api?.workbenchRequest({ ...template, operation: 'serviceOpen', serverId }); if (!result?.ok) throw new Error(result?.error || 'Service connection failed'); }}
             />
           ) : view.kind === 'overview' ? (
             configs.length === 0 && !demo ? (

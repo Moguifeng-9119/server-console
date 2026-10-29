@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const folder = path.join(__dirname, '..', 'src', 'i18n', 'locales');
 
-const keys = ['imageTitle', 'fit', 'original', 'csvTitle', 'rowsLimited', 'imageTruncated'];
+const _keys = ['imageTitle', 'fit', 'original', 'csvTitle', 'rowsLimited', 'imageTruncated'];
 const translations = {
   en: { imageTitle: 'Image preview', fit: 'Fit window', original: 'Original size', csvTitle: 'CSV preview', rowsLimited: 'Showing the first {{n}} rows only', imageTruncated: 'Only the first 2 MB were loaded.' },
   'zh-CN': { imageTitle: '图片预览', fit: '适应窗口', original: '原始大小', csvTitle: 'CSV 预览', rowsLimited: '仅显示前 {{n}} 行', imageTruncated: '仅加载了前 2 MB。' },

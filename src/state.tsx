@@ -12,6 +12,7 @@ import type { AlertRecord, HistoryPoint, AuditEntry, Server, ServerConfig, Snaps
 import { api, isElectron } from './api';
 import i18n, { initializationWarning } from './i18n';
 import { appendSample, normalizeHistory } from './history';
+import { telemetryStore } from './telemetry/store';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'default' | 'comfy';
@@ -79,7 +80,7 @@ interface Store {
   pushToast: (t: Omit<Toast, 'id'>) => void;
   audit: AuditEntry[];
   histories: Record<string, HistoryPoint[]>;
-  kill: (serverId: string, pid: number, signal: 'TERM' | 'KILL') => void;
+  kill: (serverId: string, pid: number, signal: 'TERM' | 'KILL', expectedStartTicks?: string) => void;
   restartService: (serverId: string, service: string) => void;
   colorOf: (pct: number) => string;
 }
@@ -113,7 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     loadPref('sc.thresholds', { warn: 50, high: 75, crit: 90 }, isThresholds),
   );
   const [refreshMs, setRefreshMsState] = useState<number>(() =>
-    loadPref('sc.refreshMs', 2000, (v) => [1000, 2000, 5000, 10000].includes(Number(v))),
+    loadPref('sc.refreshMs', 2000, (v) => [200, 500, 1000, 2000, 5000, 10000].includes(Number(v))),
   );
   const [alertsEnabled, setAlertsEnabledState] = useState<boolean>(() =>
     loadPref('sc.alertsEnabled', true, (v) => typeof v === 'boolean'),
@@ -217,13 +218,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // 订阅主进程采集结果
   useEffect(() => {
     if (!api || demo) return;
+    const pendingSnapshots = new Map<string, SnapshotPayload>();
+    const flushSnapshots = () => {
+      if (!pendingSnapshots.size) return;
+      const values = [...pendingSnapshots.values()]; pendingSnapshots.clear();
+      setSnaps((previous) => { const next = { ...previous }; for (const sample of values) next[sample.id] = sample; return next; });
+      setHistories((previous) => {
+        const next = { ...previous };
+        for (const sample of values) {
+          const valid = sample.gpus.filter((gpu) => !gpu.unavailableMetrics?.includes('util'));
+          const value = valid.length === sample.gpus.length && valid.length ? valid.reduce((sum, gpu) => sum + gpu.util, 0) / valid.length : null;
+          next[sample.id] = appendSample(next[sample.id] || [], { at: sample.laneTimestamps?.gpu || sample.collectedAt || Date.now(), value });
+        }
+        return next;
+      });
+    };
+    const timer = setInterval(flushSnapshots, 1000);
     const offSnap = api.onSnapshot((s) => {
-      const at = s.collectedAt || Date.now();
-      setSnaps((prev) => ({ ...prev, [s.id]: { ...s, collectedAt: at } }));
-      const value = s.gpus.length ? s.gpus.reduce((sum, g) => sum + g.util, 0) / s.gpus.length : null;
-      setHistories((prev) => ({ ...prev, [s.id]: appendSample(prev[s.id] || [], { at, value }) }));
+      const sample = { ...s, collectedAt: s.collectedAt || Date.now() };
+      telemetryStore.ingestSnapshot(sample); pendingSnapshots.set(s.id, sample);
     });
     const offStatus = api.onStatus((st) => {
+      pendingSnapshots.delete(st.id); telemetryStore.updateStatus(st.id, st.status as SnapshotPayload['status'], st.error);
       setHistories((prev) => ({ ...prev, [st.id]: appendSample(prev[st.id] || [], { at: Date.now(), value: null }) }));
       setSnaps((prev) => {
         const cur = prev[st.id];
@@ -248,7 +264,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
     });
     return () => {
-      offSnap();
+      clearInterval(timer); offSnap();
       offStatus();
     };
   }, [demo]);
@@ -398,13 +414,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const kill = useCallback(
-    (serverId: string, pid: number, signal: 'TERM' | 'KILL') => {
+    (serverId: string, pid: number, signal: 'TERM' | 'KILL', expectedStartTicks?: string) => {
       const s = serversRef.current.find((x) => x.id === serverId);
       const target = s?.processes.find((p) => p.pid === pid);
       const action = signal === 'KILL' ? 'kill -9' : 'kill -15';
       if (!demo) {
         if (!api) return;
-        api.kill(serverId, pid, signal).then((res) => {
+        api.kill(serverId, pid, signal, expectedStartTicks).then((res) => {
           if (!res.ok) {
             pushToast({ level: 'error', title: i18n.t('state.killFail', { pid }), detail: res.error });
             logAudit({ server: s?.name ?? serverId, action, target: String(pid), result: 'failed' });

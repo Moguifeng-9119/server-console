@@ -19,7 +19,7 @@ function manager({ clock = '2026-10-12 02:00', handle = {} } = {}) {
         commands.push(cmd);
         for (const [pattern, value] of Object.entries(handle)) if (cmd.includes(pattern)) return value;
         if (cmd.includes("date '+%F %H:%M'")) return { stdout: clock + '\n', stderr: '', code: 0 };
-        return { stdout: 'tmux\n', stderr: '', code: 0 };
+        return { stdout: cmd.includes('__STOPPED__') ? '__STOPPED__' : 'tmux\n', stderr: '', code: 0 };
       },
     }),
     getServers: () => [{ id: 's1' }],
@@ -95,7 +95,7 @@ describe('tickSchedules behavior', () => {
     setClock('2026-10-12 08:00');
     await m.tickSchedules(Date.now() + 30000);
     expect(live(m).status).toBe('stopped');
-    expect(commands.some((c) => c.includes('tmux kill-session'))).toBe(true);
+    expect(commands.some((c) => c.includes('runner.start') && c.includes('kill -TERM'))).toBe(true);
     m.close();
   });
 
@@ -123,7 +123,7 @@ describe('tickSchedules behavior', () => {
     task.remoteId = 'rid-1'; task.mode = 'tmux'; task.sessionName = 'sc-rid-1'; task.status = 'running';
     const stopped = await m.request({ operation: 'taskStop', serverId: 's1', id: task.id });
     expect(stopped.status).toBe('stopped');
-    expect(commands.some((c) => c.includes("tmux kill-session -t 'sc-rid-1'"))).toBe(true);
+    expect(commands.some((c) => c.includes('runner.start') && c.includes('kill -TERM'))).toBe(true);
     m.close();
   });
 

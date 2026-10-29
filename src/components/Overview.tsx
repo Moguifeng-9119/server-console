@@ -3,13 +3,15 @@ import { Activity, Cpu, FolderOpen, History, Search, Terminal } from 'lucide-rea
 import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
 import type { Server } from '../types';
-import { freeGiB, gpuOwners, matchingGpus, isFreshSample } from '../resources';
+import { freeGiB, gpuOwners, matchingGpus, isFreshSample, isFreshGpu, gpuMetricAvailable } from '../resources';
+import { useLiveServer } from '../telemetry/store';
+import { GpuGauge } from './GpuGauge';
 import { Sparkline } from './Sparkline';
 
 type OpenServer = (id: string, tab?: 'gpu' | 'files' | 'term', gpuIndex?: number) => void;
 
 export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory: (s: Server) => void }) {
-  const { servers, demo, refreshMs, sampleNow, colorOf } = useStore();
+  const { servers, demo, refreshMs, sampleNow } = useStore();
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [minimum, setMinimum] = useState('');
@@ -19,7 +21,7 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
   const min = Math.max(0, Number(minimum) || 0);
   const models = [...new Set(servers.flatMap((s) => s.gpus.map((g) => g.name)))].sort();
   const isFresh = (s: Server) => isFreshSample(s, demo, refreshMs, sampleNow);
-  const eligible = (s: Server) => isFresh(s) ? matchingGpus(s, min, model, query) : [];
+  const eligible = (s: Server) => isFresh(s) ? matchingGpus(s, min, model, query, sampleNow, refreshMs) : [];
   const allOnline = servers.filter((s) => s.status === 'online' && isFresh(s));
   const gpuCount = allOnline.reduce((sum, s) => sum + s.gpus.length, 0);
   const candidates = allOnline.flatMap(eligible);
@@ -29,7 +31,7 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
     if (min > 0 || model) return eligible(s).length > 0;
     return !q || [s.name, s.host, s.group, ...s.gpus.map((g) => g.name), ...s.gpus.flatMap((g) => gpuOwners(s, g))].join(' ').toLowerCase().includes(q);
   });
-  const maxFree = (s: Server) => s.status === 'online' && isFresh(s) ? Math.max(0, ...s.gpus.map(freeGiB)) : -1;
+  const maxFree = (s: Server) => s.status === 'online' && isFresh(s) ? Math.max(0, ...s.gpus.filter((g) => isFreshGpu(g, refreshMs, sampleNow)).map(freeGiB).filter(Number.isFinite)) : -1;
   rows.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : maxFree(b) - maxFree(a));
   const reset = () => { setQuery(''); setMinimum(''); setModel(''); setOnlineOnly(false); };
   const metrics = [
@@ -54,28 +56,30 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
     </div>
     <p className="resource-note">{t('workbench.permissionNote')}</p>
     <div className="grid resource-grid">
-      {rows.map((s) => {
-        const online = s.status === 'online';
-        const fresh = isFresh(s);
-        const matches = eligible(s);
-        const avg = s.gpus.reduce((sum, g) => sum + g.util, 0) / (s.gpus.length || 1);
-        const name = [...new Set(s.gpus.map((g) => g.name.replace(/^NVIDIA /, '')))].join(' / ');
-        return <article className={`card resource-card ${online ? '' : 'unreachable'}`} key={s.id}>
-          <div className="card-head"><i className={`dot ${s.status}`} /><button className="server-name" onClick={() => onOpen(s.id)}>{s.name}</button><span className="badge">{online ? `${s.gpus.length} GPU` : t('overview.offline')}</span></div>
-          <div className="resource-host mono">{s.host}</div><div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
-          <div className="resource-kpis"><div><strong className="num">{online && fresh ? Math.max(0, ...s.gpus.map(freeGiB)).toFixed(1) : '—'}<small> GiB</small></strong><span>{t('workbench.largest')}</span></div><div><strong className="num" style={{ color: online ? colorOf(avg) : undefined }}>{online && fresh ? Math.round(avg) + '%' : '—'}</strong><span>{t('overview.avgUtil')}</span></div><div><strong className="num">{matches.length}</strong><span>{t('workbench.matches')}</span></div></div>
-          <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
-          <div className="resource-gpus">{s.gpus.map((g) => <button key={g.uuid || g.index} className={`resource-gpu ${matches.some((m) => m.index === g.index) ? 'matches' : ''}`} data-free-gib={online && fresh ? freeGiB(g) : undefined} onClick={() => onOpen(s.id, 'gpu', g.index)} disabled={!online || !fresh} title={gpuOwners(s, g).join(', ') || t('workbench.noProcesses')} aria-label={`GPU ${g.index} · ${t('monitor.util')} ${online && fresh ? g.util + '%' : '—'}`}>
-            <span className="gpu-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="42" className="gpu-ring-track" /><circle cx="50" cy="50" r="42" className="gpu-ring-value" pathLength="100" strokeDasharray={`${online && fresh ? Math.max(0, Math.min(100, g.util)) : 0} 100`} style={{ stroke: online && fresh ? colorOf(g.util) : 'var(--text-faint)' }} /></svg><span className="gpu-ring-label"><span>GPU {g.index}</span><strong className="num">{online && fresh ? Math.round(g.util) + '%' : '—'}</strong></span></span>
-            <span className="gpu-ring-memory mono">{online && fresh ? `${(g.memUsed / 1024).toFixed(1)} / ${(g.memTotal / 1024).toFixed(0)}` : '—'} GiB</span>
-            <span className="gpu-ring-temp">{t('monitor.temp')} {online && fresh && g.temp != null ? g.temp + '°C' : '—'}</span>
-            <span className="resource-owner">{fresh && online ? gpuOwners(s, g).join(', ') || t('workbench.noProcesses') : '—'}</span>
-          </button>)}</div>
-          <div className="resource-footer"><span>{demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}{online && !fresh && !demo && ` · ${t('workbench.stale')}`}</span><button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}><History size={13} />{t('monitor.title')}</button></div>
-          <div className="resource-actions"><button className="btn primary" onClick={() => onOpen(s.id, 'gpu')}><Activity size={14} />{t('workbench.inspect')}</button><button className="btn" onClick={() => onOpen(s.id, 'term')}><Terminal size={14} />{t('workbench.terminal')}</button><button className="btn" onClick={() => onOpen(s.id, 'files')}><FolderOpen size={14} />{t('nav.files')}</button></div>
-        </article>;
-      })}
+      {rows.map((s) => <LiveServerCard key={s.id} base={s} min={min} model={model} query={query} onOpen={onOpen} onHistory={onHistory} />)}
     </div>
     {!rows.length && <div className="empty resource-empty"><Search size={28} /><h3>{t('workbench.noMatch')}</h3><p>{t('workbench.noMatchHint')}</p><button className="btn" onClick={reset}>{t('workbench.reset')}</button></div>}
   </>;
+}
+
+function LiveServerCard({ base, min, model, query, onOpen, onHistory }: { base: Server; min: number; model: string; query: string; onOpen: OpenServer; onHistory: (s: Server) => void }) {
+  const s = useLiveServer(base)!;
+  const { demo, refreshMs, sampleNow, colorOf } = useStore();
+  const { t } = useTranslation();
+  const online = s.status === 'online';
+  const fresh = isFreshSample(s, demo, refreshMs, sampleNow);
+  const matches = fresh ? matchingGpus(s, min, model, query, sampleNow, refreshMs) : [];
+  const known = s.gpus.filter((g) => isFreshGpu(g, refreshMs, sampleNow) && gpuMetricAvailable(g, 'util'));
+  const avg = known.length ? known.reduce((sum, g) => sum + g.util, 0) / known.length : null;
+  const available = s.gpus.filter((g) => isFreshGpu(g, refreshMs, sampleNow)).map(freeGiB).filter(Number.isFinite);
+  const name = [...new Set(s.gpus.map((g) => g.name.replace(/^NVIDIA /, '')))].join(' / ');
+  return <article className={`card resource-card ${online ? '' : 'unreachable'}`}>
+    <div className="card-head"><i className={`dot ${s.status}`} /><button className="server-name" onClick={() => onOpen(s.id)}>{s.name}</button><span className="badge">{online ? `${s.gpus.length} GPU` : t('overview.offline')}</span></div>
+    <div className="resource-host mono">{s.host}</div><div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
+    <div className="resource-kpis"><div><strong className="num">{online && fresh && available.length ? Math.max(...available).toFixed(1) : '—'}<small> GiB</small></strong><span>{t('workbench.largest')}</span></div><div><strong className="num" style={{ color: online && avg != null ? colorOf(avg) : undefined }}>{online && fresh && avg != null ? Math.round(avg) + '%' : '—'}</strong><span>{t('overview.avgUtil')}</span></div><div><strong className="num">{matches.length}</strong><span>{t('workbench.matches')}</span></div></div>
+    <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
+    <div className="resource-gpus">{s.gpus.map((g) => <GpuGauge key={g.uuid || g.index} id={s.id + ':' + (g.uuid || g.index)} gpu={g} online={online} fresh={fresh && (demo || isFreshGpu(g, refreshMs, sampleNow))} color={colorOf(g.util)} owners={gpuOwners(s, g)} isMatch={matches.some((m) => m.index === g.index)} freeGiBVal={freeGiB(g)} onClick={() => onOpen(s.id, 'gpu', g.index)} />)}</div>
+    <div className="resource-footer"><span>{demo ? t('workbench.demo') : s.collectedAt ? t('workbench.updated', { time: new Date(s.laneTimestamps?.gpu ?? s.collectedAt).toLocaleTimeString() }) : t('workbench.waiting')}{online && !fresh && !demo && ` · ${t('workbench.stale')}`}{s.monitoring && ` · ${s.monitoring.effectiveIntervalMs}ms`}</span><button className="btn mini" onClick={() => onHistory(s)} aria-label={t('history.title', { name: s.name })}><History size={13} />{t('monitor.title')}</button></div>
+    <div className="resource-actions"><button className="btn primary" onClick={() => onOpen(s.id, 'gpu')}><Activity size={14} />{t('workbench.inspect')}</button><button className="btn" onClick={() => onOpen(s.id, 'term')}><Terminal size={14} />{t('workbench.terminal')}</button><button className="btn" onClick={() => onOpen(s.id, 'files')}><FolderOpen size={14} />{t('nav.files')}</button></div>
+  </article>;
 }

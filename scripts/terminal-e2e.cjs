@@ -168,12 +168,13 @@ async function main() {
     await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().split(/\r?\n/).some((line) => line.trim() === 'alpha-one'), ids[0]);
     pass('server and overview navigation preserves selected terminal, shell variables and session IDs');
     await page.locator('.term:visible .term-chip-select').nth(1).click();
-    await page.locator('.term:visible .term-chip-x').nth(1).click();
+    await page.locator('.term:visible .term-chip:not(.add)').nth(1).locator('.term-chip-x').last().click();
     await page.waitForFunction(() => document.querySelectorAll('.term:not([style*="none"]) .term-chip:not(.add)').length === 1);
     assert.equal(await page.locator('.term:visible .term-chip-select').getAttribute('aria-pressed'), 'true');
     pass('closing the selected session activates the remaining terminal');
     await page.reload(); await page.waitForSelector('.nav');
-    await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().includes('alpha-one'), ids[0]);
+    try { await page.waitForFunction((id) => window.__scTerms?.[id]?.dump().includes('alpha-one'), ids[0]); }
+    catch (error) { fs.writeFileSync(path.join(artifacts, 'reload-failure.json'), JSON.stringify(await page.evaluate(async () => ({ view: localStorage.getItem('sc.view'), sessions: await window.api.terminalList(), terms: Object.fromEntries(Object.entries(window.__scTerms || {}).map(([id, term]) => [id, term.dump()])), errors: [...document.querySelectorAll('.term-error')].map((node) => node.textContent) })), null, 2)); throw error; }
     const replayed = await dumpId(ids[0]);
     assert.equal(replayed.split(/\r?\n/).filter((line) => line.trim() === 'sc-e2e-marker').length, 1);
     assert.equal(replayed.split(/\r?\n/).filter((line) => line.trim() === 'bg-45').length, 1);

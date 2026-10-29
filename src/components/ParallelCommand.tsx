@@ -81,8 +81,13 @@ export function ParallelCommand() {
     const r = await api.cmdHistoryList(query);
     if (r.ok && r.data) setHistory(r.data);
   };
-  useEffect(() => { void loadHistory(''); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-  useEffect(() => { if (running) return; const timer = setTimeout(() => void loadHistory(historyQuery), 200); return () => clearTimeout(timer); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [historyQuery, running]);
+  useEffect(() => { void loadHistory('');
+    // This initial load intentionally does not follow the search field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { if (running) return; const timer = setTimeout(() => void loadHistory(historyQuery), 200); return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyQuery, running]);
 
   const entries = Object.entries(out);
   const cols = entries.length <= 1 ? 1 : entries.length <= 4 ? 2 : 3;

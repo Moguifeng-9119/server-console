@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -107,5 +107,30 @@ describe('watch and flush', () => {
     const count = m.pickOnce(pair.id);
     expect(count).toBe(2);
     expect(enqueued.map((j) => j.dstRemote).sort()).toEqual(['/r/a.py', '/r/sub/b.py']);
+  });
+});
+
+describe('upload batch reconciliation', () => {
+  function tracked() {
+    const tasks = new Map(), store = tmp(), local = tmp();
+    let now = 10000;
+    const m = new DevSyncManager({storeFile: path.join(store, 'pairs.json'), enqueue: () => [], getTask: (id) => tasks.get(id), getServers: () => [{id: 's1'}], now: () => now});
+    m._start = () => {}; const pair = m.save({localDir: local, remoteDir: '/r', serverId: 's1'});
+    const add = (name, status) => {tasks.set(name, {id: name, status}); m.batches.set(name, {pairId: pair.id, taskIds: [name], expected: 1}); m.pairs[0].inflight = [...(m.pairs[0].inflight || []), {groupId: name, taskIds: [name], expected: 1}];};
+    return {m,tasks,pair,add,setNow: (at) => {now=at;}};
+  }
+  it.each([true,false])('keeps active queued state when older completed batches settle (insertion order %s)', (olderFirst) => {
+    const f = tracked();
+    if (olderFirst) {f.add('old','done');f.add('new','queued');} else {f.add('new','queued');f.add('old','done');}
+    f.m.refresh(); expect(f.m.pairs[0].status).toBe('queued'); expect(f.m.pairs[0].lastSyncAt).toBe(10000);
+    expect(f.m.batches.size).toBe(1); f.m.stopAll();
+  });
+  it('releases missing task batches, reports error and never advances lastSyncAt', () => {
+    const f = tracked(); f.add('missing','queued');f.tasks.delete('missing');f.m.refresh();
+    expect(f.m.pairs[0].status).toBe('error');expect(f.m.pairs[0].lastError).toMatch(/missing/);expect(f.m.pairs[0].lastSyncAt).toBe(0);expect(f.m.batches.size).toBe(0);expect(f.m.pairs[0].inflight).toEqual([]);f.m.stopAll();
+  });
+  it('preserves paused state and credits only completed batches', () => {
+    const f = tracked();f.add('one','running');f.m.pairs[0].enabled=false;f.m.refresh();expect(f.m.pairs[0].status).toBe('paused');expect(f.m.pairs[0].lastSyncAt).toBe(0);
+    f.tasks.get('one').status='done';f.setNow(20000);f.m.refresh();expect(f.m.pairs[0].status).toBe('paused');expect(f.m.pairs[0].lastSyncAt).toBe(20000);f.m.stopAll();
   });
 });

@@ -257,8 +257,10 @@ function pushUpdateStatus() {
 function saveAppSettings(settings) {
   const file = appSettingsFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  const previous = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  const merged = { ...previous, ...settings };
   const temporary = file + '.tmp';
-  fs.writeFileSync(temporary, JSON.stringify(settings, null, 2), { mode: 0o600 });
+  fs.writeFileSync(temporary, JSON.stringify(merged, null, 2), { mode: 0o600 });
   fs.renameSync(temporary, file);
 }
 

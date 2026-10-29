@@ -162,7 +162,7 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
         <div className="field">
           <label>{t('settings.refresh', { s: refreshMs / 1000 })}</label>
           <select className="mini" aria-label={t('settings.refresh')} value={refreshMs} onChange={(e) => setRefreshMs(Number(e.target.value))}>
-            {[1000, 2000, 5000, 10000].map((v) => (
+            {[200, 500, 1000, 2000, 5000, 10000].map((v) => (
               <option key={v} value={v}>
                 {t('settings.secOption', { s: v / 1000 })}
               </option>

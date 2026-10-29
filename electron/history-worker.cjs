@@ -13,6 +13,9 @@ parentPort.on('message', ({ id, method, payload }) => {
     let data;
     switch (method) {
       case 'snapshot': data = db.snapshot(payload); break;
+      case 'buckets': data = db.appendBuckets(payload); break;
+      case 'usageSnapshot': data = db.ingestUsage(payload, payload.collectedAt); break;
+      case 'usageGap': db.usageLastAt?.delete(payload.server); db.usageOccupancy?.delete(payload.server); data = true; break;
       case 'gap': data = db.gap(payload.server, payload.at); break;
       case 'query': data = db.query(payload); break;
       case 'usage': data = db.usageByUserDays(payload.server, payload.rangeDays); break;
