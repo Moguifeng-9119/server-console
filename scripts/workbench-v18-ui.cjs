@@ -5,6 +5,33 @@ const http = require('node:http');
 const { chromium } = require('playwright-core');
 const { installFixture, emitSamples } = require('./renderer-fixture.cjs');
 
+async function renameWithDelayedActivation(page) {
+  await page.evaluate(() => {
+    const timeout = window.setTimeout, clear = window.clearTimeout;
+    const state = window.__renameActivation = { timers: new Map(), released: 0 };
+    window.setTimeout = (callback, delay, ...args) => {
+      if (delay !== 50 || typeof callback !== 'function') return timeout(callback, delay, ...args);
+      const id = timeout(() => {}, 60000); state.timers.set(id, () => callback(...args)); return id;
+    };
+    window.clearTimeout = (id) => { state.timers.delete(id); clear(id); };
+    state.restore = () => { for (const id of state.timers.keys()) clear(id); state.timers.clear(); if (state.focus) document.removeEventListener('focusin', state.focus); window.setTimeout = timeout; window.clearTimeout = clear; };
+  });
+  try {
+    await page.locator('.term-chip-select').first().click(); await page.locator('.term-chip-select').nth(1).click();
+    await page.waitForFunction(() => window.__renameActivation.timers.size > 0);
+    await page.getByRole('button', { name: 'Rename', exact: true }).first().click();
+    await page.evaluate(() => {
+      const state = window.__renameActivation, input = document.querySelector('input[aria-label="Rename"]'); input.blur(); state.writes = window.__v18.writes.length;
+      state.focus = (event) => { if (event.target !== input) return; document.removeEventListener('focusin', state.focus); queueMicrotask(() => { const callbacks = [...state.timers.values()]; state.released += callbacks.length; for (const callback of callbacks) callback(); }); };
+      document.addEventListener('focusin', state.focus);
+    });
+    await page.getByRole('textbox', { name: 'Rename', exact: true }).fill('Training shell');
+    const result = await page.evaluate(() => ({ value: document.querySelector('input[aria-label="Rename"]').value, focus: document.activeElement.getAttribute('aria-label'), released: window.__renameActivation.released, writes: window.__v18.writes.slice(window.__renameActivation.writes) }));
+    assert(result.released > 0, 'Regression must release an actual delayed activation'); assert.equal(result.value, 'Training shell'); assert.equal(result.focus, 'Rename'); assert.equal(result.writes.some(([, text]) => text.includes('Training shell')), false);
+    await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.getByRole('button', { name: 'Training shell', exact: true }).waitFor();
+  } finally { await page.evaluate(() => window.__renameActivation.restore()); }
+}
+
 function installWorkbenchFixture() {
   const original = window.api;
   const state = window.__v18 = { calls: [], writes: [], workspaces: [{ id: 'workspace', serverId: 'fake1', name: 'Training workspace', cwd: '/data/experiment', gpu: '0', sessionName: 'existing train', logPath: '/data/experiment/train.log' }] };
@@ -81,7 +108,7 @@ async function main() {
       assert.equal(await page.evaluate(() => window.__v18.writes.at(-1)[0]), termId);
     }
     pass('split height stays bounded and real mouse clicks route input to each pane');
-    await page.getByRole('button', { name: 'Rename', exact: true }).first().click(); await page.getByRole('textbox', { name: 'Rename', exact: true }).fill('Training shell'); await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.getByRole('button', { name: 'Training shell', exact: true }).waitFor();
+    await renameWithDelayedActivation(page); pass('delayed terminal activation cannot steal form input or send it remotely');
     assert.equal(await page.evaluate(() => localStorage.getItem('sc.term.layout.fake1')), 'columns'); pass('terminal split and session rename preserve mounted panes and persist layout');
     await page.locator('.term-chip.add').click();
     await page.waitForFunction(() => document.querySelectorAll('.term-host').length >= 3);

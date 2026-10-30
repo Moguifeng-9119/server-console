@@ -13,7 +13,7 @@ imports, stale monitoring after SSH reconnects, and terminal split interactions.
   cancelled jump-host setup.
 - Execute log rules in bounded workers. New watchers default to text matching;
   a timed-out regex is disabled individually, with raw preview and visible error.
-- Keep both terminal split positions stable when focusing or replacing sessions.
+- Keep both terminal split positions stable when focusing, replacing or closing sessions. Delayed terminal activation no longer steals input from rename/search forms.
 - Resolve new workspaces to an absolute remote home directory before saving.
 - Keep committed backup imports applied when leaving the page. Persist import
   results, refresh the server list, and recover an interrupted multi-file import

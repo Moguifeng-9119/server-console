@@ -7,7 +7,7 @@ Date: 2026-10-30 (Asia/Shanghai)
 | Unit/integration tests | **48 files / 362 tests passed** on Windows |
 | ESLint, TypeScript, production build | Passed |
 | SSH/SFTP smoke | Passed, two authenticated loopback SSH fixtures |
-| Production renderer | **22 smoke checks**, **18 workbench checks**, file/editor workflows and ten locale reload scenarios passed |
+| Production renderer | **22 smoke checks**, **19 workbench checks**, file/editor workflows and ten locale reload scenarios passed |
 | Language initialization | Six initialization/failure/race scenarios passed |
 | Native packaged terminal | **23 checks passed**, including actual runtime tray image, encrypted credentials, session scrollback, forwarding and SQLite |
 | Native Windows chrome/layout | **36 scenarios passed**, including normal/maximized windows at 100%, 125% and 150% scaling |
@@ -41,7 +41,7 @@ acceptance evidence, not FPS or fleet-throughput measurements.
   Buffered frames and late SSH callbacks are rejected across reconnects.
 - Pathological regex rules are individually disabled after their execution budget;
   other rules and loss extraction continue. A raw preview and visible error remain.
-- A/B/C split tests cover focus and replacing one pane without moving the other.
+- A/B/C split tests cover focus, replacement and closing either side without moving the other. A controlled delayed-focus regression verifies that form input cannot be sent to a remote terminal.
 - Imports retain committed state on navigation, persist queryable results and use
   a local undo journal for interrupted multi-file writes. Journal backups preserve
   already-encrypted server-store bytes rather than decrypted credentials.
@@ -78,3 +78,8 @@ endpoints, 100 GB transfers and the planned 10-host / eight-GPU / 200 ms stress
 scenario require separate acceptance. Persistent training runs, experiment
 comparison, desktop headless source integration and task submission follow in
 later roadmap stages.
+
+Navigation CI asserts zero repeated large-directory sorts during background updates.
+Raw double-frame wall-clock timings include OS scheduling and are retained in the
+receipt; set SC_ENFORCE_NAV_TIMING=1 on a controlled machine to enforce the 700 ms
+legacy smoke budget. The separate 150 ms fleet P95 target remains unverified.

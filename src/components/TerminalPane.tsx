@@ -54,7 +54,7 @@ export function TerminalPane({
   activeRef.current = active;
   const selectedRef = useRef(selected), selectCallback = useRef(onSelect);
   selectedRef.current = selected; selectCallback.current = onSelect;
-  const activateRef = useRef<(() => void) | null>(null);
+  const activateRef = useRef<((force?: boolean) => void) | null>(null);
   const [error, setError] = useState('');
   const { t } = useTranslation();
   // ===== 终端内搜索（Ctrl+F，xterm 官方 addon）=====
@@ -203,14 +203,16 @@ export function TerminalPane({
       onResize();
 
       // 关键：xterm 只有聚焦才会产生 onData
-      activateRef.current = () => {
+      activateRef.current = (force = false) => {
         if (!activeRef.current || disposed) return;
         onResize();
         if (!selectedRef.current) return;
+        const focused = document.activeElement;
+        if (!force && focused?.matches('input,textarea,select,[contenteditable="true"]') && !focused.classList.contains('xterm-helper-textarea')) return;
         term?.focus();
         debugWindow.__scTerm = debugWindow.__scTerms?.[termId];
       };
-      host.addEventListener('mousedown', () => { selectedRef.current = true; selectCallback.current?.(); activateRef.current?.(); });
+      host.addEventListener('mousedown', () => { selectedRef.current = true; selectCallback.current?.(); activateRef.current?.(true); });
 
       // e2e 测试钩子：canvas 渲染下 DOM 读不到文本，暴露缓冲区读取器
       debugWindow.__scTerms ||= {};
