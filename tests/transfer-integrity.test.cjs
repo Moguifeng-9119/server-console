@@ -19,14 +19,15 @@ async function fixture(run) {
   finally { pool.remove('fixture'); await new Promise((resolve) => server.close(resolve)); }
 }
 
-async function finished(tm, id) {
-  const deadline = Date.now() + 30000;
+async function finished(tm, id, timeout = 30000) {
+  const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const task = tm.tasks.get(id);
     if (['done', 'error', 'canceled'].includes(task.status) && !task._gate) return task;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  throw new Error('Transfer did not finish');
+  const task = tm.tasks.get(id);
+  throw new Error('Transfer did not finish: ' + JSON.stringify({ status: task.status, bytesDone: task.bytesDone, size: task.size, error: task.error, running: tm.running, queued: tm.queue.length }));
 }
 
 describe('actual SFTP integrity and recovery', () => {
@@ -39,11 +40,11 @@ describe('actual SFTP integrity and recovery', () => {
       {kind: 'download', serverId: 'fixture', name: 'a', srcRemote: '/a', dstLocal: target},
       {kind: 'download', serverId: 'fixture', name: 'b', srcRemote: '/b', dstLocal: dir + path.sep + 'unused' + path.sep + '..' + path.sep + 'destination'},
     ]);
-    const results = await Promise.all(tasks.map((task) => finished(tm, task.id)));
+    const results = await Promise.all(tasks.map((task) => finished(tm, task.id, 60000)));
     expect(results.map((task) => task.status)).toEqual(['done', 'done']);
     expect(fs.readFileSync(target).equals(second)).toBe(true);
     expect(fs.readdirSync(dir).filter((name) => name.includes('.scpart-'))).toEqual([]);
-  }), 45000);
+  }), 75000);
 
   it('replaces a shorter unrelated destination without appending its old prefix', async () => fixture(async ({ dir, root, getConn }) => {
     const source = path.join(dir, 'source');

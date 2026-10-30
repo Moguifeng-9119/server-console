@@ -269,7 +269,7 @@ export function TerminalPane({
       ref={hostRef}
       className="term-host term-pane"
       data-term-id={termId}
-      style={{ display: active ? 'block' : 'none', order: gridPosition }}
+      style={{ display: active ? 'block' : 'none', order: gridPosition, '--term-slot': gridPosition == null ? undefined : gridPosition + 1 } as React.CSSProperties}
     >
       {searchOpen && (
         <div className="term-search-bar">

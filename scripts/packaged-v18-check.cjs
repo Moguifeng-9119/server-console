@@ -92,11 +92,12 @@ async function main() {
       assert.equal(fs.readdirSync(sshRoot).some((name) => name.includes('.sc-edit-')), false); return { staleRejected: true, destinationPreserved: true, temporaryFilesRemain: false };
     });
     await check('language and close settings preserve update and status fields', async () => {
-      assert.equal(await page.evaluate(() => window.api.setUpdateAutoInstall(true)), true);
+      const autoInstallSupported = process.platform !== 'darwin';
+      assert.equal(await page.evaluate(() => window.api.setUpdateAutoInstall(true)), autoInstallSupported);
       assert.equal(await page.evaluate(() => window.api.setAppLanguage('de')), true);
       assert.equal(await page.evaluate(() => window.api.setAppSettings({ closeAction: 'minimize' })), true);
       const saved = JSON.parse(fs.readFileSync(path.join(userData, 'appsettings.json'), 'utf8'));
-      assert.equal(saved.updateAutoInstall, true); assert.equal(saved.language, 'de'); assert.equal(saved.closeAction, 'minimize'); assert.equal(saved.statusPage.token, 'isolated-fixture-token'); assert.equal(saved.acceptanceMarker, 'isolated');
+      assert.equal(saved.updateAutoInstall, autoInstallSupported); assert.equal(saved.language, 'de'); assert.equal(saved.closeAction, 'minimize'); assert.equal(saved.statusPage.token, 'isolated-fixture-token'); assert.equal(saved.acceptanceMarker, 'isolated');
       await page.evaluate(() => window.api.setUpdateAutoInstall(false)); await page.evaluate(() => window.api.setAppSettings({ closeAction: 'exit' }));
       return { retainedUpdateSetting: true, retainedStatusSetting: true, retainedUnknownSetting: true };
     });
