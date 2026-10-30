@@ -15,8 +15,8 @@ Date: 2026-10-30 (Asia/Shanghai)
 | Forced Electron-main exit during import | Killed the packaged main process after each of servers.json, workbench.json and productivity.json writes. All three restart scenarios restored original configuration and exposed a failed import receipt without applying staged browser preferences |
 | Real SSH monitoring | Existing trusted aliases 1docker and 2docker passed GPU stream, system/process sampling, resource counters and nonzero exit status |
 | Dedicated remote task | Both hosts captured exit code 7 and output, then removed the exact owned task directory |
-| Windows NSIS | Current 0.18.1 installer and blockmap built; installer execution/upgrade runs only in isolated CI |
-| Platform CI/package jobs | Pending publication-time workflow results; linked below when complete |
+| Windows NSIS | 0.18.1 installer and blockmap built; isolated Windows CI installed 0.18.0, upgraded to 0.18.1 and verified settings preservation |
+| Platform CI/package jobs | Three source CI jobs and three package/native jobs passed; macOS DMG+ZIP generated |
 | Signing | Windows unsigned; macOS unsigned/unnotarized, manual updating only |
 
 ## Real-host observations
@@ -83,3 +83,9 @@ Navigation CI asserts zero repeated large-directory sorts during background upda
 Raw double-frame wall-clock timings include OS scheduling and are retained in the
 receipt; set SC_ENFORCE_NAV_TIMING=1 on a controlled machine to enforce the 700 ms
 legacy smoke budget. The separate 150 ms fleet P95 target remains unverified.
+
+## Validated release workflows
+
+- [Three-platform source CI](https://github.com/Moguifeng-9119/server-console/actions/runs/41036295042), app commit `29fab4c`.
+- [Three-platform package and native checks](https://github.com/Moguifeng-9119/server-console/actions/runs/41036298683), same app commit.
+- Windows installation and upgrade assertions passed on the initial package attempt; its final temporary-directory cleanup encountered an OS file lock. The Windows job rerun completed successfully.
