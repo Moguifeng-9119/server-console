@@ -83,6 +83,7 @@ class DevSyncManager {
     if (!pair.enabled || this.closed) throw new Error('Sync pair is paused');
     const files = this._walk(pair.localDir, pair.excludes).filter((f) => !DevSyncManager.excluded(this._rel(pair, f), pair.excludes));
     this._queue(pair, files);
+    pair.needsRescan = false; pair.lastError = ''; this.persist();
     return files.length;
   }
   _rel(pair, absFile) { return path.relative(pair.localDir, absFile).split(path.sep).join('/'); }
@@ -90,7 +91,7 @@ class DevSyncManager {
     const out = []; let visited = 0;
     const visit = (d, depth = 0) => {
       if (depth > 64) throw new Error('Sync directory depth exceeds 64');
-      let entries; try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      const entries = fs.readdirSync(d, { withFileTypes: true });
       for (const e of entries) {
         if (++visited > 10000 || out.length >= 2000) throw new Error('Sync scan limit reached; narrow the directory or add exclusions');
         const full = path.join(d, e.name);
@@ -137,7 +138,7 @@ class DevSyncManager {
     const rel = path.relative(pair.localDir, absFile);
     if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return; // 防目录穿越/越界
     const bucket = this.pending.get(id) || new Set();
-    if (bucket.size >= 2000 && !bucket.has(absFile)) { pair.lastError = 'Pending sync limit reached'; pair.status = 'error'; this.persist(); return; }
+    if (bucket.size >= 10000 && !bucket.has(absFile)) { pair.needsRescan = true; pair.lastError = 'Pending sync limit reached; upload all after narrowing the directory'; pair.status = 'error'; this.persist(); return; }
     bucket.add(absFile);
     this.pending.set(id, bucket);
     pair.status = 'changed';
@@ -161,7 +162,21 @@ class DevSyncManager {
       files.push({ abs: f, size: st.size });
     }
     if (!files.length || this.closed || !pair.enabled || (this.generations.get(id) || 0) !== generation) return;
-    this._queue(pair, files.map((f) => f.abs), files.map((f) => f.size));
+    try {
+      this._queue(pair, files.map((f) => f.abs), files.map((f) => f.size));
+    } catch (error) {
+      if (!this.closed && pair.enabled && (this.generations.get(id) || 0) === generation) {
+        if (!error.queuedSuccessfully) {
+          const pending = this.pending.get(id) || new Set();
+          for (const file of files) pending.add(file.abs);
+          this.pending.set(id, pending);
+          if (!this.timers.has(id)) this.timers.set(id, setTimeout(() => void this._flush(id).catch(() => {}), Math.max(1000, this.debounceMs)));
+        }
+        pair.lastError = String(error.message || error); pair.status = 'error';
+        try { this.persist(); } catch { /* Preserve the visible in-memory error and retry timer. */ }
+      }
+      throw error;
+    }
   }
   _queue(pair, absFiles, sizes = []) {
     if (!absFiles.length || !pair.enabled || this.closed) return 0;
@@ -190,8 +205,8 @@ class DevSyncManager {
     pair.inflight = [...(pair.inflight || []), { groupId: gid, taskIds, expected: jobs.length }].slice(-200);
     pair.lastQueuedAt = this.now(); pair.taskIds = taskIds; pair.status = 'queued';
     pair.lastFiles = [...(pair.lastFiles || []), ...jobs.map((j) => path.basename(j.srcLocal))].slice(-20);
-    pair.lastError = '';
-    this.persist();
+    if (!pair.needsRescan) pair.lastError = '';
+    try { this.persist(); } catch (error) { error.queuedSuccessfully = true; throw error; }
     return jobs.length;
   }
   refresh() {
@@ -224,7 +239,7 @@ class DevSyncManager {
       pair.inflight = (pair.inflight || []).filter((batch) => this.batches.has(batch.groupId));
       if (result?.completedAt) pair.lastSyncAt = Math.max(Number(pair.lastSyncAt) || 0, result.completedAt);
       if (result?.error) pair.lastError = result.error;
-      else if (result?.completedAt) pair.lastError = '';
+      else if (result?.completedAt && !pair.needsRescan) pair.lastError = '';
       if (!pair.enabled) pair.status = 'paused';
       else if (states?.has('uploading')) pair.status = 'uploading';
       else if (states?.has('queued')) pair.status = 'queued';

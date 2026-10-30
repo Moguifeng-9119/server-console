@@ -12,19 +12,28 @@ class TieredScheduler {
     this.onStatus = onStatus; this.interval = interval; this.onError = onError; this.now = now;
     this.focused = null; this.hidden = false; this.timer = null; this.stopped = false;
     this.running = new Set(); this.lastRun = new Map(); this.serverStates = new Map();
-    this.publisher = new PublishBuffer({ onPublish: (snapshot) => { if (!this.stopped && this.serverStates.has(snapshot.id)) onSnapshot(snapshot); }, maxFps: 10, now });
+    this.publisher = new PublishBuffer({ onPublish: (queued) => {
+      const { snapshot, owner, generation } = queued;
+      const state = this.serverStates.get(snapshot.id), cfg = this.configs().find((item) => item.id === snapshot.id);
+      if (!state || state !== owner || !cfg || !this.valid(cfg, state) || state.connection?.status && state.connection.status !== 'online' || state.connection?.generation !== generation) return;
+      onSnapshot(snapshot);
+    }, maxFps: 10, now });
   }
   getState(id, connection = null) {
     let state = this.serverStates.get(id);
     if (state && connection && state.connection !== connection) { this.remove(id); state = null; }
     if (!state) {
-      state = { connection, caps: null, gpus: [], processes: [], gpuProcs: new Map(), system: null, previousCpu: null, gpuUuidMap: new Map(), laneTimestamps: {}, stream: null,
-        retryStreamAt: 0, streamChangedAt: 0, lastMetadataAt: 0, controller: new RateController({ desiredHz: Math.min(5, 1000 / Math.max(200, this.interval())), minHz: 0.1, maxHz: 5, now: this.now }) };
+      state = { connection, caps: null, gpus: [], processes: [], gpuProcs: new Map(), system: null, previousCpu: null, gpuUuidMap: new Map(), laneTimestamps: {}, laneHealth: {}, stream: null,
+        gpuProcessesAvailable: false, retryStreamAt: 0, streamChangedAt: 0, lastMetadataAt: 0, controller: new RateController({ desiredHz: Math.min(5, 1000 / Math.max(200, this.interval())), minHz: 0.1, maxHz: 5, now: this.now }) };
       this.serverStates.set(id, state);
     }
     return state;
   }
-  valid(cfg, state) { return !this.stopped && this.serverStates.get(cfg.id) === state && this.configs().some((item) => item.id === cfg.id); }
+  valid(cfg, state) {
+    if (this.stopped || this.serverStates.get(cfg.id) !== state) return false;
+    const current = this.configs().find((item) => item.id === cfg.id);
+    return current === cfg && (!state.connection || this.getConnection(current) === state.connection);
+  }
   remove(id) {
     this.serverStates.get(id)?.stream?.stop(); this.serverStates.delete(id); this.publisher.clear(id);
     for (const key of this.lastRun.keys()) if (key.startsWith(id + ':')) this.lastRun.delete(key);
@@ -33,14 +42,16 @@ class TieredScheduler {
     return { id: cfg.id, status: 'online', error: '', gpus: state.gpus, processes: state.processes,
       cpuCores: state.system?.cpuCores || 0, cpuUsage: state.system?.cpuUsage ?? null, loadAvg: state.system?.loadAvg || [0, 0, 0],
       memUsed: state.system?.memUsed || 0, memTotal: state.system?.memTotal || 0, swapUsed: state.system?.swapUsed || 0, swapTotal: state.system?.swapTotal || 0,
-      collectedAt: this.now(), lastLane: lane, laneTimestamps: { ...state.laneTimestamps },
-      monitoring: { desiredIntervalMs: this.interval(), effectiveIntervalMs: state.controller.getIntervalMs(), mode: state.stream?.active ? 'stream' : state.caps?.legacyOnly ? 'compatible' : 'poll', reason: state.controller.reason } };
+      collectedAt: this.now(), lastLane: lane, laneTimestamps: { ...state.laneTimestamps }, gpuProcessesAvailable: state.gpuProcessesAvailable,
+      monitoring: { desiredIntervalMs: this.interval(), effectiveIntervalMs: state.controller.getIntervalMs(), mode: state.stream?.active ? 'stream' : state.caps?.legacyOnly ? 'compatible' : 'poll', reason: state.controller.reason, laneHealth: { ...state.laneHealth } } };
   }
+  enqueue(cfg, state, snapshot) { this.publisher.enqueue(cfg.id, { snapshot, owner: state, generation: state.connection?.generation }); }
   publish(cfg, state, lane) {
-    if (!this.valid(cfg, state)) return;
+    if (!this.valid(cfg, state) || state.connection?.status && state.connection.status !== 'online') return;
     state.laneTimestamps[lane] = this.now();
+    state.laneHealth[lane] = { healthy: true, lastObservedAt: state.laneTimestamps[lane] };
     const snapshot = this.buildSnapshot(cfg, state, lane);
-    this.onObservation(snapshot); this.publisher.enqueue(cfg.id, snapshot);
+    this.onObservation(snapshot); this.enqueue(cfg, state, snapshot);
   }
   mergeGpus(state, values, complete = true) {
     const map = complete ? new Map() : new Map(state.gpus.map((gpu) => [gpu.uuid || String(gpu.index), gpu]));
@@ -55,12 +66,19 @@ class TieredScheduler {
     this.running.add(key); this.lastRun.set(key, this.now());
     try { await fn(); }
     catch (error) {
-      if (!this.valid(cfg, state)) return;
+      if (error.staleConnection || !this.valid(cfg, state)) return;
       if (lane === 'gpu') state.controller.observePressure({ error });
       this.onError(error, cfg, lane);
-      const hasRecentSystem = state.laneTimestamps.system && this.now() - state.laneTimestamps.system < 15000;
-      const status = lane !== 'system' && hasRecentSystem ? 'online' : /authentic/i.test(String(error)) ? 'auth' : /timeout|timed out/i.test(String(error)) ? 'timeout' : 'offline';
-      this.onStatus({ id: cfg.id, status, error: String(error.message || error), lane });
+      state.laneHealth[lane] = { healthy: false, lastObservedAt: state.laneTimestamps[lane] || null, reason: String(error.message || error) };
+      if (lane === 'processes') {
+        state.gpuProcessesAvailable = false; state.gpuProcs = new Map();
+        state.gpus = state.gpus.map((gpu) => ({ ...gpu, procs: [] }));
+        state.processes = state.processes.map((process) => ({ ...process, gpu: null, gpuIndices: [] }));
+      }
+      const status = state.connection?.status === 'online' ? 'online' : /authentic/i.test(String(error)) ? 'auth' : /timeout|timed out/i.test(String(error)) ? 'timeout' : 'offline';
+      if (status !== 'online') this.publisher.clear(cfg.id);
+      this.onStatus({ id: cfg.id, status, error: String(error.message || error), lane, laneHealth: { ...state.laneHealth }, gpuProcessesAvailable: state.gpuProcessesAvailable });
+      if (status === 'online') this.enqueue(cfg, state, this.buildSnapshot(cfg, state, 'health'));
     } finally { this.running.delete(key); }
   }
   tick(force = null) {
@@ -75,15 +93,17 @@ class TieredScheduler {
       const gpuInterval = Math.max(target, state.controller.getIntervalMs());
       const due = (lane, duration) => force === cfg.id || now - (this.lastRun.get(cfg.id + ':' + lane) ?? -Infinity) >= duration;
       if (!state.caps) {
-        if (due('probe', 5000)) void this.runLane(cfg, 'probe', async () => { const caps = await probeCapabilities(conn, cfg.id); if (this.valid(cfg, state)) state.caps = caps; }, state);
+        if (due('probe', 5000)) void this.runLane(cfg, 'probe', async () => { const caps = await probeCapabilities(conn, cfg.id); if (this.valid(cfg, state)) { state.caps = caps; state.laneHealth.probe = { healthy: true, lastObservedAt: this.now() }; } }, state);
         continue;
       }
       if (state.caps.legacyOnly && typeof conn.collect === 'function') {
         if (due('legacy', Math.max(1000, target))) void this.runLane(cfg, 'legacy', async () => {
-          const sample = await conn.collect(); if (!this.valid(cfg, state)) return;
-          Object.assign(state, { gpus: sample.gpus, processes: sample.processes, system: sample });
+          const sample = await conn.collect(); if (!this.valid(cfg, state) || conn.status && conn.status !== 'online') return;
+          const gpuProcessesAvailable = sample.gpuProcessesAvailable === true;
+          Object.assign(state, { gpus: gpuProcessesAvailable ? sample.gpus : sample.gpus.map((gpu) => ({ ...gpu, procs: [] })), processes: gpuProcessesAvailable ? sample.processes : sample.processes.map((process) => ({ ...process, gpu: null, gpuIndices: [] })), system: sample, gpuProcessesAvailable });
           state.laneTimestamps = { gpu: this.now(), system: this.now(), processes: this.now() };
-          const payload = { ...this.buildSnapshot(cfg, state, undefined), ...sample, collectedAt: this.now() }; this.onObservation(payload); this.publisher.enqueue(cfg.id, payload);
+          for (const lane of ['legacy', 'gpu', 'system', 'processes']) state.laneHealth[lane] = { healthy: true, lastObservedAt: this.now() };
+          const payload = { ...sample, ...this.buildSnapshot(cfg, state, undefined), collectedAt: this.now() }; this.onObservation(payload); this.enqueue(cfg, state, payload);
         }, state);
         continue;
       }
@@ -109,7 +129,7 @@ class TieredScheduler {
       }, state);
       if (due('processes', this.hidden ? 10000 : focused ? 3000 : 8000)) void this.runLane(cfg, 'processes', async () => {
         const value = await pollProcesses(conn, state.gpuUuidMap, 8000); if (!this.valid(cfg, state)) return;
-        state.processes = value.processes; state.gpuProcs = value.gpuProcs;
+        state.processes = value.processes; state.gpuProcs = value.gpuProcs; state.gpuProcessesAvailable = value.gpuProcessesAvailable;
         state.gpus = state.gpus.map((gpu) => ({ ...gpu, procs: state.gpuProcs.get(gpu.uuid) || [] })); this.publish(cfg, state, 'processes');
       }, state);
     }

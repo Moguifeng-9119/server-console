@@ -25,7 +25,7 @@
 
 - 診断と認証情報を含まない設定バックアップで移行を支援。HTTPS Webhook は初期無効。別途起動するヘッドレス収集器はデスクトップ終了後も履歴を保存します。
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## はじめに
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 最新台帳にコマンド、結果、未検証項目を記録。実 Linux 2台で GPU ストリーム、3収集層、資源カウンター、終了コード7の専用タスクを確認しました。大規模運用、100GB 転送、Slurm/MIG、全 OS インストーラーの保証ではありません。
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## 言語とガイド
 

@@ -1,11 +1,83 @@
 import { describe, expect, it } from 'vitest';
 import { TieredScheduler } from '../electron/monitoring/scheduler.cjs';
+import { probeCapabilities } from '../electron/monitoring/capabilities.cjs';
 
 const settle = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
 
 describe('Tiered multi-lane monitoring scheduler', () => {
+  it('does not turn an expired probe into a permanent legacy fallback', async () => {
+    const error = Object.assign(new Error('SSH command belongs to a replaced connection'), { staleConnection: true });
+    await expect(probeCapabilities({ exec: async () => { throw error; } }, 'host')).rejects.toBe(error);
+  });
+  it('clears probe and legacy failures after a successful retry', async () => {
+    const cfg = { id: 'host' }, connection = { status: 'online', exec: async () => ({ stdout: 'unrecognized' }), collect: async () => ({ gpus: [], processes: [], gpuProcessesAvailable: true }) };
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection });
+    const state = scheduler.getState(cfg.id, connection); state.laneHealth.probe = { healthy: false }; state.laneHealth.legacy = { healthy: false };
+    scheduler.tick(cfg.id); await settle(); expect(state.laneHealth.probe.healthy).toBe(true);
+    scheduler.tick(cfg.id); await settle(); expect(state.laneHealth.legacy.healthy).toBe(true); scheduler.stop();
+  });
+  it('ignores an expired SSH command without marking the new connection unhealthy', async () => {
+    const cfg = { id: 'host' }, connection = { status: 'online' }, statuses = [], errors = [];
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection, onStatus: (s) => statuses.push(s), onError: (e) => errors.push(e) });
+    const state = scheduler.getState(cfg.id, connection);
+    await scheduler.runLane(cfg, 'system', async () => { throw Object.assign(new Error('replaced'), { staleConnection: true }); }, state);
+    expect(statuses).toEqual([]); expect(errors).toEqual([]); expect(state.laneHealth).toEqual({}); scheduler.stop();
+  });
+  it('keeps the host online and preserves a system failure while another lane succeeds', async () => {
+    const cfg = { id: 'host' }, connection = { status: 'online' }, statuses = [], samples = [];
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection,
+      onSnapshot: (value) => samples.push(value), onStatus: (value) => statuses.push(value), now: () => 100000 });
+    const state = scheduler.getState(cfg.id, connection);
+    state.laneTimestamps.system = 99000;
+    await scheduler.runLane(cfg, 'system', async () => { throw new Error('system query failed'); }, state);
+    expect(statuses[0]).toMatchObject({ status: 'online', lane: 'system' });
+    scheduler.publish(cfg, state, 'gpu'); scheduler.publisher.flush(cfg.id);
+    expect(samples.at(-1).monitoring.laneHealth.system.healthy).toBe(false);
+    expect(samples.at(-1).laneTimestamps.system).toBe(99000);
+    connection.status = 'offline'; const count = samples.length;
+    scheduler.publish(cfg, state, 'gpu'); scheduler.publisher.flush(cfg.id);
+    expect(samples).toHaveLength(count);
+    scheduler.stop();
+  });
+  it('drops a buffered online sample when its connection closes or changes', () => {
+    let now = 100000, connection = { status: 'online' }; const cfg = { id: 'host' }, samples = [];
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection, onSnapshot: (value) => samples.push(value), now: () => now });
+    const state = scheduler.getState(cfg.id, connection);
+    scheduler.publish(cfg, state, 'gpu'); now += 10; scheduler.publish(cfg, state, 'gpu');
+    connection.status = 'offline'; scheduler.publisher.flush(cfg.id); expect(samples).toHaveLength(1);
+    connection.status = 'online'; now += 100; scheduler.publish(cfg, state, 'gpu');
+    now += 10; scheduler.publish(cfg, state, 'gpu'); connection = { status: 'online' }; scheduler.publisher.flush(cfg.id);
+    expect(samples).toHaveLength(2); scheduler.stop();
+  });
+  it('drops a buffered sample across reconnects of the same connection object', () => {
+    let now = 100000; const connection = { status: 'online', generation: 1 }, cfg = { id: 'host' }, samples = [];
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection, onSnapshot: (value) => samples.push(value), now: () => now });
+    const state = scheduler.getState(cfg.id, connection);
+    scheduler.publish(cfg, state, 'gpu'); now += 10; scheduler.publish(cfg, state, 'gpu');
+    connection.status = 'offline'; connection.generation++; connection.status = 'online'; connection.generation++;
+    scheduler.publisher.flush(cfg.id); expect(samples).toHaveLength(1); scheduler.stop();
+  });
+  it('invalidates cached GPU owners when process collection fails', async () => {
+    const cfg = { id: 'host' }, connection = { status: 'online' }, statuses = [];
+    const scheduler = new TieredScheduler({ configs: () => [cfg], getConnection: () => connection, onSnapshot: () => {}, onStatus: (value) => statuses.push(value), now: () => 100000 });
+    const state = scheduler.getState(cfg.id, connection);
+    state.gpuProcessesAvailable = true; state.laneTimestamps.processes = 99999;
+    state.gpus = [{ index: 0, procs: [{ pid: 1, user: 'alice' }] }]; state.processes = [{ pid: 1, gpu: 0, gpuIndices: [0] }];
+    await scheduler.runLane(cfg, 'processes', async () => { throw new Error('ps failed'); }, state);
+    expect(statuses[0]).toMatchObject({ status: 'online', gpuProcessesAvailable: false });
+    expect(state.gpus[0].procs).toEqual([]); expect(state.processes[0].gpu).toBeNull();
+    scheduler.stop();
+  });
+  it('rejects an old configuration without asking the pool to reopen it', () => {
+    const old = { id: 'host', host: 'old' }, updated = { id: 'host', host: 'new' };
+    const calls = [], connection = { status: 'online' }; let current = old;
+    const scheduler = new TieredScheduler({ configs: () => [current], getConnection: (cfg) => { calls.push(cfg.host); return connection; }, onSnapshot: () => {} });
+    const state = scheduler.getState(old.id, connection); current = updated;
+    expect(scheduler.valid(old, state)).toBe(false); expect(calls).toEqual([]);
+    scheduler.stop();
+  });
   it('slow process lane does not block rapid GPU ticks', async () => {
     let now = 1000;
     let releaseProcesses;
@@ -45,8 +117,9 @@ describe('Tiered multi-lane monitoring scheduler', () => {
     };
 
     const snapshots = [];
+    const cfg = { id: 'srv-1' };
     const scheduler = new TieredScheduler({
-      configs: () => [{ id: 'srv-1' }],
+      configs: () => [cfg],
       getConnection: () => mockConn,
       onSnapshot: (snap) => snapshots.push(snap.lastLane),
       interval: () => 200,
@@ -113,8 +186,9 @@ describe('Tiered multi-lane monitoring scheduler', () => {
       },
     };
 
+    const cfg = { id: 'srv-reentrancy' };
     const scheduler = new TieredScheduler({
-      configs: () => [{ id: 'srv-reentrancy' }],
+      configs: () => [cfg],
       getConnection: () => mockConn,
       onSnapshot: () => {},
       interval: () => 200,

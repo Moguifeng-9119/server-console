@@ -38,6 +38,7 @@ export function TerminalPane({
   selected = active,
   onSelect,
   onReady,
+  gridPosition,
 }: {
   termId: string;
   onClosed: (termId: string) => void;
@@ -45,6 +46,7 @@ export function TerminalPane({
   selected?: boolean;
   onSelect?: () => void;
   onReady?: (termId: string) => void;
+  gridPosition?: number;
 }) {
   const readyCallback = useRef(onReady); readyCallback.current = onReady;
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -267,7 +269,7 @@ export function TerminalPane({
       ref={hostRef}
       className="term-host term-pane"
       data-term-id={termId}
-      style={{ display: active ? 'block' : 'none' }}
+      style={{ display: active ? 'block' : 'none', order: gridPosition }}
     >
       {searchOpen && (
         <div className="term-search-bar">
@@ -299,6 +301,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
   const [sessions, setSessions] = useState<TerminalSessionInfo[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [active, setActive] = useState('');
+  const [splitIds, setSplitIds] = useState<string[]>([]);
   const autoCreated = useRef(false);
   const pendingCreate = useRef(false);
   const [creating, setCreating] = useState(false);
@@ -313,6 +316,29 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
   const ready = useRef(new Set<string>()), pendingWrites = useRef(new Map<string, string>());
   const visibleRef = useRef(visible); visibleRef.current = visible;
   const label = (key: string, fallback: string) => t('features.' + key, { defaultValue: fallback });
+  const selectSession = (id: string) => {
+    if (layout !== 'single') setSplitIds((previous) => {
+      if (previous.includes(id)) return previous;
+      const next = [...previous];
+      if (next.includes('')) next[next.indexOf('')] = id;
+      else if (next.length < 2) next.push(id);
+      else { const index = next.indexOf(active); next[index < 0 ? 1 : index] = id; }
+      return next;
+    });
+    setActive(id);
+  };
+  useEffect(() => {
+    if (layout === 'single') return;
+    setSplitIds((previous) => {
+      const available = new Set(sessions.map((session) => session.termId));
+      const next = [previous[0], previous[1]].map((id) => available.has(id) ? id : '');
+      if (active && available.has(active) && !next.includes(active)) {
+        const empty = next.indexOf(''); next[empty >= 0 ? empty : 1] = active;
+      }
+      for (const session of sessions) { const empty = next.indexOf(''); if (empty >= 0 && !next.includes(session.termId)) next[empty] = session.termId; }
+      return next.length === previous.length && next.every((id, index) => id === previous[index]) ? previous : next;
+    });
+  }, [sessions, layout, active]);
   const changeLayout = (next: typeof layout) => { setLayout(next); try { localStorage.setItem('sc.term.layout.' + serverId, next); } catch { /* layout stays available for this session */ } };
   const rename = () => { const value = draftName.trim().slice(0, 80); const next = { ...names }; if (value) next[renaming] = value; else delete next[renaming]; setNames(next); setRenaming(''); try { localStorage.setItem('sc.term.names.' + serverId, JSON.stringify(next)); } catch { /* keep in memory */ } };
   const flushCommand = (termId: string) => { const command = pendingWrites.current.get(termId); if (!command || !visibleRef.current || !ready.current.has(termId) || !api) return; pendingWrites.current.delete(termId); void api.terminalWrite(termId, command + '\r').catch((error) => pushToast({ level: 'error', title: t('terminal.openFail'), detail: String(error) })); };
@@ -365,7 +391,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
         if (!mounted.current) return;
         if (r.ok && r.data) {
           if (command) pendingWrites.current.set(r.data, command);
-          setActive(r.data);
+          selectSession(r.data);
           refresh();
         } else {
           pushToast({ level: 'error', title: t('terminal.openFail'), detail: r.error });
@@ -432,7 +458,7 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             title={t('terminal.switchHint')}
           >
             <i className="term-dot" aria-hidden="true" />
-            <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => setActive(s.termId)}>{names[s.termId] || t('terminal.termN', { n: i + 1 })}</button><button className="term-chip-x" title={label('rename', 'Rename')} aria-label={label('rename', 'Rename')} onClick={() => { setDraftName(names[s.termId] || ''); setRenaming(s.termId); }}><Pencil size={10} /></button>
+            <button className="term-chip-select" aria-pressed={s.termId === active} onClick={() => selectSession(s.termId)}>{names[s.termId] || t('terminal.termN', { n: i + 1 })}</button><button className="term-chip-x" title={label('rename', 'Rename')} aria-label={label('rename', 'Rename')} onClick={() => { setDraftName(names[s.termId] || ''); setRenaming(s.termId); }}><Pencil size={10} /></button>
             <button
               className="term-chip-x"
               title={t('terminal.closeSession')}
@@ -457,9 +483,10 @@ export function TerminalSessions({ serverId, visible }: { serverId: string; visi
             <TerminalPane
               key={s.termId}
               termId={s.termId}
-              active={visible && (s.termId === active || layout !== 'single' && s.termId === sessions.find((session) => session.termId !== active)?.termId)}
+              gridPosition={layout === 'single' ? 0 : splitIds.indexOf(s.termId)}
+              active={visible && (layout === 'single' ? s.termId === active : splitIds.includes(s.termId))}
               selected={visible && s.termId === active}
-              onSelect={() => setActive(s.termId)}
+              onSelect={() => selectSession(s.termId)}
               onReady={terminalReady}
               onClosed={(tid) => {
                 refresh();

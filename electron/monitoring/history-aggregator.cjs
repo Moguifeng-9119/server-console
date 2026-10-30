@@ -94,7 +94,8 @@ class HistoryAggregator {
   }
   gap(server, at = Date.now(), lane = null) {
     for (const ch of this.channels.values()) {
-      if (ch.server !== server || lane === 'processes' || lane === 'gpu' && ch.device === 'system' || lane === 'system' && ch.device !== 'system') continue;
+      const gpuChannel = ch.device === 'all' || ch.device.startsWith('gpu:');
+      if (ch.server !== server || lane === 'processes' || lane === 'gpu' && !gpuChannel || lane === 'system' && ch.device !== 'system') continue;
       this.ingest({ server, device: ch.device, metric: ch.metric, label: ch.label, at, value: null });
     }
     return this.flushAll(server);

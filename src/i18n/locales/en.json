@@ -495,7 +495,8 @@
     "updateDownloading": "Downloading… {{percent}}%",
     "updateUpToDate": "You are on the latest version.",
     "updateVersion": "Version {{version}} is available.",
-    "updateOpenPage": "Open releases page"
+    "updateOpenPage": "Open releases page",
+    "manualUpdateMac": "This macOS build uses manual updates from the release page."
   },
   "relay": {
     "title": "Server relay (pick source content on the left, target directory on the right)",
@@ -815,7 +816,7 @@
     "d5": "Fr",
     "d6": "Sa",
     "logWatchers": "Log watchers",
-    "logNote": "New log bytes are read every five seconds; file rotation and incomplete lines are tracked.",
+    "logNote": "Reads new log bytes every 5 seconds. Choose text or regular expression matching.",
     "logPath": "Log path",
     "logPatterns": "Patterns (one regex per line)",
     "logTrackLoss": "Track loss values (sparkline)",
@@ -1003,7 +1004,22 @@
       "error": "Upload failed",
       "paused": "Paused"
     },
-    "backupImportedRestart": "Backup imported. Restart the app to apply appearance and terminal layout settings."
+    "backupImportedRestart": "Backup imported. Restart the app to apply appearance and terminal layout settings.",
+    "notificationNotDelivered": "Notification not delivered",
+    "notificationReason": {
+      "disabled": "Disabled",
+      "cooldown": "Cooldown",
+      "busy": "Busy",
+      "unknown": "Unknown"
+    },
+    "logPatternMode": "Match mode",
+    "logLiteral": "Text",
+    "logRegex": "Regular expression",
+    "logPatternsGeneric": "Patterns (one per line)",
+    "partialMetrics": "Some monitoring data is unavailable",
+    "gpuProcessesUnavailable": "GPU process data unavailable",
+    "logPendingPreview": "Unprocessed log preview",
+    "editLog": "Edit watcher"
   },
   "filePreview": {
     "imageTitle": "Image preview",

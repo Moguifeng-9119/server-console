@@ -350,7 +350,8 @@
     "updateDownloading": "Baixando… {{percent}}%",
     "updateUpToDate": "Você já está na versão mais recente.",
     "updateVersion": "A versão {{version}} está disponível.",
-    "updateOpenPage": "Abrir página de versões"
+    "updateOpenPage": "Abrir página de versões",
+    "manualUpdateMac": "Esta versão do macOS é atualizada manualmente pela página de lançamentos."
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -815,7 +816,7 @@
     "d5": "Se",
     "d6": "Sá",
     "logWatchers": "Monitoramento de logs",
-    "logNote": "Novos bytes do log são lidos a cada cinco segundos, acompanhando rotação e linhas incompletas.",
+    "logNote": "Lê novos registros a cada 5 segundos. Escolha texto ou expressão regular.",
     "logPath": "Caminho do log",
     "logPatterns": "Padrões (uma expressão regular por linha)",
     "logTrackLoss": "Rastrear valores de loss (mini-gráfico)",
@@ -1003,7 +1004,22 @@
       "error": "Falha no envio",
       "paused": "Pausado"
     },
-    "backupImportedRestart": "Backup importado. Reinicie o aplicativo para aplicar a aparência e o layout dos terminais."
+    "backupImportedRestart": "Backup importado. Reinicie o aplicativo para aplicar a aparência e o layout dos terminais.",
+    "notificationNotDelivered": "Notificação não enviada",
+    "notificationReason": {
+      "disabled": "Desativada",
+      "cooldown": "Aguardando",
+      "busy": "Ocupado",
+      "unknown": "Desconhecido"
+    },
+    "logPatternMode": "Modo de busca",
+    "logLiteral": "Texto",
+    "logRegex": "Expressão regular",
+    "logPatternsGeneric": "Padrões (um por linha)",
+    "partialMetrics": "Alguns dados de monitoramento estão indisponíveis",
+    "gpuProcessesUnavailable": "Dados de processos da GPU indisponíveis",
+    "logPendingPreview": "Prévia do registro não processado",
+    "editLog": "Editar monitor"
   },
   "filePreview": {
     "imageTitle": "Pré-visualização de imagem",

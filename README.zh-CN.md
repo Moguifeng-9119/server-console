@@ -25,7 +25,7 @@
 
 - 诊断与不含凭据的配置备份用于恢复和迁移。HTTPS Webhook 默认关闭，需主动配置；独立启动的无界面采集器可在桌面关闭后继续保存历史。
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## 开始使用
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 准确命令、结果与待验项目见本版验证记录。两台真实 Linux SSH 主机已测试 GPU 流、三类采集通道、资源计数和退出码为 7 的专用任务。这些检查不代表生产集群、100GB 传输、真实 Slurm/MIG 或全部系统安装器均已验证。
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## 语言与指南
 

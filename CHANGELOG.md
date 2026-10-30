@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.1 — 2026-10-30
+
+- Fix DevSync queue backpressure, process-query failure semantics, per-module collection health and history gaps.
+- Protect SSH reconnects against late channel results, old client close events and cancelled jump-host setup.
+- Isolate log rules in workers, keep terminal split positions stable, resolve workspace home paths and report real notification outcomes.
+- Persist backup import results, refresh imported servers and recover interrupted configuration transactions on startup.
+- Include runtime tray resources and macOS ZIP assets; use manual updates for unsigned macOS builds.
+
+[Release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md)
+
 ## 0.18.0 — 2026-10-26
 
 - Wire tiered GPU streaming, system and process collectors into production IPC, with bounded publishing and per-server telemetry subscriptions.

@@ -10,7 +10,7 @@ afterEach(() => {
   lang.setLanguage('en');
   for (const dir of directories.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
-function fixture() {
+function fixture(platform = process.platform) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-main-settings-')); directories.push(root);
   const handlers = new Map(), menus = [];
   const file = path.resolve('electron/main.cjs'), realRequire = createRequire(file);
@@ -22,12 +22,17 @@ function fixture() {
   };
   const context = { require: (name) => name === 'electron' ? electron : name === './ipc.cjs' ? {} : name === './lang.cjs' ? lang : name === './updates.cjs'
       ? { checkUpdate: async () => { throw new Error('HTTP 429'); } } : realRequire(name),
-    __dirname: path.dirname(file), process: { platform: process.platform, env: {}, on() {} },
+    __dirname: path.dirname(file), process: { platform, env: {}, on() {} },
     module: { exports: {} }, console, setTimeout, fetch: async () => ({ ok: false, status: 429 }), AbortSignal };
   vm.runInNewContext(fs.readFileSync(file, 'utf8') + '\nmodule.exports = {loadAppSettings, createTray};', context);
   return { root, handlers, menus, control: context.module.exports };
 }
 describe('main-process language settings', () => {
+  it('exposes manual updates for the unsigned macOS build', () => {
+    const f = fixture('darwin'); f.control.loadAppSettings();
+    expect(f.handlers.get('app:get-settings')().updateSupported).toBe(false);
+    expect(f.handlers.get('update:auto-install')(null, true)).toBe(false);
+  });
   it('does not override system language detection with an unsaved default', () => {
     const f = fixture(); f.control.loadAppSettings();
     expect(f.handlers.get('app:get-settings')().language).toBeUndefined();

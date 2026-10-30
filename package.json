@@ -1,7 +1,7 @@
 {
   "name": "server-console",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Local-first desktop console for GPU servers: SSH monitoring, dual-pane SFTP file manager and high-speed server-to-server transfers",
   "type": "module",
   "main": "electron/main.cjs",
@@ -79,6 +79,12 @@
       "**/node_modules/cpu-features/**",
       "**/*.node"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon_512.png",
+        "to": "icons/icon.png"
+      }
+    ],
     "directories": {
       "output": "release"
     },
@@ -90,7 +96,10 @@
       "icon": "build/icon.ico"
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "category": "public.app-category.developer-tools"

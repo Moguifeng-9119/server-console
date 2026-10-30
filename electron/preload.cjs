@@ -231,6 +231,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // 运维工作台（统一请求通道）
   workbenchRequest: (req) => ipcRenderer.invoke('workbench:request', req),
+  onImportResult: (cb) => {
+    const h = (_event, result) => cb(result);
+    ipcRenderer.on('configuration:import-result', h);
+    return () => ipcRenderer.removeListener('configuration:import-result', h);
+  },
   onWorkbenchEvent: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('workbench:event', h);

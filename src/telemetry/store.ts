@@ -29,6 +29,7 @@ export class TelemetryStore {
       error: snap.error || '',
       gpus: snap.gpus || [],
       processes: snap.processes || [],
+      gpuProcessesAvailable: snap.gpuProcessesAvailable,
       cpuCores: snap.cpuCores ?? prev.cpuCores,
       cpuUsage: snap.cpuUsage ?? null,
       loadAvg: snap.loadAvg || [0, 0, 0],

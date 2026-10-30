@@ -3,7 +3,7 @@ import { freeGiB, matchingGpus } from '../src/resources';
 import type { Server } from '../src/types';
 
 describe('GPU resource filtering', () => {
-  const server = { name: 'lab', host: 'fixture', status: 'online', processes: [], gpus: [
+  const server = { name: 'lab', host: 'fixture', status: 'online', collectedAt: Date.now(), processes: [], gpus: [
     { index: 0, name: 'A100', memTotal: 81920, memUsed: 61440, procs: [] },
     { index: 1, name: 'A100', memTotal: 81920, memUsed: 30720, procs: [] },
   ] } as unknown as Server;

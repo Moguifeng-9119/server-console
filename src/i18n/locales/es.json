@@ -350,7 +350,8 @@
     "updateDownloading": "Descargando… {{percent}}%",
     "updateUpToDate": "Ya tienes la última versión.",
     "updateVersion": "La versión {{version}} está disponible.",
-    "updateOpenPage": "Abrir página de versiones"
+    "updateOpenPage": "Abrir página de versiones",
+    "manualUpdateMac": "Esta versión de macOS se actualiza manualmente desde la página de lanzamientos."
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -815,7 +816,7 @@
     "d5": "Vi",
     "d6": "Sá",
     "logWatchers": "Vigilancia de registros",
-    "logNote": "Se leen nuevos bytes del registro cada cinco segundos, con seguimiento de rotación y líneas incompletas.",
+    "logNote": "Lee nuevas líneas cada 5 segundos. Elige texto o expresión regular.",
     "logPath": "Ruta del registro",
     "logPatterns": "Patrones (una expresión regular por línea)",
     "logTrackLoss": "Seguir valores de loss (minigráfico)",
@@ -1003,7 +1004,22 @@
       "error": "Error de subida",
       "paused": "En pausa"
     },
-    "backupImportedRestart": "Copia importada. Reinicia la aplicación para aplicar la apariencia y la disposición de terminales."
+    "backupImportedRestart": "Copia importada. Reinicia la aplicación para aplicar la apariencia y la disposición de terminales.",
+    "notificationNotDelivered": "Notificación no enviada",
+    "notificationReason": {
+      "disabled": "Desactivada",
+      "cooldown": "Espera",
+      "busy": "Ocupado",
+      "unknown": "Desconocido"
+    },
+    "logPatternMode": "Modo de búsqueda",
+    "logLiteral": "Texto",
+    "logRegex": "Expresión regular",
+    "logPatternsGeneric": "Patrones (uno por línea)",
+    "partialMetrics": "Algunos datos de monitorización no están disponibles",
+    "gpuProcessesUnavailable": "Datos de procesos de GPU no disponibles",
+    "logPendingPreview": "Vista previa del registro sin procesar",
+    "editLog": "Editar monitor"
   },
   "filePreview": {
     "imageTitle": "Vista previa de imagen",

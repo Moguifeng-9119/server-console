@@ -1,6 +1,6 @@
 import type { Gpu, Server } from './types';
 
-type SampleLike = { collectedAt?: number; laneTimestamps?: Partial<Record<string, number | undefined>> } & Pick<Partial<Server>, 'status' | 'name' | 'host' | 'group' | 'processes'>;
+type SampleLike = { collectedAt?: number; laneTimestamps?: Partial<Record<string, number | undefined>> } & Pick<Partial<Server>, 'status' | 'name' | 'host' | 'group' | 'processes' | 'monitoring'>;
 
 /** 指标在该 GPU 上可用（驱动有上报）；unavailableMetrics 中的为未知，占位 0 不算真实读数 */
 export function gpuMetricAvailable(gpu: Gpu, metric: keyof Gpu | string): boolean {
@@ -38,6 +38,8 @@ export function isFreshSample(
   const overallWindow = Math.max(45000, refreshMs * 12);
   if (server.laneTimestamps) {
     const key = lane ?? 'gpu'; // 整体新鲜度由 GPU 主通道门控
+    const health = server.monitoring?.laneHealth as Record<string, { healthy?: boolean }> | undefined;
+    if (health?.[key]?.healthy === false) return false;
     const at = server.laneTimestamps[key];
     return at != null && now - at < laneWindow;
   }
@@ -45,6 +47,7 @@ export function isFreshSample(
 }
 
 export function gpuOwners(server: Server, gpu: Gpu) {
+  if (server.gpuProcessesAvailable === false) return ['?'];
   return [...new Set(gpu.procs.map((p) => p.user || server.processes.find((item) => item.pid === p.pid)?.user || '?'))];
 }
 
@@ -56,7 +59,7 @@ export function matchingGpus(
   now = Date.now(),
   refreshMs = 2000,
 ): Gpu[] {
-  if (server.status !== 'online') return [];
+  if (server.status !== 'online' || !isFreshSample(server, false, refreshMs, now)) return [];
   const q = query.trim().toLowerCase();
   return server.gpus.filter((gpu) =>
     isFreshGpu(gpu, refreshMs, now)

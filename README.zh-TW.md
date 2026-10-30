@@ -25,7 +25,7 @@
 
 - 診斷與不含憑據的設定備份協助復原及遷移。HTTPS Webhook 預設關閉；另行啟動的無介面採集器可在桌面關閉後保存歷史。
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## 開始使用
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 本版驗證記錄列出命令、結果與待驗項目。兩台真實 Linux 主機已驗證 GPU 流、三類採集、資源計數及退出碼 7 的專用任務；不代表大型叢集、100GB 傳輸、Slurm/MIG 或所有系統安裝均已驗證。
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## 語言與指南
 

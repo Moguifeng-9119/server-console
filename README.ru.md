@@ -25,7 +25,7 @@
 
 - Диагностика и резервирование настроек без учётных данных помогают восстановлению. HTTPS Webhook необязателен и изначально выключен. Отдельный фоновый сборщик хранит историю при закрытом приложении.
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Начало работы
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 В актуальном журнале указаны команды, результаты и непроверенные пункты. Два Linux-хоста проверили поток GPU, три уровня, счётчики и собственную задачу с кодом 7. Это не подтверждает парк серверов, передачу 100GB, реальный Slurm/MIG или все установщики.
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Языки и руководства
 

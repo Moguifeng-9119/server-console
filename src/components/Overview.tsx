@@ -73,9 +73,12 @@ function LiveServerCard({ base, min, model, query, onOpen, onHistory }: { base: 
   const avg = known.length ? known.reduce((sum, g) => sum + g.util, 0) / known.length : null;
   const available = s.gpus.filter((g) => isFreshGpu(g, refreshMs, sampleNow)).map(freeGiB).filter(Number.isFinite);
   const name = [...new Set(s.gpus.map((g) => g.name.replace(/^NVIDIA /, '')))].join(' / ');
+  const health = s.monitoring?.laneHealth as Record<string, { healthy?: boolean }> | undefined;
+  const degraded = Object.values(health || {}).some((lane) => lane.healthy === false) || s.gpus.length > 0 && s.gpuProcessesAvailable === false;
   return <article className={`card resource-card ${online ? '' : 'unreachable'}`}>
     <div className="card-head"><i className={`dot ${s.status}`} /><button className="server-name" onClick={() => onOpen(s.id)}>{s.name}</button><span className="badge">{online ? `${s.gpus.length} GPU` : t('overview.offline')}</span></div>
     <div className="resource-host mono">{s.host}</div><div className="resource-model" title={name}>{name || t('workbench.noGpu')}</div>
+    {online && degraded && <div role="status" className="monitor-error">{t('features.partialMetrics')}</div>}
     <div className="resource-kpis"><div><strong className="num">{online && fresh && available.length ? Math.max(...available).toFixed(1) : '—'}<small> GiB</small></strong><span>{t('workbench.largest')}</span></div><div><strong className="num" style={{ color: online && avg != null ? colorOf(avg) : undefined }}>{online && fresh && avg != null ? Math.round(avg) + '%' : '—'}</strong><span>{t('overview.avgUtil')}</span></div><div><strong className="num">{matches.length}</strong><span>{t('workbench.matches')}</span></div></div>
     <Sparkline values={s.history} color={online ? 'var(--accent)' : 'var(--text-faint)'} />
     <div className="resource-gpus">{s.gpus.map((g) => <GpuGauge key={g.uuid || g.index} id={s.id + ':' + (g.uuid || g.index)} gpu={g} online={online} fresh={fresh && (demo || isFreshGpu(g, refreshMs, sampleNow))} color={colorOf(g.util)} owners={gpuOwners(s, g)} isMatch={matches.some((m) => m.index === g.index)} freeGiBVal={freeGiB(g)} onClick={() => onOpen(s.id, 'gpu', g.index)} />)}</div>

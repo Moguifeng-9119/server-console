@@ -19,6 +19,7 @@ function installWorkbenchFixture() {
     };
     if (key === 'workbenchRequest') return (request) => {
       state.calls.push(request); let data;
+      if (request.operation === 'backupImport' && request.apply && state.holdImport) return new Promise((resolve) => { state.completeImport = () => { state.mainApplied = true; resolve({ ok: true, data: { imported: true } }); }; });
       switch (request.operation) {
         case 'system': data = { filesystems: [], inodes: [], disks: [], networks: [], capabilities: { ratesReady: true } }; break;
         case 'envList': case 'taskList': case 'usageReport': case 'templateList': data = []; break;
@@ -35,7 +36,7 @@ function installWorkbenchFixture() {
         case 'diagnostics': data = { writesPerformed: false, checks: [{ name: 'SSH', status: 'ok' }] }; break;
         case 'notificationGet': data = { enabled: false, configured: false }; break;
         case 'notificationSave': data = { enabled: request.settings.enabled }; break;
-        case 'notificationTest': data = true; break;
+        case 'notificationTest': data = state.notificationResult || { delivered: true }; break;
         case 'backupExport': data = { format: 'serverconsole-config', version: 1, credentialsIncluded: false }; break;
         case 'backupImport': data = request.apply ? { imported: true } : { counts: { workspaces: 1 }, preview: true }; break;
         default: data = {};
@@ -82,6 +83,38 @@ async function main() {
     pass('split height stays bounded and real mouse clicks route input to each pane');
     await page.getByRole('button', { name: 'Rename', exact: true }).first().click(); await page.getByRole('textbox', { name: 'Rename', exact: true }).fill('Training shell'); await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.getByRole('button', { name: 'Training shell', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem('sc.term.layout.fake1')), 'columns'); pass('terminal split and session rename preserve mounted panes and persist layout');
+    await page.locator('.term-chip.add').click();
+    await page.waitForFunction(() => document.querySelectorAll('.term-host').length >= 3);
+    await page.waitForFunction(() => [...document.querySelectorAll('.term-host')].filter((node) => getComputedStyle(node).display !== 'none').length === 2);
+    const splitBefore = await page.locator('.term-host:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.termId));
+    await page.locator('.term-host:visible').first().locator('.xterm-screen').click();
+    assert.deepEqual(await page.locator('.term-host:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.termId)), splitBefore);
+    pass('focusing one of three terminals leaves both split panes unchanged');
+    const sessions = await page.evaluate(async () => (await window.api.terminalList()).filter((session) => session.serverId === 'fake1'));
+    const displayed = await page.locator('.term-host:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.termId));
+    const hiddenIndex = sessions.findIndex((session) => !displayed.includes(session.termId));
+    assert(hiddenIndex >= 0, 'third terminal must be hidden before replacement');
+    const stablePane = page.locator('.term-host[data-term-id="' + displayed[0] + '"]');
+    const stableBefore = await stablePane.boundingBox();
+    await page.locator('.term-host:visible').nth(1).locator('.xterm-screen').click();
+    await page.locator('.term-chip-select').nth(hiddenIndex).click();
+    const stableAfter = await stablePane.boundingBox();
+    assert(stableBefore && stableAfter && Math.abs(stableBefore.x - stableAfter.x) < 1, 'unselected split pane must stay on the same side');
+    pass('replacing one terminal keeps the other pane in place');
+    const closeAndCheck = async (side) => {
+      const panels = await page.locator('.term-host:visible').evaluateAll((nodes) => nodes.map((node) => ({ id: node.dataset.termId, x: node.getBoundingClientRect().x })).sort((a, b) => a.x - b.x));
+      const survivor = panels[side === 0 ? 1 : 0], removed = panels[side];
+      const ordered = await page.evaluate(async () => (await window.api.terminalList()).filter((session) => session.serverId === 'fake1'));
+      const index = ordered.findIndex((session) => session.termId === removed.id);
+      await page.locator('.term-chip').nth(index).getByRole('button', { name: /^End this session/ }).click();
+      await page.locator('.term-host[data-term-id="' + removed.id + '"]').waitFor({ state: 'detached' });
+      const after = await page.locator('.term-host[data-term-id="' + survivor.id + '"]').boundingBox();
+      assert(after && Math.abs(after.x - survivor.x) < 1, 'closing one side must preserve the surviving pane position');
+    };
+    await closeAndCheck(0);
+    await page.locator('.term-chip.add').click(); await page.waitForFunction(() => document.querySelectorAll('.term-host').length >= 3);
+    await closeAndCheck(1);
+    pass('closing either split side preserves the other terminal position');
     await page.getByRole('button', { name: 'tmux', exact: true }).click(); await page.getByRole('button', { name: 'Attach', exact: true }).click();
     await page.waitForFunction(() => window.__v18.writes.filter(([, command]) => command.includes('tmux attach-session')).length === 2); pass('tmux discovery attaches a selected remote session in a new terminal');
     await page.locator('.tabs').getByRole('button', { name: 'History monitoring', exact: true }).click(); await page.locator('.monitor-chart').waitFor();
@@ -97,11 +130,20 @@ async function main() {
     await page.getByRole('button', { name: 'Slurm jobs', exact: true }).click(); await page.getByLabel('Job ID', { exact: true }).fill('123'); await page.getByRole('button', { name: 'Inspect', exact: true }).click(); await page.locator('.workcenter-output').getByText(/JobId=123/).waitFor();
     await page.getByRole('button', { name: 'Logs', exact: true }).click(); await page.getByText('SLURM FIXTURE OUTPUT', { exact: true }).waitFor(); pass('Slurm job details and owned output log requests carry the selected job');
     await page.getByRole('button', { name: 'Diagnostics & backup', exact: true }).click(); await page.getByRole('button', { name: 'Run diagnostics', exact: true }).click(); await page.locator('.workcenter-output').getByText(/writesPerformed/).waitFor();
-    await page.getByLabel('Import backup', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'serverconsole-config', version: 1 })) });
+    await page.evaluate(() => { window.__v18.notificationResult = { delivered: false, reason: 'disabled' }; });
+    await page.getByRole('button', { name: 'Send test', exact: true }).click();
+    await page.getByRole('alert').getByText(/Notification not delivered/).waitFor();
+    pass('a disabled notification cannot be reported as delivered');
+    await page.getByLabel('Import backup', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'serverconsole-config', version: 1, presentation: { 'sc.theme.user': 'dark' } })) });
     await page.getByRole('button', { name: 'Preview', exact: true }).click(); await page.getByRole('button', { name: 'Import selected backup', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.__v18.calls.filter((call) => call.operation === 'backupImport' && call.apply === true).length), 0);
-    await page.getByRole('button', { name: 'Import selected backup', exact: true }).click(); await page.getByText('Backup imported. Restart the app to apply appearance and terminal layout settings.', { exact: true }).waitFor(); pass('backup import requires a visible preview before the explicit apply action');
-    await page.screenshot({ path: path.join(output, 'tools.png') });
+    await page.evaluate(() => { window.__v18.holdImport = true; });
+    await page.getByRole('button', { name: 'Import selected backup', exact: true }).click();
+    await page.waitForFunction(() => Boolean(window.__v18.completeImport));
+    await page.locator('.nav > button').first().click();
+    await page.evaluate(() => window.__v18.completeImport());
+    await page.waitForFunction(() => window.__v18.mainApplied && localStorage.getItem('sc.theme.user') === 'dark');
+    pass('a committed backup remains applied when leaving the work center');
     assert.deepEqual(errors, []); pass('all new workflows have no uncaught renderer errors');
     fs.writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ at: new Date().toISOString(), scope: 'Production renderer with explicitly simulated IPC; remote behavior has separate acceptance tests', checks, errors }, null, 2));
   } finally { if (browser) await browser.close(); await new Promise((resolve) => server.close(resolve)); }

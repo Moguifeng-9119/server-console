@@ -25,7 +25,7 @@
 
 - Diagnostic et sauvegarde de configuration sans identifiants pour récupération et migration. Webhooks HTTPS facultatifs, désactivés par défaut. Collecteur sans interface démarré séparément pour garder l’historique bureau fermé.
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Démarrage
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 Le registre actuel donne commandes, résultats et contrôles en attente. Deux hôtes Linux réels ont testé flux GPU, trois niveaux, compteurs et tâche dédiée sortant avec le code 7. Cela ne valide pas une flotte, les transferts 100Go, Slurm/MIG réels ni tous les installateurs.
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Langues et guides
 

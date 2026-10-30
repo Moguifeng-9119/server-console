@@ -8,7 +8,7 @@ const candidates = process.platform === 'win32' ? ['release/win-unpacked/ServerC
   : ['release/linux-unpacked/serverconsole', 'release/linux-unpacked/server-console'];
 const executablePath = candidates.map((name) => path.join(root, name)).find((name) => fs.existsSync(name));
 if (!executablePath) throw new Error('Current unpacked application missing: ' + candidates.join(', '));
-for (const script of [['terminal-e2e.cjs'], ['window-layout-check.cjs', '--native']]) {
+for (const script of [['terminal-e2e.cjs'], ['window-layout-check.cjs', '--native'], ['packaged-v18-check.cjs']]) {
   const result = spawnSync(process.execPath, [path.join(__dirname, script[0]), ...script.slice(1)], {cwd: root, env: {...process.env, SC_ELECTRON_PATH: executablePath}, stdio: 'inherit', timeout: 180000, windowsHide: true});
   if (result.error) throw result.error;
   if (result.status !== 0) { process.exitCode = result.status ?? 1; break; }

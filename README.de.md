@@ -25,7 +25,7 @@
 
 - Diagnose und Konfigurationssicherung ohne Zugangsdaten helfen beim Umzug. HTTPS-Webhooks sind optional und zunächst aus. Ein separat gestarteter Headless-Sammler speichert Verlauf bei geschlossenem Desktop.
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Erste Schritte
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 Das aktuelle Prüfprotokoll enthält Befehle, Ergebnisse und offene Prüfungen. Zwei reale Linux-Hosts prüften GPU-Stream, drei Ebenen, Zähler und eine eigene Aufgabe mit Exitcode 7. Flotten, 100GB-Transfers, echtes Slurm/MIG und alle Installer sind damit nicht geprüft.
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Sprachen und Anleitungen
 

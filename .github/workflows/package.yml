@@ -53,6 +53,7 @@ jobs:
             test-artifacts/terminal
             test-artifacts/window-layout
             test-artifacts/install-upgrade
+            test-artifacts/packaged-v18
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:

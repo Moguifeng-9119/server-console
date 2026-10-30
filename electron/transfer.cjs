@@ -280,7 +280,10 @@ class TransferManager {
   }
 
   emit(t) {
-    if (this.listener) this.listener(this.pub(t));
+    if (this.listener) {
+      try { this.listener(this.pub(t)); }
+      catch (error) { console.error('Transfer update listener failed:', error && error.message ? error.message : String(error)); }
+    }
     this.saveSoon();
   }
 

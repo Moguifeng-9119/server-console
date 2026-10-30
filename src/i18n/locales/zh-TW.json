@@ -350,7 +350,8 @@
     "updateDownloading": "下載中… {{percent}}%",
     "updateUpToDate": "已是最新版本。",
     "updateVersion": "有新版本 {{version}} 可用。",
-    "updateOpenPage": "開啟發布頁"
+    "updateOpenPage": "開啟發布頁",
+    "manualUpdateMac": "此 macOS 版本請透過發行頁面手動更新。"
   },
   "terminal": {
     "termN": "終端機 {{n}}",
@@ -815,7 +816,7 @@
     "d5": "五",
     "d6": "六",
     "logWatchers": "日誌監控",
-    "logNote": "每五秒增量讀取新日誌位元組，並追蹤日誌輪替和未完成行。",
+    "logNote": "每 5 秒讀取新增日誌，可選一般文字或正規表示式比對。",
     "logPath": "日誌路徑",
     "logPatterns": "匹配模式（每行一個正規表示式）",
     "logTrackLoss": "追蹤 loss 數值（迷你曲線）",
@@ -1003,7 +1004,22 @@
       "error": "上傳失敗",
       "paused": "已暫停"
     },
-    "backupImportedRestart": "備份已匯入。重新啟動應用程式後外觀與終端機版面設定生效。"
+    "backupImportedRestart": "備份已匯入。重新啟動應用程式後外觀與終端機版面設定生效。",
+    "notificationNotDelivered": "通知未送出",
+    "notificationReason": {
+      "disabled": "未啟用",
+      "cooldown": "冷卻中",
+      "busy": "傳送忙碌",
+      "unknown": "未知"
+    },
+    "logPatternMode": "比對方式",
+    "logLiteral": "一般文字",
+    "logRegex": "正規表示式",
+    "logPatternsGeneric": "比對內容（每行一項）",
+    "partialMetrics": "部分監控資料無法使用",
+    "gpuProcessesUnavailable": "GPU 程序資訊無法使用",
+    "logPendingPreview": "未處理日誌預覽",
+    "editLog": "編輯監視器"
   },
   "filePreview": {
     "imageTitle": "圖片預覽",

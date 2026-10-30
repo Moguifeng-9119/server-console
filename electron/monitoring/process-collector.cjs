@@ -1,6 +1,6 @@
 // Process collector: queries GPU compute applications and system processes
 const PROC_CMD = [
-  'nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits 2>/dev/null',
+  'if nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits 2>/dev/null; then echo __GPU_QUERY_OK__; else echo __GPU_QUERY_FAILED__; fi',
   'echo __PS__',
   'ps -eo pid,user,pcpu,pmem,rss,stat,etime,args --no-headers',
 ].join('; ');
@@ -12,7 +12,7 @@ function num(v, fallback = 0) {
 
 function parseProcesses(raw, gpuUuidMap = new Map()) {
   const parts = String(raw || '').split('__PS__');
-  const appRaw = (parts[0] || '').trim();
+  const appRaw = (parts[0] || '').replace(/__GPU_QUERY_(?:OK|FAILED)__/g, '').trim();
   const psRaw = (parts[1] || '').trim();
 
   // Map pid -> array of { index, memMb }
@@ -70,7 +70,13 @@ function parseProcesses(raw, gpuUuidMap = new Map()) {
 async function pollProcesses(connection, gpuUuidMap = new Map(), timeoutMs = 8000) {
   const { stdout, stderr, code, signal } = await connection.exec(PROC_CMD, timeoutMs);
   if (signal || code !== undefined && code !== 0) throw new Error(stderr || `Process query failed (${signal || code})`);
-  return parseProcesses(stdout, gpuUuidMap);
+  const result = parseProcesses(stdout, gpuUuidMap);
+  const gpuProcessesAvailable = String(stdout).split('__PS__', 1)[0].includes('__GPU_QUERY_OK__');
+  if (!gpuProcessesAvailable) {
+    result.gpuProcs.clear();
+    for (const process of result.processes) { process.gpu = null; process.gpuIndices = []; }
+  }
+  return { ...result, gpuProcessesAvailable };
 }
 
 module.exports = {

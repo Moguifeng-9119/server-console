@@ -42,6 +42,12 @@ async function main() {
     const version = await application.evaluate(({app}) => app.getVersion());
     assert.equal(version, JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'))).version, 'Packaged app must match current source version');
     pass('current packaged version launches');
+    const iconAvailable = await application.evaluate(({ nativeImage }) => {
+      const path = process.getBuiltinModule('node:path');
+      return !nativeImage.createFromPath(path.join(process.resourcesPath, 'icons/icon.png')).isEmpty();
+    });
+    assert(iconAvailable, 'Packaged runtime icon must be available');
+    pass('packaged runtime icon is available for the tray');
     const sourceRoot = path.resolve(__dirname, '..');
     const files = fs.readdirSync(path.join(sourceRoot, 'electron')).filter((name) => name.endsWith('.cjs')).map((name) => 'electron/' + name);
     files.push('dist/index.html', ...fs.readdirSync(path.join(sourceRoot, 'dist/assets')).map((name) => 'dist/assets/' + name));

@@ -73,7 +73,7 @@ interface Api {
   webhookSend: (payload: { title: string; body: string }) => Promise<IpcResult<boolean>>;
 
   setAppSettings: (o: { closeAction?: 'ask' | 'minimize' | 'exit' }) => Promise<boolean>;
-  getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit'; language?: string; updateAutoInstall?: boolean; statusPage?: StatusPageInfo }>;
+    getAppSettings: () => Promise<{ closeAction: 'ask' | 'minimize' | 'exit'; language?: string; updateAutoInstall?: boolean; updateSupported?: boolean; statusPage?: StatusPageInfo }>;
   setStatusPage: (enabled: boolean) => Promise<IpcResult<StatusPageInfo>>;
   getUpdateStatus: () => Promise<UpdateStatus>;
   setUpdateAutoInstall: (on: boolean) => Promise<boolean>;
@@ -102,7 +102,7 @@ interface Api {
   historyQuery: (query: HistoryQuery) => Promise<HistoryResult>;
   onHistoryError: (cb: (data: { error: string }) => void) => () => void;
   onSnapshot: (cb: (s: SnapshotPayload) => void) => () => void;
-  onStatus: (cb: (s: { id: string; status: string; error: string }) => void) => () => void;
+    onStatus: (cb: (s: { id: string; status: string; error: string; lane?: string }) => void) => () => void;
 
   // 本机对话框
   dlgOpenFiles: () => Promise<string[]>;
@@ -196,6 +196,7 @@ interface Api {
 
   // 运维工作台（统一请求通道）
   workbenchRequest: <T>(req: { operation: string; serverId?: string } & Record<string, unknown>) => Promise<IpcResult<T>>;
+  onImportResult?: (cb: (result: { operationId: string; status: 'committed' | 'failed'; error?: string; at: number }) => void) => () => void;
   onWorkbenchEvent: (cb: (event: { id: string; serverId: string; type: string; title: string; body?: string; at: number }) => void) => () => void;
 }
 

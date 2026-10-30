@@ -2,6 +2,40 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
+const { Worker } = require('node:worker_threads');
+
+function runLogWorker(lines, patterns, mode, trackLoss) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'log-parser-worker.cjs'));
+    let settled = false;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); void worker.terminate();
+      if (error) reject(error); else resolve(result);
+    };
+    let timer = setTimeout(() => finish(new Error('Log parser could not start')), 10000);
+    worker.once('error', (error) => finish(error));
+    worker.once('message', (result) => finish(null, { ...result, timedOut: false }));
+    worker.once('online', () => {
+      if (settled) return;
+      clearTimeout(timer); timer = setTimeout(() => finish(null, { hitIndices: [], progress: [], timedOut: true }), 1500);
+      worker.postMessage({ lines, patterns, mode, trackLoss });
+    });
+  });
+}
+async function parseLogInWorker(lines, patterns, mode, trackLoss) {
+  if (!lines.length || (!patterns.length && !trackLoss)) return { hits: [], progress: [], disabledPatterns: [], timedOut: false };
+  const indices = new Set(), disabledPatterns = [];
+  const groups = mode === 'regex' ? patterns.map((pattern) => [pattern]) : patterns.length ? [patterns] : [];
+  for (const group of groups) {
+    const result = await runLogWorker(lines, group, mode, false);
+    if (result.timedOut) { if (mode === 'regex') disabledPatterns.push(group[0]); else return { hits: [], progress: [], disabledPatterns: [], timedOut: true }; }
+    else for (const index of result.hitIndices) indices.add(index);
+  }
+  const parsed = trackLoss ? await runLogWorker(lines, [], 'literal', true) : { progress: [], timedOut: false };
+  if (parsed.timedOut) return { hits: [], progress: [], disabledPatterns: [], timedOut: true };
+  return { hits: [...indices].sort((a, b) => a - b).map((index) => lines[index]), progress: parsed.progress, disabledPatterns, timedOut: false };
+}
 
 const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
 const text = (value, max = 4096) => String(value ?? '').slice(0, max);
@@ -149,7 +183,7 @@ class WorkbenchManager {
     const at = Number(snapshot.collectedAt) || Date.now(); const prior = this.snapshots.get(snapshot.id); this.snapshots.set(snapshot.id, snapshot);
     if (prior && snapshot.status === prior.status && at < (Number(prior.collectedAt) || 0)) return;
     const gpuMaxAge = Math.max(5000, (snapshot.monitoring?.effectiveIntervalMs || 2000) * 4);
-    const laneAt = (lane) => snapshot.laneTimestamps?.[lane] ?? (!snapshot.lastLane || snapshot.lastLane === lane ? at : null);
+    const laneAt = (lane) => snapshot.monitoring?.laneHealth?.[lane]?.healthy === false ? null : snapshot.laneTimestamps?.[lane] ?? (!snapshot.lastLane || snapshot.lastLane === lane ? at : null);
     const freshAt = (observedAt, maxAge = gpuMaxAge) => Number.isFinite(observedAt) && observedAt <= at + 1000 && at - observedAt <= maxAge;
     const gpuAt = (g) => g.observedAt ?? laneAt('gpu');
     const available = (g, metric) => !g.unavailableMetrics?.includes(metric) && typeof g[metric] === 'number' && Number.isFinite(g[metric]);
@@ -237,7 +271,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     if (op === 'envList') return clone(this.data.env || []);
     if (op === 'usageReport') return this.usageReport(Math.max(1, Math.min(365, finite(r.rangeDays, 30))));
     if (op === 'logList') return clone(this.data.logs || []);
-    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [], progressPoints: existing?.progressPoints || [], cursor: existing?.serverId === sid && existing?.path === text(r.path, 4096).trim() ? existing.cursor : undefined }); }
+    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); const patternMode = r.patternMode === 'literal' ? 'literal' : 'regex'; if (patternMode === 'regex') for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, patternMode, disabledPatterns: existing && JSON.stringify(existing.patterns) === JSON.stringify(patterns) && (existing.patternMode || 'regex') === patternMode ? existing.disabledPatterns || [] : [], pendingPreview: existing?.pendingPreview, lastError: existing?.lastError, lastErrorAt: existing?.lastErrorAt, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [], progressPoints: existing?.progressPoints || [], cursor: existing?.serverId === sid && existing?.path === text(r.path, 4096).trim() ? existing.cursor : undefined }); }
     if (op === 'logDelete') { this.data.logs = (this.data.logs || []).filter((l) => l.id !== idOf(r.id)); this.persist(); return true; }
     if (op === 'logPoll') return this.pollLog(idOf(r.id));
     throw new Error('Unsupported workbench operation');
@@ -455,15 +489,24 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       const fresh = cursor ? parts : [];
       log.lastLines = [...(continuous ? log.lastLines || [] : []), ...parts].slice(-60).map((line) => line.slice(0, 65536));
       log.cursor = { path: log.path, identity, offset: start + bytes.length, partial: partial.slice(-65536), byteRemainder: remainderBytes };
-      log.backlogBytes = Math.max(0, size - log.cursor.offset); log.lastPollAt = Date.now(); delete log.lastError;
-      const matchers = (log.patterns || []).map((p) => new RegExp(p));
-      const hits = fresh.filter((line) => matchers.some((re) => re.test(line)));
+      log.backlogBytes = Math.max(0, size - log.cursor.offset); log.lastPollAt = Date.now();
+      const parsed = await parseLogInWorker(fresh, (log.patterns || []).filter((pattern) => !(log.disabledPatterns || []).includes(pattern)), log.patternMode || 'regex', log.trackLoss);
+      if (this.closed || !this.data.logs.includes(original)) throw new Error('Log watcher changed during parsing');
+      if (parsed.timedOut) {
+        log.enabled = false; log.lastError = 'Log matching timed out; watcher paused'; log.lastErrorAt = Date.now();
+        log.cursor = cursor; log.backlogBytes = Math.max(0, size - (cursor?.offset || 0));
+        log.pendingPreview = parts.slice(-60).map((line) => line.slice(0, 65536));
+        log.lastLines = original.lastLines || [];
+      } else if (parsed.disabledPatterns.length) {
+        log.disabledPatterns = [...new Set([...(log.disabledPatterns || []), ...parsed.disabledPatterns])];
+        log.lastError = 'Timed-out patterns disabled; affected lines require review: ' + parsed.disabledPatterns.join(', ').slice(0, 400);
+        log.lastErrorAt = Date.now(); log.pendingPreview = parts.slice(-60).map((line) => line.slice(0, 65536));
+      } else if (!(log.disabledPatterns || []).length) { delete log.pendingPreview; delete log.lastError; }
+      const hits = parsed.hits;
       if (hits.length) {
         log.lastHits = [...(log.lastHits || []), ...hits.map((line) => ({ line: line.slice(0, 500), at: Date.now() }))].slice(-20);
       }
-      if (log.trackLoss) for (const line of fresh) {
-        const match = (name) => { const m = line.match(new RegExp('(?:^|[\\s,;])' + name + '[=:\\s]+([0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)', 'i')); return m && Number.isFinite(+m[1]) ? +m[1] : null; };
-        const loss = match('loss'), step = match('step'), epoch = match('epoch');
+      if (log.trackLoss) for (const { loss, step, epoch } of parsed.progress) {
         if (loss !== null) log.lossPoints = [...(log.lossPoints || []), loss].slice(-120);
         if (loss !== null || step !== null || epoch !== null) log.progressPoints = [...(log.progressPoints || []), { at: Date.now(), loss, step, epoch }].slice(-120);
       }

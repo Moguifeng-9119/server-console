@@ -75,6 +75,8 @@ jobs:
             cp "$FILE" "upload/$NAME"
           done < <(find packages -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' -o -name '*.blockmap' -o -name 'latest*.yml' \) -print0)
           test -f upload/latest.yml
+          test -f upload/latest-mac.yml
+          compgen -G "upload/*${RELEASE_TAG#v}*.zip" > /dev/null
           test -f "upload/ServerConsole-Setup-${RELEASE_TAG#v}.exe.blockmap"
           node scripts/release-checksums.cjs upload "${RELEASE_TAG#v}"
           cat upload/SHA256SUMS.txt

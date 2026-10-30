@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const COLLECT_CMD = [
   'nvidia-smi --query-gpu=index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,fan.speed --format=csv,noheader,nounits 2>/dev/null',
   'echo __APPS__',
-  'nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits 2>/dev/null',
+  'if nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits 2>/dev/null; then echo __GPU_QUERY_OK__; else echo __GPU_QUERY_FAILED__; fi',
   'echo __SYS__',
   'cat /proc/loadavg; nproc; free -b',
   'echo __CPU__; head -n 1 /proc/stat',
@@ -153,6 +153,7 @@ function parseSnapshot(out, previousCpu = null) {
   return {
     gpus,
     processes,
+    gpuProcessesAvailable: appRaw.includes('__GPU_QUERY_OK__'),
     cpuCores,
     loadAvg: [load[0] || 0, load[1] || 0, load[2] || 0],
     cpuUsage: totalDelta > 0 && idleDelta >= 0 && idleDelta <= totalDelta
@@ -173,11 +174,13 @@ class Connection {
     this.client = null;
     this.pending = null;
     this.status = 'offline';
+    this.generation = 0;
     this.error = '';
     this._hostKeyError = '';
     this._fails = 0; // 连续失败次数（指数退避）
     this._nextRetryAt = 0;
     this._cpuSample = null;
+    this._attempt = 0;
   }
 
   // 退避窗口内跳过重连尝试，避免对宕机服务器每个采集周期都发起 10s 超时的连接
@@ -192,7 +195,10 @@ class Connection {
   connect() {
     if (this.pending) return this.pending;
     if (this.client && this.status === 'online') return Promise.resolve();
+    const attempt = ++this._attempt;
+    const current = () => { if (this._attempt !== attempt) throw Object.assign(new Error('SSH connection attempt cancelled'), { staleConnection: true }); };
     this.pending = (async () => {
+      let ownedClient;
       try {
         /** @type {Record<string, any>} */
         const connectOpts = { host: this.cfg.host, port: this.cfg.port || 22, ...this.authConfig() };
@@ -218,10 +224,12 @@ class Connection {
             .catch((e) => {
               throw new Error(lang.t('jumpFailed', { detail: e.message }));
             });
+          current();
           if (jump) {
             const jc = new Client();
             this._jumpClient = jc;
             jc.on('close', () => {
+              if (this._jumpClient !== jc) return;
               // 跳板断开时一并断开目标，避免半挂连接
               try {
                 if (this.client) this.client.end();
@@ -234,15 +242,20 @@ class Connection {
               jc.once('error', (e) => rej(new Error(lang.t('jumpFailed', { detail: e.message }))));
               jc.connect({ host: jump.host, port: jump.port || 22, ...authOpts(jump) });
             });
+            current();
             connectOpts.sock = await new Promise((res, rej) =>
               jc.forwardOut('127.0.0.1', 0, this.cfg.host, this.cfg.port || 22, (e, s) => (e ? rej(e) : res(s))),
             );
+            current();
           }
         }
         await new Promise((resolve, reject) => {
           const client = new Client();
+          ownedClient = client;
           client
             .on('ready', () => {
+              if (this.client !== client || this._attempt !== attempt) { client.end(); reject(Object.assign(new Error('Connection was replaced'), { staleConnection: true })); return; }
+              this.generation++;
               this._cpuSample = null;
               this.status = 'online';
               this.error = '';
@@ -252,6 +265,7 @@ class Connection {
               resolve();
             })
             .on('error', (err) => {
+              if (this.client !== client) { reject(err); return; }
               // 指纹校验的拒绝原因比 ssh2 的通用报错更有用，替换之
               if (this._hostKeyError) {
                 err.message = this._hostKeyError;
@@ -264,9 +278,12 @@ class Connection {
               reject(err);
             })
             .on('close', () => {
+              if (this.client !== client) { reject(Object.assign(new Error('SSH connection was replaced'), { staleConnection: true })); return; }
+              this.generation++;
               this.status = 'offline';
               this.pending = null;
               this.dispose();
+              reject(new Error('SSH connection closed'));
             });
           // keyboard-interactive（2FA/MFA）：有注入的交互通道就走渲染层弹框；否则回退用配置密码作答
           client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
@@ -276,12 +293,11 @@ class Connection {
               .then((answers) => finish(Array.isArray(answers) && answers.length === qs.length ? answers : qs.map(() => this.cfg.password || '')))
               .catch(() => finish(qs.map(() => this.cfg.password || '')));
           });
-          client.connect(connectOpts);
           this.client = client;
+          client.connect(connectOpts);
         });
       } catch (e) {
-        this.pending = null;
-        this.dispose();
+        if (this._attempt === attempt && (!ownedClient || this.client === ownedClient || !this.client)) { this.pending = null; this.dispose(); }
         throw e;
       }
     })();
@@ -298,16 +314,18 @@ class Connection {
       this._sftp = null;
     }
     if (this._jumpClient) {
+      const jump = this._jumpClient; this._jumpClient = null;
       try {
-        this._jumpClient.end();
+        jump.end();
       } catch {
         /* noop */
       }
       this._jumpClient = null;
     }
     if (this.client) {
+      const client = this.client; this.client = null;
       try {
-        this.client.end();
+        client.end();
       } catch {
         /* noop */
       }
@@ -318,6 +336,8 @@ class Connection {
   // Direct-transfer cleanup is owned by its task. Never sweep other live sessions on connect.
 
   close() {
+    this._attempt++; this.pending = null;
+    this.generation++;
     this.dispose();
     this.status = 'offline';
   }
@@ -326,8 +346,11 @@ class Connection {
     return this.connect().then(
       () =>
         new Promise((resolve, reject) => {
-          this.client.exec(cmd, (err, stream) => {
-            if (err) return reject(err);
+          const generation = this.generation, client = this.client;
+          const stale = () => this.generation !== generation || this.client !== client;
+          const fail = (error) => { if (stale()) { error = Object.assign(new Error('SSH command belongs to a replaced connection'), { staleConnection: true }); } reject(error); };
+          client.exec(cmd, (err, stream) => {
+            if (err) return fail(err);
             let out = '';
             let errOut = '';
             const timer = setTimeout(() => {
@@ -336,13 +359,15 @@ class Connection {
               } catch {
                 /* noop */
               }
-              reject(new Error(lang.t('timeout')));
+              fail(new Error(lang.t('timeout')));
             }, timeout);
             stream
               .on('close', (code, signal) => {
                 clearTimeout(timer);
+                if (stale()) { fail(new Error('Stale SSH result')); return; }
                 resolve({ stdout: out, stderr: errOut, code, signal });
               })
+              .on('error', (error) => { clearTimeout(timer); fail(error); })
               .on('data', (d) => (out += d.toString()))
               .stderr.on('data', (d) => (errOut += d.toString()));
           });

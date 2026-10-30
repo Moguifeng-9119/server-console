@@ -120,7 +120,7 @@ function GpuList({ s, onMenu, focusGpuIndex, actionable }: { s: Server; onMenu: 
             </div>
 
             <div className="gpu-procs">
-              {g.procs.length === 0 && <span className="faint">{t('workbench.noProcesses')}</span>}
+              {g.procs.length === 0 && <span className="faint">{s.gpuProcessesAvailable === false ? t('features.gpuProcessesUnavailable') : t('workbench.noProcesses')}</span>}
               {g.procs.map((p) => (
                 <div
                   key={p.pid}
@@ -162,7 +162,7 @@ function ProcessTable({ s, onMenu, actionable }: { s: Server; onMenu: (pid: numb
     const q = query.trim().toLowerCase();
     let list = s.processes.filter((p) => {
       if (user !== 'all' && p.user !== user) return false;
-      if (onlyGpu && p.gpu === null) return false;
+      if (onlyGpu && s.gpuProcessesAvailable !== false && p.gpu === null) return false;
       if (!q) return true;
       return p.command.toLowerCase().includes(q) || String(p.pid).includes(q) || p.user.includes(q);
     });
@@ -173,7 +173,7 @@ function ProcessTable({ s, onMenu, actionable }: { s: Server; onMenu: (pid: numb
       return asc ? r : -r;
     });
     return list;
-  }, [s.processes, query, user, onlyGpu, sortKey, asc]);
+  }, [s.processes, s.gpuProcessesAvailable, query, user, onlyGpu, sortKey, asc]);
 
   const th = (key: SortKey, label: string, w?: number) => (
     <th
@@ -208,7 +208,7 @@ function ProcessTable({ s, onMenu, actionable }: { s: Server; onMenu: (pid: numb
           ))}
         </select>
         <label className="dim" style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-          <input type="checkbox" checked={onlyGpu} onChange={(e) => setOnlyGpu(e.target.checked)} />
+          <input type="checkbox" checked={onlyGpu && s.gpuProcessesAvailable !== false} disabled={s.gpuProcessesAvailable === false} onChange={(e) => setOnlyGpu(e.target.checked)} />
           {t('proc.onlyGpu')}
         </label>
         <span className="faint">

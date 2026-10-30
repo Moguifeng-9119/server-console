@@ -43,7 +43,7 @@ function logCrash(tag, detail) {
 // ===== 自动更新（electron-updater）：默认仅通知；设置里可开"自动下载并安装" =====
 let autoUpdater = null;
 function setupAutoUpdate() {
-  if (!app.isPackaged) return; // 开发态/便携解压态不启用
+  if (!app.isPackaged || process.platform === 'darwin') return; // Unsigned macOS builds use the release page.
   try {
     const { autoUpdater: updater } = require('electron-updater');
     autoUpdater = updater;
@@ -72,7 +72,7 @@ function setupAutoUpdate() {
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   // 开发态没有 exe 资源可取，显式给窗口/任务栏一个图标；打包态回退到 exe 内嵌图标
-  const windowIcon = path.join(__dirname, '../build/icon_512.png');
+  const windowIcon = app.isPackaged ? path.join(process.resourcesPath, 'icons/icon.png') : path.join(__dirname, '../build/icon_512.png');
   const win = new BrowserWindow({
     width: Math.min(1440, Math.round(width * 0.9)),
     height: Math.min(900, Math.round(height * 0.9)),
@@ -166,14 +166,14 @@ ipcMain.on('app:show-main', () => {
   mainWindow.show();
   mainWindow.focus();
 });
-ipcMain.handle('app:get-settings', () => ({ closeAction, language: savedLanguage, updateAutoInstall, statusPage: statusPageInfo() }));
+ipcMain.handle('app:get-settings', () => ({ closeAction, language: savedLanguage, updateAutoInstall: process.platform === 'darwin' ? false : updateAutoInstall, updateSupported: process.platform !== 'darwin', statusPage: statusPageInfo() }));
 ipcMain.handle('app:set-status-page', (_e, payload) => {
   const enabled = !!(payload && (payload.enabled ?? payload));
   return applyStatusPage(enabled);
 });
 ipcMain.handle('update:get-status', () => updateStatus);
 ipcMain.handle('update:auto-install', (_e, on) => {
-  updateAutoInstall = on === true;
+  updateAutoInstall = process.platform !== 'darwin' && on === true;
   saveAppSettings({ closeAction, language: savedLanguage, updateAutoInstall, statusPage });
   if (autoUpdater) autoUpdater.autoDownload = updateAutoInstall;
   if (updateAutoInstall && updateStatus.available && !updateStatus.downloaded && autoUpdater) autoUpdater.downloadUpdate().catch((e) => logCrash('update-download', String(e)));
@@ -281,7 +281,7 @@ function refreshTrayMenu() {
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, '../build/icon_512.png');
+  const iconPath = app.isPackaged ? path.join(process.resourcesPath, 'icons/icon.png') : path.join(__dirname, '../build/icon_512.png');
   const img = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 }) : undefined;
   tray = new Tray(img || nativeImage.createEmpty());
   refreshTrayMenu();

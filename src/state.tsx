@@ -13,6 +13,7 @@ import { api, isElectron } from './api';
 import i18n, { initializationWarning } from './i18n';
 import { appendSample, normalizeHistory } from './history';
 import { telemetryStore } from './telemetry/store';
+import { settlePresentationImport } from './telemetry/config-backup';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'default' | 'comfy';
@@ -193,6 +194,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setConfigs(await api.listServers());
   }, []);
 
+  useEffect(() => api?.onImportResult?.((result) => {
+    try { settlePresentationImport(localStorage, result); } catch (error) { pushToast({ level: 'error', title: i18n.t('backend.error'), detail: String(error) }); }
+    if (result.status === 'committed') void refresh().catch((error) => pushToast({ level: 'error', title: i18n.t('backend.error'), detail: String(error) }));
+    pushToast({ level: result.status === 'committed' ? 'info' : 'error', title: i18n.t(result.status === 'committed' ? 'features.backupImportedRestart' : 'backend.error'), detail: result.error });
+  }), [refresh, pushToast]);
+
+  useEffect(() => {
+    if (!api) return;
+    void api.workbenchRequest<Array<{ operationId: string; status: string }>>({ operation: 'backupResults' }).then((result) => {
+      if (!result.ok || !Array.isArray(result.data)) return;
+      for (const receipt of result.data) settlePresentationImport(localStorage, receipt);
+    }).catch((error) => pushToast({ level: 'error', title: i18n.t('backend.error'), detail: String(error) }));
+  }, [pushToast]);
+
   // 首次加载：有真实服务器配置就切到实数据，否则停在演示数据；同时回读上次会话的审计日志
   useEffect(() => {
     if (!api) return;
@@ -239,6 +254,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       telemetryStore.ingestSnapshot(sample); pendingSnapshots.set(s.id, sample);
     });
     const offStatus = api.onStatus((st) => {
+      if (st.status === 'online' && st.lane) return;
       pendingSnapshots.delete(st.id); telemetryStore.updateStatus(st.id, st.status as SnapshotPayload['status'], st.error);
       setHistories((prev) => ({ ...prev, [st.id]: appendSample(prev[st.id] || [], { at: Date.now(), value: null }) }));
       setSnaps((prev) => {
@@ -322,8 +338,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         status: s?.status ?? 'offline',
         gpus: s?.gpus ?? [],
         processes: s?.processes ?? [],
+        gpuProcessesAvailable: s?.gpuProcessesAvailable,
         history: (histories[c.id] ?? []).flatMap((point) => point.value == null ? [] : [point.value]),
         collectedAt: s?.collectedAt,
+        laneTimestamps: s?.laneTimestamps,
+        monitoring: s?.monitoring,
         cpuCores: s?.cpuCores ?? 0,
         cpuUsage: s?.cpuUsage ?? null,
         loadAvg: s?.loadAvg ?? [0, 0, 0],

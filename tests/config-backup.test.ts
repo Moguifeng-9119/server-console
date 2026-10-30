@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exportPresentationBackup, importPresentationBackup, validatePresentationBackup } from '../src/telemetry/config-backup';
+import { exportPresentationBackup, importPresentationBackup, validatePresentationBackup, stagePresentationImport, settlePresentationImport } from '../src/telemetry/config-backup';
 
 function storage(seed: Record<string, string> = {}) {
   const values = new Map(Object.entries(seed));
@@ -7,6 +7,18 @@ function storage(seed: Record<string, string> = {}) {
     getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
 }
 describe('configuration presentation migration', () => {
+  it('leaves live preferences unchanged until a committed import receipt is available after reload', () => {
+    const target = storage({ 'sc.lang': 'en' }); stagePresentationImport(target, 'pending', { 'sc.lang': 'fr' });
+    expect(target.getItem('sc.lang')).toBe('en');
+    expect(settlePresentationImport(target, { operationId: 'pending', status: 'committed' })).toBe(true);
+    expect(target.getItem('sc.lang')).toBe('fr'); expect(target.getItem('sc.pendingImport.pending')).toBeNull();
+    expect(settlePresentationImport(target, { operationId: 'pending', status: 'committed' })).toBe(false);
+  });
+  it('discards staged preferences after recovery reports an interrupted import', () => {
+    const target = storage({ 'sc.lang': 'en' }); stagePresentationImport(target, 'pending', { 'sc.lang': 'fr' });
+    settlePresentationImport(target, { operationId: 'pending', status: 'failed' });
+    expect(target.getItem('sc.lang')).toBe('en'); expect(target.getItem('sc.pendingImport.pending')).toBeNull();
+  });
   it('exports layout, names and valid appearance settings while excluding secrets and session output', () => {
     expect(exportPresentationBackup(storage({ 'sc.term.layout.host-1': 'columns', 'sc.term.names.host-1': '{"term-1":"Training"}', 'sc.lang': 'zh-CN', 'ssh.password': 'secret', 'sc.term.output.host-1': 'private output' })))
       .toEqual({ 'sc.term.layout.host-1': 'columns', 'sc.term.names.host-1': '{"term-1":"Training"}', 'sc.lang': 'zh-CN' });

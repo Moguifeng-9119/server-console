@@ -350,7 +350,8 @@
     "updateDownloading": "다운로드 중… {{percent}}%",
     "updateUpToDate": "최신 버전입니다.",
     "updateVersion": "버전 {{version}}을(를) 사용할 수 있습니다.",
-    "updateOpenPage": "릴리스 페이지 열기"
+    "updateOpenPage": "릴리스 페이지 열기",
+    "manualUpdateMac": "이 macOS 버전은 릴리스 페이지에서 수동으로 업데이트합니다."
   },
   "terminal": {
     "termN": "터미널 {{n}}",
@@ -815,7 +816,7 @@
     "d5": "금",
     "d6": "토",
     "logWatchers": "로그 감시",
-    "logNote": "5초마다 새 로그 바이트를 읽고 로그 순환과 미완성 행을 추적합니다.",
+    "logNote": "5초마다 새 로그를 읽고 텍스트 또는 정규식으로 일치시킵니다.",
     "logPath": "로그 경로",
     "logPatterns": "패턴 (한 줄에 정규 표현식 하나)",
     "logTrackLoss": "loss 값 추적 (스파크라인)",
@@ -1003,7 +1004,22 @@
       "error": "업로드 실패",
       "paused": "일시 중지됨"
     },
-    "backupImportedRestart": "백업을 가져왔습니다. 모양과 터미널 배치 설정을 적용하려면 앱을 다시 시작하세요."
+    "backupImportedRestart": "백업을 가져왔습니다. 모양과 터미널 배치 설정을 적용하려면 앱을 다시 시작하세요.",
+    "notificationNotDelivered": "알림을 보내지 못했습니다",
+    "notificationReason": {
+      "disabled": "비활성화",
+      "cooldown": "대기 중",
+      "busy": "사용 중",
+      "unknown": "알 수 없음"
+    },
+    "logPatternMode": "일치 방식",
+    "logLiteral": "텍스트",
+    "logRegex": "정규식",
+    "logPatternsGeneric": "패턴 (한 줄에 하나)",
+    "partialMetrics": "일부 모니터링 데이터를 사용할 수 없습니다",
+    "gpuProcessesUnavailable": "GPU 프로세스 정보를 사용할 수 없습니다",
+    "logPendingPreview": "처리되지 않은 로그 미리보기",
+    "editLog": "감시 설정 편집"
   },
   "filePreview": {
     "imageTitle": "이미지 미리보기",

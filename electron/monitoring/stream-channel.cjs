@@ -14,6 +14,7 @@ class StreamChannel {
     if (this.active) return;
     this.active = true; this.buffer = ''; this.stderr = ''; this.decoder = new StringDecoder('utf8');
     this.lastDataAt = this.now(); const generation = ++this.generation;
+    let connectionGeneration;
     const valid = () => this.active && generation === this.generation;
     const interval = Math.max(200, Math.min(10000, Math.round(Number(this.intervalMs) || 500)));
     // exec replaces the shell so a TERM targets nvidia-smi, never unrelated processes.
@@ -26,6 +27,7 @@ class StreamChannel {
     try {
       await this.connection.connect();
       if (!valid()) return;
+      connectionGeneration = this.connection.generation;
       await new Promise((resolve, reject) => {
         this.connection.client.exec(cmd, (error, stream) => {
           if (error) { reject(error); return; }
@@ -33,6 +35,7 @@ class StreamChannel {
           this.stream = stream;
           stream.on('data', (chunk) => {
             if (!valid()) return;
+            if (this.connection.generation !== connectionGeneration) { fail(new Error('GPU stream connection changed')); return; }
             this.buffer += this.decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
             let index;
             while ((index = this.buffer.indexOf('\n')) >= 0) {
@@ -54,7 +57,8 @@ class StreamChannel {
             fail(new Error('GPU stream closed (' + (signal || (code ?? 'unknown')) + ')' + (this.stderr ? ': ' + this.stderr.trim() : '')));
           });
           this.idleChecker = setInterval(() => {
-            if (valid() && this.now() - this.lastDataAt > this.idleTimeoutMs) fail(new Error('GPU stream idle timeout'));
+            if (valid() && this.connection.generation !== connectionGeneration) fail(new Error('GPU stream connection changed'));
+            else if (valid() && this.now() - this.lastDataAt > this.idleTimeoutMs) fail(new Error('GPU stream idle timeout'));
           }, Math.min(1000, this.idleTimeoutMs));
           this.idleChecker.unref?.();
           resolve();

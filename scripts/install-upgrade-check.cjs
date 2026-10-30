@@ -16,13 +16,13 @@ async function checkInstallUpgrade() {
   if (process.env.GITHUB_ACTIONS !== 'true' || process.platform !== 'win32') throw new Error('Installer checks run only in an isolated Windows GitHub Actions runner');
   const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-install-upgrade-'));
   const installDirectory = path.join(owned, 'app'), userData = path.join(owned, 'userdata'), executablePath = path.join(installDirectory, 'ServerConsole.exe');
-  const receipt = { version: require('../package.json').version, previous: '0.17.1', checks: [], passed: false };
+  const receipt = { version: require('../package.json').version, previous: '0.18.0', checks: [], passed: false };
   const artifacts = path.join(root, 'test-artifacts', 'install-upgrade'); fs.mkdirSync(artifacts, { recursive: true });
   let application;
   try {
-    const metadataResponse = await fetch('https://api.github.com/repos/Moguifeng-9119/server-console/releases/tags/v0.17.1', { headers: { 'user-agent': 'ServerConsole-installer-ci' }, signal: AbortSignal.timeout(30000) });
+    const metadataResponse = await fetch('https://api.github.com/repos/Moguifeng-9119/server-console/releases/tags/v0.18.0', { headers: { 'user-agent': 'ServerConsole-installer-ci' }, signal: AbortSignal.timeout(30000) });
     assert(metadataResponse.ok, 'Previous release metadata unavailable');
-    const metadata = await metadataResponse.json(), asset = metadata.assets.find((item) => item.name === 'ServerConsole-Setup-0.17.1.exe');
+    const metadata = await metadataResponse.json(), asset = metadata.assets.find((item) => item.name === 'ServerConsole-Setup-0.18.0.exe');
     assert(asset, 'Previous NSIS installer missing');
     const response = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(180000) }); assert(response.ok && response.body, 'Previous installer download failed');
     const previousInstaller = path.join(owned, 'previous.exe'); await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(previousInstaller));

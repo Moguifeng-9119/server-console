@@ -50,3 +50,17 @@ export function importPresentationBackup(storage: StorageAccess, value: unknown)
   catch (error) { rollback(); throw error; }
   return rollback;
 }
+
+export type ImportReceipt = { operationId: string; status: string };
+export function stagePresentationImport(storage: StorageAccess, operationId: string, value: unknown): void {
+  if (!/^[\w-]{1,100}$/.test(operationId)) throw new Error('Invalid import operation ID');
+  storage.setItem('sc.pendingImport.' + operationId, JSON.stringify(validatePresentationBackup(value)));
+}
+export function settlePresentationImport(storage: StorageAccess, receipt: ImportReceipt): boolean {
+  if (!/^[\w-]{1,100}$/.test(receipt.operationId)) return false;
+  const key = 'sc.pendingImport.' + receipt.operationId, raw = storage.getItem(key);
+  if (raw === null || !['committed', 'failed'].includes(receipt.status)) return false;
+  if (receipt.status === 'committed') importPresentationBackup(storage, JSON.parse(raw));
+  storage.removeItem(key);
+  return receipt.status === 'committed';
+}

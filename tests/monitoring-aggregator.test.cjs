@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { HistoryAggregator } from '../electron/monitoring/history-aggregator.cjs';
 
 describe('HistoryAggregator 1-second statistical buckets', () => {
+  it('limits a GPU failure gap to GPU and fleet channels', () => {
+    const agg = new HistoryAggregator();
+    for (const device of ['gpu:0', 'all', 'system', 'disk:sda', 'network:eth0', 'mount:/']) {
+      agg.ingest({ server: 's1', device, metric: 'value', label: device, at: 1000, value: 5 });
+    }
+    const gaps = agg.gap('s1', 2000, 'gpu').filter((bucket) => bucket.missing).map((bucket) => bucket.device).sort();
+    expect(gaps).toEqual(['all', 'gpu:0']);
+  });
   it('preserves high-frequency peaks (min/max) and calculates sample count', () => {
     const agg = new HistoryAggregator();
     const baseSecond = 10000; // 10.000s

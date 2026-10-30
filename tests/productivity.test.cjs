@@ -62,6 +62,20 @@ describe('read-only remote tools', () => {
 });
 
 describe('credential-free configuration migration', () => {
+  it('persists successful import receipts and makes an operation ID idempotent', async () => {
+    const onImport = vi.fn(), importState = vi.fn(async () => {}), { instance, directory } = manager({ onImport, importState });
+    const request = { operation: 'backupImport', apply: true, backup: instance.backupExport(), operationId: 'import-one' };
+    await instance.request(request); await instance.request(request);
+    expect(importState).toHaveBeenCalledOnce(); expect(onImport).toHaveBeenCalledOnce();
+    const restored = new ProductivityManager({ directory }).init();
+    expect(await restored.request({ operation: 'backupResults' })).toEqual([expect.objectContaining({ operationId: 'import-one', status: 'committed', applied: true })]);
+  });
+  it('retains a failed import result without publishing a success', async () => {
+    const onImport = vi.fn(), { instance } = manager({ onImport, importState: async () => { throw new Error('test failure'); } });
+    await expect(instance.request({ operation: 'backupImport', apply: true, backup: instance.backupExport(), operationId: 'import-bad' })).rejects.toThrow('test failure');
+    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+    expect(await instance.request({ operation: 'backupResults' })).toEqual([expect.objectContaining({ status: 'failed', error: 'test failure' })]);
+  });
   it('omits credentials and redacts command assignments', () => {
     const { instance } = manager({ exportState: () => ({ templates: [{ id: 't1', command: 'TOKEN=abc python run.py', apiKey: 'abcd' }], password: 'secret', preferences: { layout: 'columns' } }) });
     const backup = instance.backupExport(), serialized = JSON.stringify(backup);

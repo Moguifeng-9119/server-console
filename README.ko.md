@@ -25,7 +25,7 @@
 
 - 진단과 자격 증명 없는 설정 백업으로 복구·이전을 돕습니다. HTTPS Webhook은 기본 비활성입니다. 별도 실행하는 헤드리스 수집기는 데스크톱 종료 후에도 기록을 저장합니다.
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## 시작하기
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 최신 기록에서 명령, 결과와 미검증 항목을 확인하세요. 실제 Linux 2대에서 GPU 스트림, 3계층 수집, 자원 카운터, 종료 코드 7의 전용 작업을 확인했습니다. 대규모 환경, 100GB 전송, Slurm/MIG, 모든 설치 프로그램을 검증한 것은 아닙니다.
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## 언어와 가이드
 

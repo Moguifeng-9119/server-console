@@ -33,6 +33,7 @@ export interface MonitoringCapabilities {
 }
 
 export interface ServerTelemetryState {
+  gpuProcessesAvailable?: boolean;
   laneTimestamps?: SnapshotPayload['laneTimestamps'];
   monitoring?: SnapshotPayload['monitoring'];
   serverId: string;

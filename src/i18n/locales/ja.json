@@ -350,7 +350,8 @@
     "updateDownloading": "ダウンロード中… {{percent}}%",
     "updateUpToDate": "最新バージョンです。",
     "updateVersion": "バージョン {{version}} が利用可能です。",
-    "updateOpenPage": "リリースページを開く"
+    "updateOpenPage": "リリースページを開く",
+    "manualUpdateMac": "この macOS 版はリリースページから手動で更新します。"
   },
   "terminal": {
     "termN": "ターミナル {{n}}",
@@ -815,7 +816,7 @@
     "d5": "金",
     "d6": "土",
     "logWatchers": "ログ監視",
-    "logNote": "5 秒ごとに追加ログを読み、ローテーションと未完了行を追跡します。",
+    "logNote": "5 秒ごとに新しいログを読み取り、テキストまたは正規表現で照合します。",
     "logPath": "ログのパス",
     "logPatterns": "パターン（1 行に 1 つの正規表現）",
     "logTrackLoss": "loss 値を追跡（スパークライン）",
@@ -1003,7 +1004,22 @@
       "error": "アップロード失敗",
       "paused": "一時停止中"
     },
-    "backupImportedRestart": "バックアップを読み込みました。外観と端末レイアウトの設定を反映するには再起動してください。"
+    "backupImportedRestart": "バックアップを読み込みました。外観と端末レイアウトの設定を反映するには再起動してください。",
+    "notificationNotDelivered": "通知を送信できませんでした",
+    "notificationReason": {
+      "disabled": "無効",
+      "cooldown": "待機中",
+      "busy": "処理中",
+      "unknown": "不明"
+    },
+    "logPatternMode": "一致方法",
+    "logLiteral": "テキスト",
+    "logRegex": "正規表現",
+    "logPatternsGeneric": "パターン（1 行に 1 つ）",
+    "partialMetrics": "一部の監視データを取得できません",
+    "gpuProcessesUnavailable": "GPU プロセス情報を取得できません",
+    "logPendingPreview": "未処理ログのプレビュー",
+    "editLog": "監視設定を編集"
   },
   "filePreview": {
     "imageTitle": "画像プレビュー",

@@ -15,6 +15,11 @@ describe('monitoring lane and metric validity', () => {
     expect(isFreshSample({ ...sample, laneTimestamps: { system: now } }, false, 200, now)).toBe(false);
     expect(isFreshSample(server, false, 200, now, 'processes')).toBe(true);
   });
+  it('marks a lane stale immediately when its last query failed', () => {
+    const sample = { ...server, laneTimestamps: { gpu: now, system: now }, monitoring: { laneHealth: { gpu: { healthy: false }, system: { healthy: true } } } };
+    expect(isFreshSample(sample, false, 200, now)).toBe(false);
+    expect(isFreshSample(sample, false, 200, now, 'system')).toBe(true);
+  });
   it('does not offer a cached device when another device keeps reporting', () => {
     const sample = { ...server, gpus: [{ ...gpu, observedAt: now - 10001 }, { ...gpu, index: 1, observedAt: now }] };
     expect(matchingGpus(sample, 0, '', '', now).map((item) => item.index)).toEqual([1]);

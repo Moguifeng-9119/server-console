@@ -32,6 +32,17 @@ describe('safe task termination', () => {
   });
 });
 describe('incremental logs', () => {
+  it('disables a timed-out pattern while keeping other rules and loss tracking active', async () => {
+    let reads = 0; const content = 'a'.repeat(30) + '!\nstep=2 loss=0.5 ready\n';
+    const m = manager(async () => ++reads === 1 ? packet('1:2', 0, 0, '') : reads === 2 ? packet('1:2', content.length, 0, content) : packet('1:2', content.length, content.length, ''));
+    const log = await m.request({ operation: 'logSave', serverId: 'a', path: '/log', patterns: ['(a+)+$', 'ready'], patternMode: 'regex', trackLoss: true });
+    await m.pollLog(log.id); const result = await m.pollLog(log.id);
+    expect(result.enabled).toBe(true); expect(result.lastError).toContain('Timed-out');
+    expect(result.disabledPatterns).toEqual(['(a+)+$']); expect(result.cursor.offset).toBe(content.length);
+    expect(result.pendingPreview).toContain('a'.repeat(30) + '!'); expect(result.lastHits).toHaveLength(1); expect(result.lossPoints).toEqual([0.5]);
+    const retried = await m.pollLog(log.id);
+    expect(retried.cursor.offset).toBe(content.length); expect(retried.lastLines).toHaveLength(2); expect(retried.lastHits).toHaveLength(1);
+  }, 6000);
   it('reads more than 60 appended lines, preserves partial lines, and resumes after rotation', async () => {
     const baseline = 'existing\n', next = Array.from({length: 200}, (_, i) => `step=${i} loss=0.25`).join('\n') + '\npartial';
     const messages = [packet('1:2', baseline.length, 0, baseline), packet('1:2', baseline.length + Buffer.byteLength(next), baseline.length, next), packet('1:3', 10, 0, 'error new\n')];

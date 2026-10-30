@@ -29,6 +29,7 @@ async function writeChecksums(directory, version) {
   for (const name of names.filter((file) => file.endsWith('.yml'))) {
     const metadata = updateManifest(fs.readFileSync(path.join(directory, name), 'utf8'));
     if (metadata.version !== version || !metadata.files.length) throw new Error('Wrong or incomplete update metadata: ' + name);
+    if (name === 'latest-mac.yml' && !metadata.files.some((entry) => entry.url.endsWith('.zip'))) throw new Error('macOS update metadata must include a ZIP');
     const entries = metadata.files.concat(metadata.path ? [{ url: metadata.path, sha512: metadata.sha512, size: null }] : []);
     for (const entry of entries) {
       if (!/^[A-Za-z0-9_.-]+$/.test(entry.url) || !names.includes(entry.url)) throw new Error('Update metadata references a missing or renamed package: ' + entry.url);

@@ -350,7 +350,8 @@
     "updateDownloading": "Téléchargement… {{percent}}%",
     "updateUpToDate": "Vous avez la dernière version.",
     "updateVersion": "La version {{version}} est disponible.",
-    "updateOpenPage": "Ouvrir la page des versions"
+    "updateOpenPage": "Ouvrir la page des versions",
+    "manualUpdateMac": "Cette version macOS se met à jour manuellement depuis la page des versions."
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -815,7 +816,7 @@
     "d5": "Ve",
     "d6": "Sa",
     "logWatchers": "Surveillance des journaux",
-    "logNote": "Les nouveaux octets du journal sont lus toutes les cinq secondes ; rotation et lignes incomplètes sont suivies.",
+    "logNote": "Lit les nouveaux journaux toutes les 5 secondes. Choisissez texte ou expression régulière.",
     "logPath": "Chemin du journal",
     "logPatterns": "Motifs (une expression régulière par ligne)",
     "logTrackLoss": "Suivre les valeurs de loss (micro-graphique)",
@@ -1003,7 +1004,22 @@
       "error": "Échec du transfert",
       "paused": "En pause"
     },
-    "backupImportedRestart": "Sauvegarde importée. Redémarrez l’application pour appliquer l’apparence et la disposition des terminaux."
+    "backupImportedRestart": "Sauvegarde importée. Redémarrez l’application pour appliquer l’apparence et la disposition des terminaux.",
+    "notificationNotDelivered": "Notification non envoyée",
+    "notificationReason": {
+      "disabled": "Désactivé",
+      "cooldown": "Délai actif",
+      "busy": "Occupé",
+      "unknown": "Inconnu"
+    },
+    "logPatternMode": "Mode de recherche",
+    "logLiteral": "Texte",
+    "logRegex": "Expression régulière",
+    "logPatternsGeneric": "Motifs (un par ligne)",
+    "partialMetrics": "Certaines données de surveillance sont indisponibles",
+    "gpuProcessesUnavailable": "Données des processus GPU indisponibles",
+    "logPendingPreview": "Aperçu du journal non traité",
+    "editLog": "Modifier la surveillance"
   },
   "filePreview": {
     "imageTitle": "Aperçu de l’image",

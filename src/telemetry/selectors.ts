@@ -12,10 +12,11 @@ export function isFreshTelemetry(
   refreshMs: number,
   now = Date.now(),
 ): boolean {
-  return isFreshSample({ collectedAt: telemetry.collectedAt ?? undefined, laneTimestamps: telemetry.laneTimestamps }, demo, refreshMs, now);
+  return isFreshSample({ collectedAt: telemetry.collectedAt ?? undefined, laneTimestamps: telemetry.laneTimestamps, monitoring: telemetry.monitoring }, demo, refreshMs, now);
 }
 
 export function gpuOwnersFromTelemetry(telemetry: ServerTelemetryState, gpu: Gpu): string[] {
+  if (telemetry.gpuProcessesAvailable === false) return ['?'];
   const processUsers = new Map<number, string>();
   for (const p of telemetry.processes) {
     if (p.user) processUsers.set(p.pid, p.user);
@@ -40,7 +41,7 @@ export function matchingGpusFromTelemetry(
   now = Date.now(),
   refreshMs = telemetry.monitoring?.effectiveIntervalMs ?? 2000,
 ): Gpu[] {
-  if (telemetry.status !== 'online') return [];
+  if (telemetry.status !== 'online' || !isFreshTelemetry(telemetry, false, refreshMs, now)) return [];
   const q = query.trim().toLowerCase();
 
   return telemetry.gpus.filter((gpu) => {

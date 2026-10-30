@@ -25,7 +25,7 @@
 
 - Diagnóstico e backup de configuração sem credenciais ajudam na recuperação e migração. Webhooks HTTPS são opcionais e desativados inicialmente. Um coletor sem interface iniciado à parte mantém histórico com o aplicativo fechado.
 
-[0.18.0 release notes](docs/RELEASE-v0.18.0.md) · [Validation](docs/VALIDATION-0.18.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Primeiros passos
 
@@ -66,7 +66,7 @@ npm run test:workflow
 
 O registro atual contém comandos, resultados e verificações pendentes. Dois hosts Linux reais verificaram fluxo GPU, três camadas, contadores e tarefa própria com saída 7. Isso não valida frotas, transferências de 100GB, Slurm/MIG reais ou todos os instaladores.
 
-[Current validation ledger](docs/VALIDATION-0.18.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Idiomas e guias
 

@@ -350,7 +350,8 @@
     "updateDownloading": "Wird geladen… {{percent}}%",
     "updateUpToDate": "Du verwendest die neueste Version.",
     "updateVersion": "Version {{version}} ist verfügbar.",
-    "updateOpenPage": "Release-Seite öffnen"
+    "updateOpenPage": "Release-Seite öffnen",
+    "manualUpdateMac": "Dieser macOS-Build wird über die Release-Seite manuell aktualisiert."
   },
   "terminal": {
     "termN": "Terminal {{n}}",
@@ -815,7 +816,7 @@
     "d5": "Fr",
     "d6": "Sa",
     "logWatchers": "Log-Überwachung",
-    "logNote": "Neue Protokollbytes werden alle fünf Sekunden gelesen; Rotation und unvollständige Zeilen werden verfolgt.",
+    "logNote": "Liest alle 5 Sekunden neue Logdaten. Text oder regulären Ausdruck wählen.",
     "logPath": "Protokollpfad",
     "logPatterns": "Muster (ein regulärer Ausdruck pro Zeile)",
     "logTrackLoss": "Loss-Werte verfolgen (Sparkline)",
@@ -1003,7 +1004,22 @@
       "error": "Upload fehlgeschlagen",
       "paused": "Pausiert"
     },
-    "backupImportedRestart": "Sicherung importiert. Starten Sie die App neu, um Darstellung und Terminalanordnung anzuwenden."
+    "backupImportedRestart": "Sicherung importiert. Starten Sie die App neu, um Darstellung und Terminalanordnung anzuwenden.",
+    "notificationNotDelivered": "Benachrichtigung nicht gesendet",
+    "notificationReason": {
+      "disabled": "Deaktiviert",
+      "cooldown": "Abklingzeit",
+      "busy": "Beschäftigt",
+      "unknown": "Unbekannt"
+    },
+    "logPatternMode": "Suchmodus",
+    "logLiteral": "Text",
+    "logRegex": "Regulärer Ausdruck",
+    "logPatternsGeneric": "Suchmuster (eines pro Zeile)",
+    "partialMetrics": "Einige Überwachungsdaten sind nicht verfügbar",
+    "gpuProcessesUnavailable": "GPU-Prozessdaten nicht verfügbar",
+    "logPendingPreview": "Vorschau unbearbeiteter Protokolle",
+    "editLog": "Überwachung bearbeiten"
   },
   "filePreview": {
     "imageTitle": "Bildvorschau",

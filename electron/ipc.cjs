@@ -83,7 +83,8 @@ function collectionStatus(status) {
   enqueueHistory(aggregator.gap(status.id, at, status.status === 'online' ? status.lane : null));
   if (status.status !== 'online') void historyStore?.request('gap', { server: status.id, at }).catch(historyError);
   else if (status.lane === 'processes') void historyStore?.request('usageGap', { server: status.id }).catch(historyError);
-  workbench?.consumeSnapshot({ id: status.id, gpus: [], processes: [], cpuUsage: null, memUsed: 0, memTotal: 0, ...previous, ...status, collectedAt: at, lastLane: status.lane });
+  const gpus = status.gpuProcessesAvailable === false ? (previous?.gpus || []).map((gpu) => ({ ...gpu, procs: [] })) : previous?.gpus || [];
+  workbench?.consumeSnapshot({ id: status.id, processes: [], cpuUsage: null, memUsed: 0, memTotal: 0, ...previous, ...status, gpus, monitoring: { ...previous?.monitoring, laneHealth: status.laneHealth }, collectedAt: at, lastLane: status.lane });
   broadcast('ssh:status', status);
 }
 function recordResources(serverId, sample) {
@@ -833,6 +834,7 @@ function registerIpc() {
   const { ProductivityManager } = require('./productivity.cjs');
   productivity = new ProductivityManager({
     directory: app.getPath('userData'), getServers: () => servers, getConnection: getConn,
+    onImport: (result) => broadcast('configuration:import-result', result),
     exportState: () => ({ rules: workbench.data.rules, watches: workbench.data.watches, templates: workbench.data.templates }),
     importState: async (state) => {
       const next = servers.map((server) => ({ ...server }));
@@ -1065,6 +1067,7 @@ function handleInteractive({ name, prompts }) {
 
 function init() {
   const userData = app.getPath('userData');
+  new (require('./configuration-transaction.cjs').ConfigurationTransaction)(userData).recover();
   historyStore = new HistoryStore(userData, historyError);
   historyWriter = new HistoryWriter({ store: historyStore, onError: historyError });
   historyTimer = setInterval(() => { enqueueHistory(aggregator.flush(Date.now() - 1000)); }, 1000);

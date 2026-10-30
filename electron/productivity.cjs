@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const https = require('node:https');
+const { ConfigurationTransaction } = require('./configuration-transaction.cjs');
 
 const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
 const cleanText = (value, limit = 4096) => String(value ?? '').replace(/\0/g, '').slice(0, limit);
@@ -46,17 +47,20 @@ function sendWebhook(url, payload) {
 }
 
 class ProductivityManager {
-  constructor({ directory, getServers = () => [], getConnection, exportState = () => ({}), importState = /** @type {(state:any)=>Promise<void | (()=>void | Promise<void>)>} */ (async (_state) => {}), now = Date.now, deliver = sendWebhook }) {
+  constructor({ directory, getServers = () => [], getConnection, exportState = () => ({}), importState = /** @type {(state:any)=>Promise<void | (()=>void | Promise<void>)>} */ (async (_state) => {}), now = Date.now, deliver = sendWebhook, onImport = (_result) => {} }) {
     this.file = path.join(directory, 'productivity.json'); this.getServers = getServers; this.getConnection = getConnection;
     this.exportState = exportState; this.importState = importState; this.now = now; this.deliver = deliver;
-    /** @type {{ version: number, workspaces: any[], notification: any }} */
-    this.data = { version: 1, workspaces: [], notification: { enabled: false, url: '', types: ['rule-triggered', 'rule-recovered', 'gpu-available', 'task-finished', 'log-hit'], cooldownMs: 60000 } };
+    this.onImport = onImport;
+    this.importTransaction = new ConfigurationTransaction(directory);
+    /** @type {{ version: number, workspaces: any[], importResults: any[], notification: any }} */
+    this.data = { version: 1, workspaces: [], importResults: [], notification: { enabled: false, url: '', types: ['rule-triggered', 'rule-recovered', 'gpu-available', 'task-finished', 'log-hit'], cooldownMs: 60000 } };
     this.lastDelivered = new Map(); this.dispatching = new Set(); this.closed = false; this.importing = false;
   }
   init() {
     if (fs.existsSync(this.file)) {
       const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       if (Array.isArray(saved.workspaces)) this.data.workspaces = saved.workspaces.slice(0, 1000);
+      if (Array.isArray(saved.importResults)) this.data.importResults = saved.importResults.slice(0, 20);
       if (saved.notification && typeof saved.notification === 'object') this.data.notification = { ...this.data.notification, ...saved.notification };
     }
     return this;
@@ -135,7 +139,7 @@ class ProductivityManager {
     const state = Object.fromEntries(['rules', 'watches', 'templates', 'layouts', 'preferences'].flatMap((key) => supplied[key] === undefined ? [] : [[key, redact(supplied[key], key)]]));
     return { format: 'serverconsole-config', version: 1, createdAt: this.now(), servers: this.getServers().map(publicServer), workspaces: clone(this.data.workspaces), state, credentialsIncluded: false, warning: 'Credentials are omitted. Review command templates and paths before sharing.' };
   }
-  async backupImport(value, apply = false) {
+  async backupImport(value, apply = false, operationId = String(crypto.randomUUID())) {
     if (!value || value.format !== 'serverconsole-config' || value.version !== 1 || Buffer.byteLength(JSON.stringify(value)) > 4 * 1024 * 1024) throw new Error('Invalid configuration backup');
     const servers = (Array.isArray(value.servers) ? value.servers : []).slice(0, 1000).map((server) => {
       const clean = publicServer(server); validId(clean.id);
@@ -158,6 +162,9 @@ class ProductivityManager {
     for (const key of ['rules', 'watches', 'templates', 'tasks']) if (Array.isArray(state[key])) state[key] = state[key].map((item) => ({ ...item, enabled: false, schedule: undefined }));
     const preview = { servers: servers.length, workspaces: workspaces.length, sections: Object.keys(state), credentialsIncluded: false, applied: false };
     if (!apply) return preview;
+    validId(operationId);
+    const committed = this.data.importResults.find((item) => item.operationId === operationId && item.status === 'committed');
+    if (committed) return clone(committed);
     if (this.importing) throw new Error('Configuration import is in progress');
     const merged = new Map(this.data.workspaces.map((workspace) => [workspace.id, workspace]));
     for (const workspace of workspaces) merged.set(workspace.id, workspace);
@@ -165,21 +172,27 @@ class ProductivityManager {
     const previous = this.backupExport(), recoveryFile = path.join(path.dirname(this.file), 'configuration-before-import.json');
     fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(recoveryFile, JSON.stringify(previous), { mode: 0o600 });
     this.importing = true;
+    const result = { ...preview, operationId, status: 'committed', applied: true, recoveryAvailable: true, at: this.now() };
     try {
+      this.importTransaction.begin(operationId);
       const rollback = await this.importState({ ...state, servers });
       try {
-        const draft = { ...this.data, workspaces: [...merged.values()] };
-        this.persist(draft); this.data = draft;
+        const draft = { ...this.data, workspaces: [...merged.values()], importResults: [result, ...this.data.importResults].slice(0, 20) };
+        this.persist(draft); this.importTransaction.finish(); this.data = draft;
       } catch (error) {
         if (typeof rollback === 'function') {
           try { await rollback(); } catch (rollbackError) { throw new AggregateError([error, rollbackError], 'Configuration import failed and rollback could not be completed'); }
         }
         throw error;
       }
+    } catch (error) {
+      try { this.importTransaction.recover(); } catch (recoveryError) { throw new AggregateError([error, recoveryError], 'Configuration import needs recovery before continuing'); }
+      throw error;
     } finally { this.importing = false; }
-    return { ...preview, applied: true, recoveryAvailable: true };
+    try { this.onImport(clone(result)); } catch { /* A renderer notification cannot undo a committed import. */ }
+    return result;
   }
-  supports(operation) { return ['workspaceList', 'workspaceSave', 'workspaceDelete', 'diagnostics', 'diagnosticsExport', 'slurmJobs', 'slurmDetail', 'slurmLog', 'notificationGet', 'notificationSave', 'notificationTest', 'backupExport', 'backupImport'].includes(operation); }
+  supports(operation) { return ['workspaceList', 'workspaceSave', 'workspaceDelete', 'diagnostics', 'diagnosticsExport', 'slurmJobs', 'slurmDetail', 'slurmLog', 'notificationGet', 'notificationSave', 'notificationTest', 'backupExport', 'backupImport', 'backupResults'].includes(operation); }
   async request(request) {
     switch (request.operation) {
       case 'workspaceList': return clone(this.data.workspaces.filter((item) => !request.serverId || item.serverId === request.serverId));
@@ -194,7 +207,19 @@ class ProductivityManager {
       case 'notificationSave': return this.notificationSave(request.settings || request.value || request);
       case 'notificationTest': return this.dispatchEvent({ type: 'test', title: 'ServerConsole test notification', body: 'Explicit notification test', at: this.now() }, true);
       case 'backupExport': return this.backupExport();
-      case 'backupImport': return this.backupImport(request.backup || request.value, request.apply === true);
+      case 'backupResults': return clone(this.data.importResults);
+      case 'backupImport': {
+        const operationId = request.operationId ? validId(request.operationId) : crypto.randomUUID();
+        try { return await this.backupImport(request.backup || request.value, request.apply === true, operationId); }
+        catch (error) {
+          if (request.apply === true && !this.importing) {
+            const result = { operationId, status: 'failed', applied: false, error: redact(cleanText(error.message, 1000)), at: this.now() };
+            try { this.commit({ ...this.data, importResults: [result, ...this.data.importResults].slice(0, 20) }); } catch { /* Disk failure remains an error; never change it into success. */ }
+            try { this.onImport(result); } catch { /* Keep the original error. */ }
+          }
+          throw error;
+        }
+      }
       default: throw new Error('Unknown productivity operation');
     }
   }

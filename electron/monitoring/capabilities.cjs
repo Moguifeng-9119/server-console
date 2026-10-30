@@ -31,6 +31,7 @@ async function probeCapabilities(connection, _serverId) {
 
     return caps;
   } catch (error) {
+    if (error.staleConnection) throw error;
     // Authentication/transport errors must remain visible to the UI.
     if (/auth|timed out|timeout|ECONN|closed/i.test(String(error))) throw error;
     return defaultCaps;

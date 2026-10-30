@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +30,14 @@ describe('TransferManager queue state machine', () => {
     expect(tm.list().length).toBe(2);
     expect(a.srcPath).toBe('/x/a');
     expect(a.dstPath).toBe(':/y/a'); // serverName 为空 → '': + 远程路径
+  });
+  it('keeps enqueueing when an update listener throws', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      tm.onUpdate(() => { throw new Error('renderer closed'); });
+      expect(tm.addMany([job('a'), job('b')])).toHaveLength(2);
+      expect(tm.list()).toHaveLength(2); expect(error).toHaveBeenCalled();
+    } finally { error.mockRestore(); }
   });
 
   it('pause/resume/cancel a queued task', () => {

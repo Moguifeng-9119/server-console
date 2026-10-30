@@ -182,6 +182,7 @@ class HistoryDatabase {
   ingestUsage(s, at, previousAt = null) {
     if (s.status && s.status !== 'online') { this.usageLastAt.delete(s.id); this.usageOccupancy.delete(s.id); return; }
     if (s.lastLane && !['legacy', 'processes'].includes(s.lastLane)) return;
+    if (s.gpuProcessesAvailable === false) { this.usageLastAt.delete(s.id); this.usageOccupancy.delete(s.id); return; }
     const prev = previousAt ?? this.usageLastAt.get(s.id);
     if (prev != null && at <= prev) return;
     const prior = this.usageOccupancy.get(s.id);

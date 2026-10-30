@@ -59,6 +59,7 @@ export interface Server {
   group?: string;
   gpus: Gpu[];
   processes: ProcessItem[];
+  gpuProcessesAvailable?: boolean;
   history: number[];
   cpuCores: number;
   cpuUsage: number | null;
@@ -92,6 +93,7 @@ export interface SnapshotPayload {
   error: string;
   gpus: Gpu[];
   processes: ProcessItem[];
+  gpuProcessesAvailable?: boolean;
   cpuCores: number;
   cpuUsage: number | null;
   collectedAt?: number;

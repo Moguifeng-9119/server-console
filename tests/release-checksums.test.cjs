@@ -27,6 +27,12 @@ describe('release integrity tooling', () => {
     fs.unlinkSync(path.join(directory, name)); fs.writeFileSync(path.join(directory, 'other-0.18.0.exe'), 'x');
     await expect(writeChecksums(directory, '0.18.0')).rejects.toThrow(/missing or renamed/);
   });
+  it('rejects macOS update metadata that contains no ZIP', async () => {
+    const { directory } = fixture(), name = 'ServerConsole-0.18.0-universal.dmg', content = Buffer.from('mac installer');
+    fs.writeFileSync(path.join(directory, name), content);
+    fs.writeFileSync(path.join(directory, 'latest-mac.yml'), `version: 0.18.0\nfiles:\n  - url: ${name}\n    sha512: ${crypto.createHash('sha512').update(content).digest('base64')}\n    size: ${content.length}\n`);
+    await expect(writeChecksums(directory, '0.18.0')).rejects.toThrow(/must include a ZIP/);
+  });
   it('refuses installer mutation outside an isolated CI runner', async () => {
     if (process.env.GITHUB_ACTIONS === 'true' && process.platform === 'win32') return;
     await expect(checkInstallUpgrade()).rejects.toThrow(/only in an isolated/);

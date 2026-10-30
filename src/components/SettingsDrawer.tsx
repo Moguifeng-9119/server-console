@@ -67,11 +67,12 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
     a.webhookGet().then((o) => setWebhookUrl(o.url || '')).catch(fail);
     a.snippetsList().then(setSnippets).catch(fail);
     a.forwardingsList().then(setRules).catch(fail);
-    a.getAppSettings().then((o) => { setStatusPage(o.statusPage || null); if (typeof o.updateAutoInstall === 'boolean') setAutoInstall(o.updateAutoInstall); }).catch(fail);
+    a.getAppSettings().then((o) => { setStatusPage(o.statusPage || null); setUpdateSupported(o.updateSupported !== false); if (typeof o.updateAutoInstall === 'boolean') setAutoInstall(o.updateAutoInstall); }).catch(fail);
     a.getUpdateStatus().then(setUpdate).catch(() => {});
     return a.onForwardingsChanged(setRules);
   }, []);
   const [autoInstall, setAutoInstall] = useState(false);
+  const [updateSupported, setUpdateSupported] = useState(true);
   const copyStatus = async (text: string) => { try { await navigator.clipboard.writeText(text); setStatus(t('settings.statusCopied')); } catch { /* clipboard unavailable */ } };
 
   const themes: Array<[ThemeMode, string]> = [
@@ -560,14 +561,14 @@ export function SettingsDrawer({ onClose }: { onClose: () => void }) {
           {update?.error && <div role="alert" className="note" style={{ color: 'var(--warn)', marginBottom: 6 }}>{update.error}</div>}
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <button className="btn mini" disabled={!api} onClick={() => (async () => { const r = await api?.checkUpdate(); if (r && r.ok && r.data) setUpdate({ available: r.data.isNew, version: r.data.latest.replace(/^v/, ''), checked: true }); else if (r && !r.ok) throw new Error(r.error || 'check failed'); })()}>{t('settings.updateNow')}</button>
-            {update?.available && !update.downloaded && <button className="btn mini" disabled={!api || update.downloading} onClick={() => run(api?.updateDownload())}>{t('settings.updateDownload')}</button>}
+            {updateSupported && update?.available && !update.downloaded && <button className="btn mini" disabled={!api || update.downloading} onClick={() => run(api?.updateDownload())}>{t('settings.updateDownload')}</button>}
             {update?.available && <button className="btn mini" onClick={() => void api?.updateInstall()}>{update.downloaded ? t('settings.updateInstallOnQuit') : t('settings.updateOpenPage')}</button>}
           </div>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-            <input type="checkbox" checked={autoInstall} disabled={!api} onChange={(e) => { setAutoInstall(e.target.checked); run(api?.setUpdateAutoInstall(e.target.checked)); }} />
+            <input type="checkbox" checked={autoInstall} disabled={!api || !updateSupported} onChange={(e) => { setAutoInstall(e.target.checked); run(api?.setUpdateAutoInstall(e.target.checked)); }} />
             {t('settings.updateAutoTitle')}
           </label>
-          <div className="note" style={{ marginTop: 4 }}>{t('settings.updateAutoDesc')}</div>
+          <div className="note" style={{ marginTop: 4 }}>{updateSupported ? t('settings.updateAutoDesc') : t('settings.manualUpdateMac')}</div>
         </div>
         </section>}
         <button className="btn" style={{ width: '100%' }} onClick={onClose}>

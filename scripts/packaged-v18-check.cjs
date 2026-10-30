@@ -42,7 +42,7 @@ async function main() {
     report.packagedVersion = await application.evaluate(({ app }) => app.getVersion());
     await check('current package version and source identity', async () => {
       assert.equal(report.packagedVersion, report.sourceVersion);
-      const names = ['electron/ipc.cjs', 'electron/preload.cjs', 'electron/main.cjs', 'electron/workbench.cjs', 'electron/productivity.cjs', 'electron/text-editor.cjs', 'electron/history-db.cjs', 'electron/history-worker.cjs', 'electron/devsync.cjs'];
+      const names = ['electron/ipc.cjs', 'electron/preload.cjs', 'electron/main.cjs', 'electron/workbench.cjs', 'electron/productivity.cjs', 'electron/text-editor.cjs', 'electron/history-db.cjs', 'electron/history-worker.cjs', 'electron/devsync.cjs', 'electron/ssh.cjs', 'electron/log-parser-worker.cjs', 'electron/configuration-transaction.cjs', 'electron/monitoring/scheduler.cjs'];
       const expected = names.map((file) => ({ file, hash: crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex') }));
       const mismatches = await application.evaluate(({ app }, files) => {
         const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path'), crypto = process.getBuiltinModule('node:crypto');
@@ -116,6 +116,8 @@ async function main() {
       let listed = await page.evaluate(() => window.api.workbenchRequest({ operation: 'workspaceList' })); assert.equal(listed.data.some((workspace) => workspace.id === 'native-imported-workspace'), false);
       const applied = await page.evaluate((value) => window.api.workbenchRequest({ operation: 'backupImport', backup: value, apply: true }), backup); assert(applied.ok, applied.error); assert.equal(applied.data.applied, true);
       listed = await page.evaluate(() => window.api.workbenchRequest({ operation: 'workspaceList' })); assert.equal(listed.data.find((workspace) => workspace.id === 'native-imported-workspace').cwd, '/imported');
+      const receipts = await page.evaluate(() => window.api.workbenchRequest({ operation: 'backupResults' })); assert(receipts.ok, receipts.error);
+      assert.equal(receipts.data.find((item) => item.operationId === applied.data.operationId)?.status, 'committed');
       assert(fs.existsSync(path.join(userData, 'configuration-before-import.json'))); return { credentialsOmitted: true, previewMutatedNothing: true, applied: true, recoveryFileWritten: true };
     });
     await check('failed backup commit rolls server and workspace state back', async () => {
@@ -153,6 +155,31 @@ async function main() {
       const opened = await application.evaluate(() => globalThis.__scAcceptanceOpenedUrls);
       assert.equal(opened.filter((url) => url === 'http://127.0.0.1:' + localPort).length, 2);
       return { forwardingRules: matching.length, repeatedOpenSucceeded: true, roundTripVerified: true, browserWasStubbed: true };
+    });
+    for (const boundary of ['servers.json', 'workbench.json', 'productivity.json']) await check('forced main-process exit during import after ' + boundary, async () => {
+      const exported = await page.evaluate(() => window.api.workbenchRequest({ operation: 'backupExport' })); assert(exported.ok, exported.error);
+      const marker = 'crash-' + boundary.replace('.json', ''), backup = exported.data;
+      backup.servers.push({ id: marker, name: marker, host: '127.0.0.1', port: sshd.address().port, username: 'fixture', authType: 'password' });
+      backup.workspaces.push({ id: marker, serverId: marker, name: marker, cwd: '/crash-fixture' });
+      await page.evaluate((id) => { localStorage.setItem('sc.lang', 'en'); localStorage.setItem('sc.pendingImport.' + id, JSON.stringify({ 'sc.lang': 'fr' })); }, marker);
+      await application.evaluate((_electron, target) => {
+        const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path'), rename = fs.renameSync;
+        fs.renameSync = function (from, to) { const result = rename.call(this, from, to); if (path.basename(String(to)) === target) process.kill(process.pid, 'SIGKILL'); return result; };
+      }, boundary);
+      const exited = new Promise((resolve) => application.process().once('exit', resolve));
+      void page.evaluate(({ value, id }) => window.api.workbenchRequest({ operation: 'backupImport', backup: value, apply: true, operationId: id }), { value: backup, id: marker }).catch(() => {});
+      await within(exited, 10000); application = null;
+      assert(fs.existsSync(path.join(userData, 'configuration-import-journal.json')), 'Interrupted import must have a recovery journal');
+      application = await _electron.launch({ executablePath, env: { ...process.env, SC_USER_DATA: userData }, timeout: 15000 });
+      page = await application.firstWindow(); page.on('pageerror', (error) => rendererErrors.push(error.message));
+      await page.waitForSelector('.nav');
+      await page.waitForFunction((id) => localStorage.getItem('sc.pendingImport.' + id) === null, marker);
+      assert.equal(await page.evaluate(() => localStorage.getItem('sc.lang')), 'en', 'Interrupted import must not change presentation preferences');
+      const servers = await page.evaluate(() => window.api.listServers()); assert.equal(servers.some((server) => server.id === marker), false);
+      const workspaces = await page.evaluate(() => window.api.workbenchRequest({ operation: 'workspaceList' })); assert.equal(workspaces.data.some((workspace) => workspace.id === marker), false);
+      const results = await page.evaluate(() => window.api.workbenchRequest({ operation: 'backupResults' })); assert.equal(results.data[0].status, 'failed'); assert.match(results.data[0].error, /Interrupted/);
+      assert.equal(fs.existsSync(path.join(userData, 'configuration-import-journal.json')), false);
+      return { forcedExit: true, restarted: true, originalConfigurationRestored: true, failedReceiptQueryable: true };
     });
     await check('no uncaught renderer errors', async () => { assert.deepEqual(rendererErrors, []); return { errors: rendererErrors.length }; });
     await page.screenshot({ path: path.join(artifacts, 'packaged.png') });

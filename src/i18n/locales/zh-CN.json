@@ -495,7 +495,8 @@
     "updateDownloading": "下载中… {{percent}}%",
     "updateUpToDate": "已是最新版本。",
     "updateVersion": "有新版本 {{version}} 可用。",
-    "updateOpenPage": "打开发布页"
+    "updateOpenPage": "打开发布页",
+    "manualUpdateMac": "此 macOS 版本请通过发布页面手动更新。"
   },
   "relay": {
     "title": "服务器互传（左侧勾选内容，右侧选择落到哪个目录）",
@@ -815,7 +816,7 @@
     "d5": "五",
     "d6": "六",
     "logWatchers": "日志监控",
-    "logNote": "每五秒增量读取新增日志字节，并跟踪日志轮转和未完成行。",
+    "logNote": "每 5 秒读取新增日志，可选择普通文本或正则表达式匹配。",
     "logPath": "日志路径",
     "logPatterns": "匹配模式（每行一个正则）",
     "logTrackLoss": "跟踪 loss 数值（迷你曲线）",
@@ -1003,7 +1004,22 @@
       "error": "上传失败",
       "paused": "已暂停"
     },
-    "backupImportedRestart": "备份已导入。重启应用后外观和终端布局设置生效。"
+    "backupImportedRestart": "备份已导入。重启应用后外观和终端布局设置生效。",
+    "notificationNotDelivered": "通知未发送",
+    "notificationReason": {
+      "disabled": "未启用",
+      "cooldown": "冷却中",
+      "busy": "发送繁忙",
+      "unknown": "未知"
+    },
+    "logPatternMode": "匹配方式",
+    "logLiteral": "普通文本",
+    "logRegex": "正则表达式",
+    "logPatternsGeneric": "匹配内容（每行一项）",
+    "partialMetrics": "部分监控数据不可用",
+    "gpuProcessesUnavailable": "GPU 进程信息不可用",
+    "logPendingPreview": "未处理日志预览",
+    "editLog": "编辑监视器"
   },
   "filePreview": {
     "imageTitle": "图片预览",
