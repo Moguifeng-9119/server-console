@@ -2,6 +2,8 @@
 const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');
 const path = require('node:path');
+const { ResearchDatabase } = require('./research-db.cjs');
+const { backupBeforeResearchMigration } = require('./sqlite-migration.cjs');
 const DAY = 86400000, MINUTE = 60000;
 const RAW_RETENTION = DAY, RETENTION = 30 * DAY;
 const finite = (v) => typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -9,7 +11,12 @@ const finite = (v) => typeof v === 'number' && Number.isFinite(v) ? v : null;
 class HistoryDatabase {
   constructor(file) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
+    const existing = fs.existsSync(file);
     this.db = new DatabaseSync(file);
+    if (existing && !this.db.prepare("SELECT name FROM sqlite_master WHERE name='research_runs'").get()) {
+      try { backupBeforeResearchMigration(this.db, file); }
+      catch (error) { this.db.close(); throw new Error('Database upgrade stopped: the pre-upgrade backup could not be validated. Original database retained. ' + error.message); }
+    }
     this.db.exec(`PRAGMA auto_vacuum=INCREMENTAL; PRAGMA journal_mode=WAL;
       PRAGMA synchronous=NORMAL; PRAGMA cache_size=-4096; PRAGMA wal_autocheckpoint=256;
       CREATE TABLE IF NOT EXISTS channels (
@@ -31,6 +38,8 @@ class HistoryDatabase {
         day TEXT NOT NULL, server TEXT NOT NULL, user TEXT NOT NULL,
         gpu_minutes REAL NOT NULL DEFAULT 0,
         PRIMARY KEY(day,server,user)) WITHOUT ROWID;`);
+    this.research = new ResearchDatabase(this.db);
+    this.db.prepare("INSERT OR IGNORE INTO metadata(key,value) VALUES('research-schema','1')").run();
     this.channel = this.db.prepare('SELECT * FROM channels WHERE server=? AND device=? AND metric=?');
     this.create = this.db.prepare('INSERT OR IGNORE INTO channels(server,device,metric,label) VALUES(?,?,?,?)');
     this.insert = this.db.prepare('INSERT OR IGNORE INTO raw VALUES(?,?,?)');
@@ -230,6 +239,7 @@ class HistoryDatabase {
       // Daily accounting cannot split the oldest partial UTC day; expire it in full.
       this.db.prepare('DELETE FROM usage_minutes WHERE day <= ?').run(new Date(now - RETENTION).toISOString().slice(0, 10));
       this.db.prepare('DELETE FROM channels WHERE last_at < ? AND id NOT IN (SELECT channel FROM minutes) AND id NOT IN (SELECT channel FROM raw)').run(now - RETENTION);
+      this.research.cleanup(now);
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
     this.db.exec('PRAGMA incremental_vacuum; PRAGMA wal_checkpoint(TRUNCATE);');

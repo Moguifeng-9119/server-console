@@ -95,3 +95,22 @@ so it cannot replace a separate secure backup of your own SSH keys.
 
 For staging recovery, file-transfer guarantees and keyboard controls, see the
 [complete usage guide](USER-GUIDE.md) and [security policy](../SECURITY.md).
+# Training runs (0.19)
+
+Choose **Experiments** on the home page or in Workbench. Open **New training run**,
+enter an absolute working directory and a launch command, then explicitly start.
+Parameters are recorded metadata; put executable arguments in the command.
+Opening Experiments from a workspace supplies its directory and GPU selection.
+
+Each launch gets a separate Run and an owned stdout/stderr log. The detail page
+contains training curves, logs, parameters, observed exit status and diagnostic
+evidence. Terminal and Files open that Run's working directory. JSONL accepts
+flat numeric fields or a `metrics` object; text supports `step=1 loss=0.5 lr=0.001`.
+Use total steps only when known; ETA stays unavailable without measured progress.
+
+Use **Attach log** to import another absolute log path from its beginning. Choose
+a file belonging to this experiment; automatic capture always uses the unique
+owned output log. Training points expire after 30 days; Run summaries remain.
+Deleting a completed Run removes its metrics and evidence. Active or unknown
+Runs require status reconciliation before deletion. Diagnostics show evidence
+and do not stop or restart tasks.

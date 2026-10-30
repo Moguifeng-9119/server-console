@@ -9,7 +9,9 @@
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-## 0.18.0 변경 사항
+## 0.19.0 변경 사항
+
+- 훈련 Run은 명령, 매개변수, 종료 코드, JSONL/텍스트 지표, 곡선과 진단 근거를 저장합니다. 홈에서 리소스와 실험 보기를 전환할 수 있습니다. 훈련 지표는 30일 후 자동 정리됩니다.
 
 - GPU·시스템·프로세스 계층 수집을 실제 스케줄러에 연결했습니다. 알 수 없는 값과 누락 구간을 보존하며 GPU 계기판은 한 줄에 4개입니다.
 
@@ -25,7 +27,7 @@
 
 - 진단과 자격 증명 없는 설정 백업으로 복구·이전을 돕습니다. HTTPS Webhook은 기본 비활성입니다. 별도 실행하는 헤드리스 수집기는 데스크톱 종료 후에도 기록을 저장합니다.
 
-[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.19.0 release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## 시작하기
 
@@ -66,7 +68,7 @@ npm run test:workflow
 
 최신 기록에서 명령, 결과와 미검증 항목을 확인하세요. 실제 Linux 2대에서 GPU 스트림, 3계층 수집, 자원 카운터, 종료 코드 7의 전용 작업을 확인했습니다. 대규모 환경, 100GB 전송, Slurm/MIG, 모든 설치 프로그램을 검증한 것은 아닙니다.
 
-[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.19.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## 언어와 가이드
 

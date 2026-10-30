@@ -31,7 +31,7 @@ describe('workbench tasks and resource reminders', () => {
     await manager.request({ operation: 'taskStart', serverId: 'a', id: task.id }); expect(launch).toContain('runner.start'); expect(launch).toContain('sh -c');
     expect((await manager.request({ operation: 'taskStatus', serverId: 'a', id: task.id })).status).toBe('failed');
     await manager.request({ operation: 'taskStatus', serverId: 'a', id: task.id }); expect(events).toHaveLength(1);
-    status = '__UNKNOWN__'; expect((await manager.request({ operation: 'taskStatus', serverId: 'a', id: task.id })).status).toBe('unknown');
+    status = '__UNKNOWN__'; expect(await manager.request({ operation: 'taskStatus', serverId: 'a', id: task.id })).toMatchObject({ status: 'failed', exitCode: 7 });
   });
   it('rejects task actions under another server scope', async () => {
     const { manager } = fixture(); const task = await manager.request({ operation: 'taskSave', serverId: 'a', command: 'true' });

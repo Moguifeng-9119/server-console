@@ -9,7 +9,9 @@
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-## What changes in 0.18.0
+## What changes in 0.19.0
+
+- Persistent training Runs connect commands, parameters, exit codes, JSONL/text metrics, curves and diagnostic evidence. Choose Resources or Experiments on the home page; training points expire after 30 days.
 
 - Layered GPU/system/process collection is connected to the production scheduler. Unknown metrics stay unknown; timestamps and gaps are preserved. The overview keeps four GPU gauges per row.
 
@@ -25,7 +27,7 @@
 
 - Diagnostics and credential-free configuration backups help recovery and migration. HTTPS webhooks are optional and disabled by default. A separately started headless collector can retain history while the desktop is closed.
 
-[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.19.0 release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Get started
 
@@ -66,7 +68,7 @@ npm run test:workflow
 
 See the current validation ledger for exact commands, results and pending checks. Two real Linux SSH hosts exercised GPU streaming, all three sampling lanes, resource counters and an owned task returning exit code 7. These checks do not establish fleet performance, 100 GB transfer performance, real Slurm/MIG availability or every platform installer.
 
-[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.19.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Languages and guides
 

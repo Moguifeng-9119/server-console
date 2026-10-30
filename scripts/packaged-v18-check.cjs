@@ -42,7 +42,7 @@ async function main() {
     report.packagedVersion = await application.evaluate(({ app }) => app.getVersion());
     await check('current package version and source identity', async () => {
       assert.equal(report.packagedVersion, report.sourceVersion);
-      const names = ['electron/ipc.cjs', 'electron/preload.cjs', 'electron/main.cjs', 'electron/workbench.cjs', 'electron/productivity.cjs', 'electron/text-editor.cjs', 'electron/history-db.cjs', 'electron/history-worker.cjs', 'electron/devsync.cjs', 'electron/ssh.cjs', 'electron/log-parser-worker.cjs', 'electron/configuration-transaction.cjs', 'electron/monitoring/scheduler.cjs'];
+      const names = ['electron/ipc.cjs', 'electron/preload.cjs', 'electron/main.cjs', 'electron/workbench.cjs', 'electron/productivity.cjs', 'electron/text-editor.cjs', 'electron/history-db.cjs', 'electron/history-worker.cjs', 'electron/devsync.cjs', 'electron/ssh.cjs', 'electron/log-parser-worker.cjs', 'electron/configuration-transaction.cjs', 'electron/monitoring/scheduler.cjs', 'electron/research-db.cjs', 'electron/sqlite-migration.cjs', 'electron/generated/schema.js', 'electron/generated/training-parser.js'];
       const expected = names.map((file) => ({ file, hash: crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex') }));
       const mismatches = await application.evaluate(({ app }, files) => {
         const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path'), crypto = process.getBuiltinModule('node:crypto');
@@ -76,6 +76,10 @@ async function main() {
       const result = await page.evaluate((id) => window.api.workbenchRequest({ operation: 'report', serverId: id, rangeMs: 604800000 }), serverId);
       assert(result.ok, result.error); assert(result.data.devices.length >= 3); assert.equal(result.data.end - result.data.start, 604800000);
       return { devices: result.data.devices.length, rangeDays: 7, coverageIsMeasured: result.data.devices.every((device) => Number.isFinite(device.coveragePercent)) };
+    });
+    await check('research SQLite worker and sandboxed IPC are available in the installed package', async () => {
+      const runs = await page.evaluate(() => window.api.workbenchRequest({ operation: 'runList', limit: 100 })); assert(runs.ok, runs.error); assert(Array.isArray(runs.data));
+      return { persistentRunApi: true, generatedAdaptersPackaged: true };
     });
     await check('text read fingerprint and atomic edit through real SFTP', async () => {
       const loaded = await page.evaluate((id) => window.api.sftpReadText(id, '/editable.txt', false), serverId);

@@ -8,6 +8,7 @@ const { readConfig } = require('../electron/sshconfig.cjs');
 const { Pool, setHostKeyChecker } = require('../electron/ssh.cjs');
 const { WorkbenchManager } = require('../electron/workbench.cjs');
 const { TieredScheduler } = require('../electron/monitoring/scheduler.cjs');
+const { HistoryStore } = require('../electron/history-store.cjs');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
 
@@ -33,7 +34,8 @@ async function main() {
     for (const host of hosts) {
       const checks = []; const item = { alias: host.alias, checks, passed: false }; receipt.hosts.push(item);
       const conn = pool.get(host.cfg); let scheduler, task;
-      const manager = new WorkbenchManager({ directory: path.join(directory, host.cfg.id), getServers: () => [host.cfg], getConnection: () => conn }).init();
+      const history = new HistoryStore(path.join(directory, host.cfg.id));
+      const manager = new WorkbenchManager({ directory: path.join(directory, host.cfg.id), getServers: () => [host.cfg], getConnection: () => conn, researchRequest: (method, payload) => history.request(method, payload) }).init();
       const pass = (name) => { checks.push(name); console.log('PASS ' + host.alias + ': ' + name); };
       try {
         await conn.connect(); pass('SSH host key matched existing known_hosts');
@@ -43,12 +45,19 @@ async function main() {
         await sleep(2100);
         const second = await manager.request({ operation: 'system', serverId: host.cfg.id });
         assert(second.at > first.at); assert(second.networks.some((n) => Number.isFinite(n.receiveBytesPerSecond))); pass('filesystem, inode and network rate observations');
-        task = await manager.request({ operation: 'taskSave', serverId: host.cfg.id, name: 'Acceptance exit-code check', cwd: '~', command: "printf 'SC_WORKBENCH_SMOKE\\n'; exec sh -c 'exit 7'" });
+        task = await manager.request({ operation: 'taskSave', serverId: host.cfg.id, name: 'Acceptance exit-code check', cwd: '~', totalSteps: 100, command: "printf '%s\\n' 'SC_WORKBENCH_SMOKE' '{\"step\":1,\"loss\":0.5,\"learning_rate\":0.001}' '{\"step\":2,\"loss\":0.3}' '{\"step\":3,\"loss\":NaN}' 'CUDA out of memory (synthetic acceptance marker)'; exec sh -c 'exit 7'" });
         task = await manager.request({ operation: 'taskStart', serverId: host.cfg.id, id: task.id });
         const deadline = Date.now() + 15000;
         while (Date.now() < deadline) { task = await manager.request({ operation: 'taskStatus', serverId: host.cfg.id, id: task.id }); if (task.status === 'failed') break; await sleep(250); }
         assert.equal(task.exitCode, 7); assert.equal(task.status, 'failed');
         const log = await manager.request({ operation: 'taskLog', serverId: host.cfg.id, id: task.id }); assert(log.text.includes('SC_WORKBENCH_SMOKE')); pass('owned task captures exec exit code 7 and output');
+        const watcher = manager.data.logs.find((entry) => entry.runId === task.remoteId); assert(watcher, task.logError || 'Automatic training log watcher is missing');
+        await manager.pollLog(watcher.id);
+        const run = await history.request('runGet', { id: task.remoteId }), curve = await history.request('runMetrics', { runId: task.remoteId, name: 'loss', axis: 'step' });
+        assert.equal(run.status, 'failed'); assert.equal(run.exitCode, 7); assert.deepEqual(curve.points.map((point) => point.value), [0.5, 0.3, null]); assert.deepEqual(run.events.map((event) => event.kind).sort(), ['nan', 'oom']);
+        await manager.pollLog(watcher.id); const repeated = await history.request('runMetrics', { runId: task.remoteId, name: 'loss', axis: 'step' }); assert.equal(repeated.total, 3);
+        item.research = { runPersisted: true, metricPoints: repeated.total, duplicatePoints: 0, syntheticNanOomEvidence: true };
+        pass('real SSH task logs persist independent Run, curves and synthetic NaN/OOM evidence without duplicates');
         const counts = { gpu: 0, system: 0, processes: 0 }; const failures = []; let streamed = false;
         scheduler = new TieredScheduler({ configs: () => [host.cfg], getConnection: () => conn, interval: () => 500,
           onObservation: (snapshot) => { if (snapshot.lastLane in counts) counts[snapshot.lastLane]++; streamed ||= snapshot.monitoring?.mode === 'stream'; },
@@ -66,7 +75,7 @@ async function main() {
           const result = await conn.exec('rm -f -- ' + ['runner.sh', 'output.log', 'exit.code', 'exit.tmp', 'runner.pid', 'runner.start'].map((name) => owned + '/' + name).join(' ') + '; rmdir -- ' + owned).catch(() => null);
           item.ownedTaskRemoved = result?.code === 0;
         }
-        manager.close(); pool.remove(host.cfg.id);
+        manager.close(); await history.close(); pool.remove(host.cfg.id);
       }
     }
     receipt.passed = receipt.hosts.every((host) => host.passed);

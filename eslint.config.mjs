@@ -4,7 +4,7 @@ import hooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'release/**', 'node_modules/**', 'test-artifacts/**', 'scripts/i18n-wire*.cjs'] },
+  { ignores: ['dist/**', 'electron/generated/**', 'release/**', 'node_modules/**', 'test-artifacts/**', 'scripts/i18n-wire*.cjs'] },
   js.configs.recommended,
   { files: ['**/*.{js,cjs,mjs}'], languageOptions: { globals: { ...globals.node, ...globals.browser } }, rules: { 'no-empty': ['error', { allowEmptyCatch: true }], 'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }] } },
   ...tseslint.configs.recommended,

@@ -13,7 +13,7 @@ class HistoryStore {
       const call = this.pending.get(message.id);
       if (!call) return;
       this.pending.delete(message.id);
-      if (message.error) call.reject(new Error(message.error)); else call.resolve(message.data);
+      if (message.error) call.reject(Object.assign(new Error(message.error), { code: message.code })); else call.resolve(message.data);
     });
     const failed = (error) => {
       this.failure = error;

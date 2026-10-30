@@ -9,7 +9,9 @@
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-## Nouveautés de 0.18.0
+## Nouveautés de 0.19.0
+
+- Les exécutions conservent commandes, paramètres, codes de sortie, métriques JSONL/texte, courbes et preuves de diagnostic. Basculez entre Ressources et Expériences sur l’accueil ; les métriques expirent après 30 jours.
 
 - La collecte GPU, système et processus par niveaux est reliée au véritable ordonnanceur. Valeurs inconnues, horodatages et interruptions sont conservés. La vue générale garde quatre jauges GPU par ligne.
 
@@ -25,7 +27,7 @@
 
 - Diagnostic et sauvegarde de configuration sans identifiants pour récupération et migration. Webhooks HTTPS facultatifs, désactivés par défaut. Collecteur sans interface démarré séparément pour garder l’historique bureau fermé.
 
-[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.19.0 release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Démarrage
 
@@ -66,7 +68,7 @@ npm run test:workflow
 
 Le registre actuel donne commandes, résultats et contrôles en attente. Deux hôtes Linux réels ont testé flux GPU, trois niveaux, compteurs et tâche dédiée sortant avec le code 7. Cela ne valide pas une flotte, les transferts 100Go, Slurm/MIG réels ni tous les installateurs.
 
-[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.19.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Langues et guides
 

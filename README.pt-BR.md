@@ -9,7 +9,9 @@
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-## Novidades da 0.18.0
+## Novidades da 0.19.0
+
+- As execuções de treinamento guardam comandos, parâmetros, códigos de saída, métricas JSONL/texto, curvas e evidências de diagnóstico. Alterne Recursos e Experimentos na página inicial; as métricas expiram após 30 dias.
 
 - A coleta em camadas de GPU, sistema e processos está ligada ao agendador real. Valores desconhecidos, horários e lacunas são preservados. A visão geral mantém quatro indicadores GPU por linha.
 
@@ -25,7 +27,7 @@
 
 - Diagnóstico e backup de configuração sem credenciais ajudam na recuperação e migração. Webhooks HTTPS são opcionais e desativados inicialmente. Um coletor sem interface iniciado à parte mantém histórico com o aplicativo fechado.
 
-[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.19.0 release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Primeiros passos
 
@@ -66,7 +68,7 @@ npm run test:workflow
 
 O registro atual contém comandos, resultados e verificações pendentes. Dois hosts Linux reais verificaram fluxo GPU, três camadas, contadores e tarefa própria com saída 7. Isso não valida frotas, transferências de 100GB, Slurm/MIG reais ou todos os instaladores.
 
-[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.19.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Idiomas e guias
 

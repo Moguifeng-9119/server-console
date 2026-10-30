@@ -24,3 +24,6 @@ test-artifacts/
 docs/ASSESSMENT-STATUS.zh-CN.md
 docs/IMPROVEMENTS.zh-CN.md
 ServerConsole-*.pptx
+
+# Compiled worker adapters
+electron/generated/

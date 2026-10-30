@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.0 — 2026-10-31
+
+- Add persistent training Runs, JSONL/text metric adapters, uPlot curves, CSV export and evidence for OOM, NaN, step stalls and full working-directory filesystems.
+- Add Resources/Experiments home views, workspace launch defaults, shared Zod validation and React Hook Form launch forms across ten languages.
+- Isolate log parsing and source fingerprints in workers; batch SQLite writes with ACK backpressure and retry deduplication.
+- Preserve terminal task outcomes across storage failures and prevent deleted Runs from being recreated by stale task settings.
+- Validate a database backup before the research migration; retain metric points for 30 days and Run summaries until explicit deletion.
+
+[Release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md)
+
 ## 0.18.1 — 2026-10-30
 
 - Fix DevSync queue backpressure, process-query failure semantics, per-module collection health and history gaps.

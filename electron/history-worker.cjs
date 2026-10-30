@@ -19,6 +19,14 @@ parentPort.on('message', ({ id, method, payload }) => {
       case 'gap': data = db.gap(payload.server, payload.at); break;
       case 'query': data = db.query(payload); break;
       case 'usage': data = db.usageByUserDays(payload.server, payload.rangeDays); break;
+      case 'runCreate': data = db.research.create(payload); break;
+      case 'runGet': data = db.research.get(payload.id); break;
+      case 'runList': data = db.research.list(payload); break;
+      case 'runUpdate': data = db.research.update(payload); break;
+      case 'runAppend': data = db.research.append(payload); break;
+      case 'runDiagnose': data = db.research.diagnose(payload); break;
+      case 'runMetrics': data = db.research.metrics(payload); break;
+      case 'runDelete': data = db.research.remove(payload.id); break;
       case 'load': data = db.legacyLoad(); break;
       case 'save': data = db.legacySave(payload); break;
       case 'cleanup': data = db.cleanup(); break;
@@ -27,5 +35,5 @@ parentPort.on('message', ({ id, method, payload }) => {
     }
     parentPort.postMessage({ id, data });
     if (method === 'close') parentPort.close();
-  } catch (error) { parentPort.postMessage({ id, error: String(error) }); }
+  } catch (error) { parentPort.postMessage({ id, error: String(error), code: error.code }); }
 });

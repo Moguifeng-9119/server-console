@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Activity, Cpu, FolderOpen, History, Search, Terminal } from 'lucide-react';
 import { useStore } from '../state';
 import { useTranslation } from 'react-i18next';
@@ -7,12 +7,16 @@ import { freeGiB, gpuOwners, matchingGpus, isFreshSample, isFreshGpu, gpuMetricA
 import { useLiveServer } from '../telemetry/store';
 import { GpuGauge } from './GpuGauge';
 import { Sparkline } from './Sparkline';
+import { queueTerminalCommand, queueFilesPath } from '../workbench-navigation';
+
+const ResearchPane = lazy(() => import('./ResearchPane'));
 
 type OpenServer = (id: string, tab?: 'gpu' | 'files' | 'term', gpuIndex?: number) => void;
 
 export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory: (s: Server) => void }) {
   const { servers, demo, refreshMs, sampleNow } = useStore();
   const { t } = useTranslation();
+  const [homeView, setHomeView] = useState<'resources' | 'experiments'>(() => { try { return localStorage.getItem('sc.homeView') === 'experiments' ? 'experiments' : 'resources'; } catch { return 'resources'; } });
   const [query, setQuery] = useState('');
   const [minimum, setMinimum] = useState('');
   const [model, setModel] = useState('');
@@ -46,6 +50,8 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
       <div><div className="eyebrow">{t('workbench.eyebrow')}</div><h1>{t('workbench.title')}</h1><p>{t('workbench.subtitle')}</p></div>
       <span className={`mode-badge ${demo ? 'demo' : ''}`}>{t(demo ? 'workbench.demo' : 'workbench.ssh')}</span>
     </div>
+    <div className="home-view-switch">{(['resources', 'experiments'] as const).map((view) => <button className={'btn ' + (homeView === view ? 'on' : '')} aria-pressed={homeView === view} key={view} onClick={() => { setHomeView(view); try { localStorage.setItem('sc.homeView', view); } catch { /* Keep the selected view in this session. */ } }}>{t('research.views.' + view)}</button>)}</div>
+    {homeView === 'experiments' ? <Suspense fallback={<p>{t('research.loading')}</p>}><ResearchPane servers={servers} onTerminal={(id, command) => { if (command) queueTerminalCommand(id, command); onOpen(id, 'term'); }} onFiles={(id, directory) => { if (directory) queueFilesPath(id, directory); onOpen(id, 'files'); }} /></Suspense> : <>
     <div className="fleet-summary">{metrics.map(({ icon: Icon, value, label }) => <div className="summary-cell" key={label}><Icon size={17} /><div><strong className="num">{value}</strong><span>{label}</span></div></div>)}</div>
     <div className="resource-toolbar">
       <label className="resource-search"><Search size={15} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('workbench.search')} aria-label={t('workbench.search')} /></label>
@@ -59,6 +65,7 @@ export function Overview({ onOpen, onHistory }: { onOpen: OpenServer; onHistory:
       {rows.map((s) => <LiveServerCard key={s.id} base={s} min={min} model={model} query={query} onOpen={onOpen} onHistory={onHistory} />)}
     </div>
     {!rows.length && <div className="empty resource-empty"><Search size={28} /><h3>{t('workbench.noMatch')}</h3><p>{t('workbench.noMatchHint')}</p><button className="btn" onClick={reset}>{t('workbench.reset')}</button></div>}
+    </>}
   </>;
 }
 

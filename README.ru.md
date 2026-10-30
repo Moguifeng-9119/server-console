@@ -9,7 +9,9 @@
 ![CI](https://github.com/Moguifeng-9119/server-console/actions/workflows/ci.yml/badge.svg)
 ![MIT](https://img.shields.io/badge/license-MIT-0891b2)
 
-## Новое в 0.18.0
+## Новое в 0.19.0
+
+- Запуски обучения сохраняют команды, параметры, коды выхода, метрики JSONL/текста, кривые и диагностические данные. На главной переключаются ресурсы и эксперименты; метрики автоматически удаляются через 30 дней.
 
 - Поуровневый сбор GPU, системы и процессов подключён к действующему планировщику. Неизвестные значения, время и пропуски сохраняются. В обзоре четыре индикатора GPU в строке.
 
@@ -25,7 +27,7 @@
 
 - Диагностика и резервирование настроек без учётных данных помогают восстановлению. HTTPS Webhook необязателен и изначально выключен. Отдельный фоновый сборщик хранит историю при закрытом приложении.
 
-[0.18.1 release notes](docs/RELEASE-v0.18.1.md) · [Validation](docs/VALIDATION-0.18.1.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
+[0.19.0 release notes](docs/RELEASE-v0.19.0.md) · [Validation](docs/VALIDATION-0.19.0.md) · [Workspaces / tools guide](docs/WORKBENCH-GUIDE.md)
 
 ## Начало работы
 
@@ -66,7 +68,7 @@ npm run test:workflow
 
 В актуальном журнале указаны команды, результаты и непроверенные пункты. Два Linux-хоста проверили поток GPU, три уровня, счётчики и собственную задачу с кодом 7. Это не подтверждает парк серверов, передачу 100GB, реальный Slurm/MIG или все установщики.
 
-[Current validation ledger](docs/VALIDATION-0.18.1.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
+[Current validation ledger](docs/VALIDATION-0.19.0.md) · [Packaging workflow](.github/workflows/package.yml) · [Benchmark methodology](docs/BENCHMARKS.md)
 
 ## Языки и руководства
 

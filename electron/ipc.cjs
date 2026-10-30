@@ -97,6 +97,7 @@ function recordResources(serverId, sample) {
   for (const m of sample.filesystems) { add('mount:' + m.mount, m.mount, 'diskUsedPercent', m.percent); add('mount:' + m.mount, m.mount, 'availableBytes', m.available); }
   for (const m of sample.inodes) add('mount:' + m.mount, m.mount, 'inodeUsedPercent', m.percent);
   resources.set(serverId, { channels, gapAt: 0 });
+  void workbench?.diagnoseRuns(serverId, sample).catch(historyError);
 }
 let lastHistoryError = 0;
 function historyError(error) {
@@ -807,6 +808,7 @@ function registerIpc() {
     getConnection: getConn,
     getServers: () => servers,
     historyQuery: (query) => historyStore.request('query', query),
+    researchRequest: (method, payload) => historyStore.request(method, payload).catch((error) => { if (error.code !== 'RUN_DELETED') historyError(error); throw error; }),
     onResource: recordResources,
     notify: (title, body) => {
       if (Notification.isSupported()) new Notification({ title, body }).show();
@@ -880,6 +882,15 @@ function registerIpc() {
     },
   }).init();
   ipcMain.handle('workbench:request', wrap(async (req) => {
+    if (req?.operation === 'taskSave' && req.workspaceId && !productivity?.data.workspaces.some((workspace) => workspace.id === req.workspaceId && workspace.serverId === req.serverId)) throw new Error('Workspace belongs to a different server or no longer exists');
+    if (['runList', 'runGet', 'runMetrics', 'runDelete'].includes(req?.operation)) {
+      if (req.operation === 'runList') return historyStore.request('runList', { serverId: req.serverId, workspaceId: req.workspaceId, limit: req.limit });
+      const run = await historyStore.request('runGet', { id: req.id || req.runId });
+      if (req.serverId && run.serverId !== req.serverId) throw new Error('Run belongs to a different server');
+      if (req.operation === 'runGet') return run;
+      if (req.operation === 'runDelete') { if (['starting', 'running', 'unknown'].includes(run.status)) throw new Error('Reconcile a live run before deleting it'); return workbench.deleteRun(run.id); }
+      return historyStore.request('runMetrics', { runId: run.id, name: req.name, axis: req.axis, limit: req.limit });
+    }
     if (req?.operation === 'serviceOpen') {
       const template = await workbench.request({ ...req, operation: 'serviceTemplate' });
       const existing = forwardings.list().find((rule) => rule.serverId === req.serverId && rule.localPort === template.localPort && rule.remoteHost === '127.0.0.1' && rule.remotePort === template.remotePort);

@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
 const { Worker } = require('node:worker_threads');
 
-function runLogWorker(lines, patterns, mode, trackLoss) {
+function runLogWorker(lines, patterns, mode, trackLoss, context = null, onTraining = null) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.join(__dirname, 'log-parser-worker.cjs'));
     let settled = false;
@@ -15,15 +15,22 @@ function runLogWorker(lines, patterns, mode, trackLoss) {
     };
     let timer = setTimeout(() => finish(new Error('Log parser could not start')), 10000);
     worker.once('error', (error) => finish(error));
-    worker.once('message', (result) => finish(null, { ...result, timedOut: false }));
+    const processingBudget = () => { clearTimeout(timer); timer = setTimeout(() => finish(null, { hitIndices: [], progress: [], timedOut: true }), 1500); };
+    worker.on('message', (result) => {
+      if (settled) return;
+      if (result.type !== 'training') { finish(null, { ...result, timedOut: false }); return; }
+      if (!onTraining) { finish(new Error('Unexpected training batch')); return; }
+      clearTimeout(timer); timer = setTimeout(() => finish(new Error('Training storage batch timed out')), 30000);
+      void Promise.resolve().then(() => onTraining(result)).then(() => { if (!settled) { processingBudget(); worker.postMessage({ ack: true }); } }, (error) => finish(error));
+    });
     worker.once('online', () => {
       if (settled) return;
-      clearTimeout(timer); timer = setTimeout(() => finish(null, { hitIndices: [], progress: [], timedOut: true }), 1500);
-      worker.postMessage({ lines, patterns, mode, trackLoss });
+      processingBudget();
+      worker.postMessage({ lines, patterns, mode, trackLoss, context });
     });
   });
 }
-async function parseLogInWorker(lines, patterns, mode, trackLoss) {
+async function parseLogInWorker(lines, patterns, mode, trackLoss, context = null, onTraining = null) {
   if (!lines.length || (!patterns.length && !trackLoss)) return { hits: [], progress: [], disabledPatterns: [], timedOut: false };
   const indices = new Set(), disabledPatterns = [];
   const groups = mode === 'regex' ? patterns.map((pattern) => [pattern]) : patterns.length ? [patterns] : [];
@@ -32,9 +39,9 @@ async function parseLogInWorker(lines, patterns, mode, trackLoss) {
     if (result.timedOut) { if (mode === 'regex') disabledPatterns.push(group[0]); else return { hits: [], progress: [], disabledPatterns: [], timedOut: true }; }
     else for (const index of result.hitIndices) indices.add(index);
   }
-  const parsed = trackLoss ? await runLogWorker(lines, [], 'literal', true) : { progress: [], timedOut: false };
+  const parsed = trackLoss ? await runLogWorker(lines, [], 'literal', true, context, onTraining) : { progress: [], timedOut: false };
   if (parsed.timedOut) return { hits: [], progress: [], disabledPatterns: [], timedOut: true };
-  return { hits: [...indices].sort((a, b) => a - b).map((index) => lines[index]), progress: parsed.progress, disabledPatterns, timedOut: false };
+  return { hits: [...indices].sort((a, b) => a - b).slice(-20).map((index) => lines[index]), progress: parsed.progress, disabledPatterns, timedOut: false };
 }
 
 const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
@@ -112,11 +119,12 @@ const SYSTEM_COMMAND = "printf '__SC_OS__\\n'; uname -s; printf '__SC_DF__\\n'; 
 
 /** Local persisted workspaces and explicitly requested remote tools. */
 class WorkbenchManager {
-  constructor({ directory, getConnection, getServers = () => [], notify = (_title, _body) => {}, onEvent = (_event) => {}, historyQuery = null, usageQuery = null, onResource = (_serverId, _value) => {}, resourceConcurrency = 4, now = Date.now }) {
+  constructor({ directory, getConnection, getServers = () => [], notify = (_title, _body) => {}, onEvent = (_event) => {}, historyQuery = null, usageQuery = null, researchRequest = null, onResource = (_serverId, _value) => {}, resourceConcurrency = 4, now = Date.now }) {
     this.file = path.join(directory, 'workbench.json'); this.getConnection = getConnection; this.getServers = getServers; this.notify = notify; this.onEvent = onEvent; this.historyQuery = historyQuery; this.usageQuery = usageQuery;
     this.data = { version: 1, tasks: [], watches: [], rules: [], events: [], templates: [], logs: [], env: [] }; this.previous = new Map(); this.snapshots = new Map(); this.progress = new Map(); this.running = new Set(); this.closed = false; this.taskPollAt = new Map();
     this.clockCache = new Map(); // serverId -> { at, date, minutes }（服务器本地时钟，10s 缓存）
     this.logInFlight = new Map();
+    this.researchRequest = researchRequest;
     this.onResource = onResource; this.resourceNow = now; this.resourceConcurrency = Math.max(1, Math.min(16, Math.floor(Number(resourceConcurrency) || 4)));
     this.resourceIdentities = new Map(); this.resourceInFlight = new Map(); this.resourceFailures = new Map(); this.resourceQueue = []; this.resourceActive = 0; this.resourceBusyHosts = new Set();
   }
@@ -177,6 +185,18 @@ class WorkbenchManager {
     }
   }
   event(type, serverId, title, body, extra = {}) { const item = { id: crypto.randomUUID(), type, serverId, title, body, at: Date.now(), ...extra }; this.data.events.unshift(item); this.data.events = this.data.events.slice(0, 1000); this.persist(); this.onEvent(item); Promise.resolve(this.notify(title, body)).catch((error) => this.onEvent({ type: 'notification-error', error: String(error), at: Date.now() })); return item; }
+  async diagnoseRuns(serverId, sample) {
+    if (!this.researchRequest || this.closed) return;
+    for (const task of this.data.tasks.filter((item) => item.serverId === serverId && item.status === 'running' && item.remoteId && !item.runDeleted)) {
+      const log = this.data.logs.find((item) => item.runId === task.remoteId && item.enabled !== false && !item.lastError && !item.backlogBytes && item.lastPollAt <= sample.at && sample.at - item.lastPollAt <= 30000);
+      if (!log) continue;
+      const key = 'diagnose:' + task.remoteId; if (this.running.has(key)) continue;
+      this.running.add(key);
+      try { await this.researchRequest('runDiagnose', { runId: task.remoteId, at: sample.at, filesystems: sample.filesystems, physicalCwd: task.physicalCwd }); }
+      catch (error) { if (error.code === 'RUN_DELETED') this.detachDeletedRun(task.remoteId); else throw error; }
+      finally { this.running.delete(key); }
+    }
+  }
   quiet(rule, at) { if (!rule.quietStart || !rule.quietEnd || rule.quietStart === rule.quietEnd) return false; const d = new Date(at); const now = d.getHours() * 60 + d.getMinutes(); const minutes = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; }; const start = minutes(rule.quietStart), end = minutes(rule.quietEnd); return start < end ? now >= start && now < end : now >= start || now < end; }
   consumeSnapshot(snapshot) {
     if (this.closed || !snapshot?.id) return;
@@ -189,7 +209,7 @@ class WorkbenchManager {
     const available = (g, metric) => !g.unavailableMetrics?.includes(metric) && typeof g[metric] === 'number' && Number.isFinite(g[metric]);
     if (at - (this.taskPollAt.get(snapshot.id) || 0) > 10000) {
       this.taskPollAt.set(snapshot.id, at);
-      for (const task of this.data.tasks.filter((item) => item.serverId === snapshot.id && item.remoteId && ['starting', 'running', 'unknown'].includes(item.status))) {
+      for (const task of this.data.tasks.filter((item) => item.serverId === snapshot.id && item.remoteId && (['starting', 'running', 'unknown'].includes(item.status) || item.runError || item.logError || item.stateError || item.completionPending))) {
         if (this.running.has('poll:' + task.id)) continue;
         this.running.add('poll:' + task.id);
         void this.taskStatus(task.id).catch(() => { /* keep unknown remote status until a successful probe */ }).finally(() => this.running.delete('poll:' + task.id));
@@ -250,7 +270,7 @@ class WorkbenchManager {
     if (op === 'tmux' || op === 'tmux.list') { const result = await this.exec(sid, "if ! command -v tmux >/dev/null 2>&1; then printf '__UNSUPPORTED__'; elif tmux list-sessions -F '#{session_name}\\t#{session_windows}\\t#{session_attached}' 2>/dev/null; then :; else printf '__EMPTY__'; fi"); return { available: !result.includes('__UNSUPPORTED__'), sessions: result.split(/\r?\n/).filter((l) => l && !l.startsWith('__')).map((line) => { const [name, windows, attached] = line.split('\t'); return { name, windows: +windows, attached: +attached }; }) }; }
     if (op === 'tmux.attach') { const sessions = await this.request({ operation: 'tmux.list', serverId: sid }); if (!sessions.sessions.some((s) => s.name === r.name)) throw new Error('Session no longer exists'); return { command: 'tmux attach-session -t ' + quote(String(r.name)) }; }
     if (op === 'taskList') return clone(this.data.tasks.filter((t) => !sid || t.serverId === sid));
-    if (op === 'taskSave') { this.server(sid); const existing = this.data.tasks.find((t) => t.id === r.id); if (existing && existing.serverId !== sid) throw new Error('Task server cannot be changed'); if (existing?.remoteId) throw new Error('Started tasks are immutable; create a new task'); const command = text(r.command, 65536).trim(); if (!command) throw new Error('Enter a command'); const cwd = text(r.cwd || '~'); if (cwd !== '~' && !cwd.startsWith('/')) throw new Error('Working directory must be absolute or ~'); const gpu = text(r.gpu, 2048); if (gpu && !/^[a-zA-Z0-9,._/-]+$/.test(gpu)) throw new Error('Invalid GPU selection'); const schedule = normalizeSchedule(r.schedule, existing?.schedule); return this.upsert('tasks', { id: r.id, serverId: sid, name: text(r.name || command.slice(0, 60), 120), command, cwd, gpu, schedule, logPath: text(r.logPath), terminal: r.terminal && typeof r.terminal === 'object' ? { name: text(r.terminal.name, 120) } : {}, status: 'saved', createdAt: existing?.createdAt || Date.now() }); }
+    if (op === 'taskSave') { this.server(sid); const existing = this.data.tasks.find((t) => t.id === r.id); if (existing && existing.serverId !== sid) throw new Error('Task server cannot be changed'); if (existing?.remoteId) throw new Error('Started tasks are immutable; create a new task'); const command = text(r.command, 65536).trim(); if (!command) throw new Error('Enter a command'); const cwd = text(r.cwd || '~'); if (cwd !== '~' && !cwd.startsWith('/')) throw new Error('Working directory must be absolute or ~'); const gpu = text(r.gpu, 2048); if (gpu && !/^[a-zA-Z0-9,._/-]+$/.test(gpu)) throw new Error('Invalid GPU selection'); const schedule = normalizeSchedule(r.schedule, existing?.schedule); const training = require('./generated/schema.js').runInputSchema.parse({ serverId: sid, name: r.name || 'Training', command, cwd, gpu, parameters: r.parameters, totalSteps: r.totalSteps, workspaceId: r.workspaceId }); return this.upsert('tasks', { id: r.id, serverId: sid, name: text(r.name || command.slice(0, 60), 120), command, cwd, gpu, schedule, workspaceId: training.workspaceId, parameters: training.parameters, totalSteps: training.totalSteps, logPath: text(r.logPath), terminal: r.terminal && typeof r.terminal === 'object' ? { name: text(r.terminal.name, 120) } : {}, status: 'saved', createdAt: existing?.createdAt || Date.now() }); }
     if (op === 'taskStart') return this.startTask(idOf(r.id));
     if (op === 'taskStop') return this.killTask(idOf(r.id), 'Stopped manually');
     if (op === 'taskStatus') return this.taskStatus(idOf(r.id));
@@ -271,8 +291,8 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     if (op === 'envList') return clone(this.data.env || []);
     if (op === 'usageReport') return this.usageReport(Math.max(1, Math.min(365, finite(r.rangeDays, 30))));
     if (op === 'logList') return clone(this.data.logs || []);
-    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); const patternMode = r.patternMode === 'literal' ? 'literal' : 'regex'; if (patternMode === 'regex') for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); return this.upsert('logs', { id: r.id, serverId: sid, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, patternMode, disabledPatterns: existing && JSON.stringify(existing.patterns) === JSON.stringify(patterns) && (existing.patternMode || 'regex') === patternMode ? existing.disabledPatterns || [] : [], pendingPreview: existing?.pendingPreview, lastError: existing?.lastError, lastErrorAt: existing?.lastErrorAt, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [], progressPoints: existing?.progressPoints || [], cursor: existing?.serverId === sid && existing?.path === text(r.path, 4096).trim() ? existing.cursor : undefined }); }
-    if (op === 'logDelete') { this.data.logs = (this.data.logs || []).filter((l) => l.id !== idOf(r.id)); this.persist(); return true; }
+    if (op === 'logSave') { this.server(sid); const patterns = [...new Set((Array.isArray(r.patterns) ? r.patterns : String(r.patterns || '').split(/\r?\n/)).map((p) => String(p).trim()).filter(Boolean))].slice(0, 8); const patternMode = r.patternMode === 'literal' ? 'literal' : 'regex'; if (patternMode === 'regex') for (const p of patterns) { try { new RegExp(p); } catch { throw new Error('Invalid pattern: ' + p); } } const existing = (this.data.logs || []).find((l) => l.id === r.id); const runId = r.runId ? idOf(r.runId) : existing?.runId; if (runId && this.researchRequest) { const run = await this.researchRequest('runGet', { id: runId }); if (run.serverId !== sid) throw new Error('Run belongs to a different server'); } return this.upsert('logs', { id: r.id, serverId: sid, runId, name: text(r.name || 'log', 120), path: text(r.path, 4096).trim(), patterns, patternMode, disabledPatterns: existing && JSON.stringify(existing.patterns) === JSON.stringify(patterns) && (existing.patternMode || 'regex') === patternMode ? existing.disabledPatterns || [] : [], pendingPreview: existing?.pendingPreview, lastError: existing?.lastError, lastErrorAt: existing?.lastErrorAt, trackLoss: r.trackLoss === true, enabled: r.enabled !== false, lastLines: existing?.lastLines || [], lastHits: existing?.lastHits || [], lossPoints: existing?.lossPoints || [], progressPoints: existing?.progressPoints || [], cursor: existing?.serverId === sid && existing?.path === text(r.path, 4096).trim() ? existing.cursor : undefined }); }
+    if (op === 'logDelete') { const id = idOf(r.id); this.data.logs = (this.data.logs || []).filter((l) => l.id !== id); for (const task of this.data.tasks) if (task.logWatcherId === id) { task.logMonitoringDisabled = true; delete task.logError; } this.persist(); return true; }
     if (op === 'logPoll') return this.pollLog(idOf(r.id));
     throw new Error('Unsupported workbench operation');
   }
@@ -295,31 +315,100 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       ' && printf %s ' + quote(script) + ' >' + dir + '/runner.sh && chmod 700 ' + dir + '/runner.sh || exit 1; ' +
       'if command -v tmux >/dev/null 2>&1; then tmux new-session -d -s ' + quote('sc-' + task.remoteId) + ' ' +
       quote('sh ' + dir + '/runner.sh >' + dir + '/output.log 2>&1') + " || exit 1; printf 'tmux\\n'; " +
-      'else nohup sh ' + dir + '/runner.sh >' + dir + "/output.log 2>&1 </dev/null & printf 'nohup\\n'; fi";
+      'else nohup sh ' + dir + '/runner.sh >' + dir + "/output.log 2>&1 </dev/null & printf 'nohup\\n'; fi; printf '__SC_HOME__%s\\n' \"$HOME\"; (cd -- " + cwd + " 2>/dev/null && printf '__SC_CWD__%s\\n' \"$(pwd -P)\") || true";
     try {
-      const mode = (await this.exec(task.serverId, command)).trim();
+      if (this.researchRequest) await this.researchRequest('runCreate', { id: task.remoteId, taskId: task.id, workspaceId: task.workspaceId || null, serverId: task.serverId, name: task.name, command: task.command, cwd: task.cwd, gpu: task.gpu || '', parameters: task.parameters || {}, totalSteps: task.totalSteps || null, status: 'starting', startedAt: task.startedAt });
+      const acknowledgement = (await this.exec(task.serverId, command)).trim(), mode = acknowledgement.split(/\r?\n/)[0];
       if (!['tmux', 'nohup'].includes(mode)) throw new Error('Task launcher did not acknowledge startup');
       task.mode = mode; task.sessionName = mode === 'tmux' ? 'sc-' + task.remoteId : null; task.status = 'starting';
-      task.ownedLog = '~/.local/state/serverconsole/tasks/' + task.remoteId + '/output.log'; this.persist(); return clone(task);
-    } catch (error) { task.status = 'unknown'; task.error = String(error); this.persist(); throw error; }
+      task.ownedLog = '~/.local/state/serverconsole/tasks/' + task.remoteId + '/output.log';
+      const suppliedHome = acknowledgement.split(/\r?\n/).find((line) => line.startsWith('__SC_HOME__'))?.slice(11);
+      if (suppliedHome?.startsWith('/')) task.remoteHome = suppliedHome;
+      const physicalCwd = acknowledgement.split(/\r?\n/).find((line) => line.startsWith('__SC_CWD__'))?.slice(10);
+      if (physicalCwd?.startsWith('/')) task.physicalCwd = physicalCwd;
+      await this.ensureTaskLog(task); await this.syncTaskRun(task);
+      this.persist(); return clone(task);
+    } catch (error) { task.status = 'unknown'; task.error = String(error); if (this.researchRequest) await this.researchRequest('runUpdate', { id: task.remoteId, status: 'unknown' }).catch(() => {}); this.persist(); throw error; }
     finally { this.running.delete(id); }
   }
   async taskStatus(id) {
     const task = this.task(id); if (!task.remoteId) return clone(task);
-    if (task.status === 'stopped') return clone(task); // 计划/手动终止后不再被退出码覆盖回 failed
+    if (this.researchRequest) {
+      try {
+        const saved = await this.ensureTaskRun(task);
+        if (saved && ['succeeded', 'failed', 'stopped'].includes(saved.status)) {
+          if (!['succeeded', 'failed', 'stopped'].includes(task.status) && saved.status !== 'stopped') task.completionPending = true;
+          task.status = saved.status; task.exitCode = saved.exitCode; task.finishedAt = saved.finishedAt; delete task.error;
+        }
+      } catch (error) { if (error.code === 'RUN_DELETED') this.detachDeletedRun(task.remoteId); else task.runError = String(error.message || error); }
+    }
+    if (task.status === 'stopped' || ['succeeded', 'failed'].includes(task.status) && Number.isInteger(task.exitCode)) { await this.ensureTaskLog(task); await this.syncTaskRun(task); this.commitTaskObservation(task); return clone(task); }
     const dir = taskPath(task.remoteId);
     const command = 'if test -f ' + dir + '/exit.code; then cat ' + dir + '/exit.code; ' +
       'elif test -s ' + dir + '/runner.pid && test -s ' + dir + '/runner.start; then pid=$(cat ' + dir + '/runner.pid); expected=$(cat ' + dir + '/runner.start); ' +
       'case "$pid" in ""|*[!0-9]*) printf __UNKNOWN__;; *) current=$(sed \'s/^.*) //\' /proc/"$pid"/stat 2>/dev/null | awk \'{print $20}\'); ' +
       'if test -n "$current" && test "$current" = "$expected"; then printf __PENDING__; else printf __UNKNOWN__; fi;; esac; ' +
       'else printf __STARTING__; fi';
-    const output = (await this.exec(task.serverId, command)).trim();
+    let output;
+    try { output = (await this.exec(task.serverId, command)).trim(); }
+    catch (error) { task.status = 'unknown'; task.error = String(error.message || error); await this.syncTaskRun(task); this.persist(); throw error; }
+    delete task.error;
     if (/^\d+$/.test(output)) {
       const done = ['succeeded', 'failed'].includes(task.status);
       task.exitCode = +output; task.status = task.exitCode === 0 ? 'succeeded' : 'failed';
-      if (!done) { task.finishedAt = Date.now(); this.event('task-finished', task.serverId, task.name, 'Exit code: ' + task.exitCode, { taskId: task.id }); }
+      if (!done) { task.finishedAt = Date.now(); task.completionPending = true; }
     } else task.status = output === '__PENDING__' ? 'running' : output === '__STARTING__' && Date.now() - task.startedAt < 30000 ? 'starting' : 'unknown';
-    this.persist(); return clone(task);
+    await this.ensureTaskLog(task); await this.syncTaskRun(task);
+    this.commitTaskObservation(task); return clone(task);
+  }
+
+  async ensureTaskRun(task) {
+    if (!this.researchRequest || !task.remoteId || task.runDeleted) return;
+    return this.researchRequest('runCreate', { id: task.remoteId, taskId: task.id, workspaceId: task.workspaceId || null, serverId: task.serverId, name: task.name, command: task.command, cwd: task.cwd, gpu: task.gpu || '', parameters: task.parameters || {}, totalSteps: task.totalSteps || null, status: 'unknown', startedAt: task.startedAt });
+  }
+  async syncTaskRun(task) {
+    if (!this.researchRequest || !task.remoteId || task.runDeleted) return;
+    try { await this.ensureTaskRun(task); await this.researchRequest('runUpdate', { id: task.remoteId, status: task.status, exitCode: task.exitCode ?? null, finishedAt: task.finishedAt ?? null, error: task.error || task.logError || null }); delete task.runError; }
+    catch (error) { if (error.code === 'RUN_DELETED') this.detachDeletedRun(task.remoteId); else task.runError = String(error.message || error); }
+  }
+  async ensureTaskLog(task) {
+    if (!this.researchRequest || !task.remoteId || task.runDeleted || task.logMonitoringDisabled) return;
+    const key = 'log-binding:' + task.id; if (this.running.has(key)) return;
+    const existing = this.data.logs.find((log) => log.runId === task.remoteId);
+    this.running.add(key);
+    try {
+      if (existing) {
+        task.logWatcherId = existing.id; delete task.logError; return;
+      }
+      const home = task.remoteHome || await (await this.server(task.serverId)).homePath();
+      // A per-run output file gives unambiguous ownership across repeated launches.
+      const log = await this.request({ operation: 'logSave', serverId: task.serverId, runId: task.remoteId, name: task.name, path: home.replace(/\/$/, '') + '/.local/state/serverconsole/tasks/' + task.remoteId + '/output.log', patterns: [], patternMode: 'literal', trackLoss: true });
+      task.logWatcherId = log.id; delete task.logError;
+    } catch (error) { task.logError = String(error.message || error); }
+    finally { this.running.delete(key); }
+  }
+  detachDeletedRun(runId) {
+    for (const task of this.data.tasks) if (task.remoteId === runId) { task.runDeleted = true; task.logMonitoringDisabled = true; delete task.runError; delete task.logError; }
+    for (const log of this.data.logs) if (log.runId === runId) { log.enabled = false; delete log.runId; }
+  }
+  async deleteRun(runId) {
+    const run = await this.researchRequest('runGet', { id: runId });
+    if (['starting', 'running', 'unknown'].includes(run.status)) throw new Error('Reconcile a live run before deleting it');
+    await this.researchRequest('runDelete', { id: runId }); this.detachDeletedRun(runId);
+    try { this.persist(); return { deleted: true, trackingCleanupPending: false }; }
+    catch { return { deleted: true, trackingCleanupPending: true }; }
+  }
+  commitTaskObservation(task) {
+    const previousEvents = this.data.events, pending = task.completionPending;
+    const item = pending ? { id: task.completionEventId || crypto.randomUUID(), type: 'task-finished', serverId: task.serverId, title: task.name, body: 'Exit code: ' + task.exitCode, at: task.finishedAt, taskId: task.id } : null;
+    if (item) { task.completionEventId = item.id; task.completionPending = false; this.data.events = [item, ...previousEvents.filter((event) => event.id !== item.id)].slice(0, 1000); }
+    delete task.stateError;
+    try { this.persist(); }
+    catch (error) { this.data.events = previousEvents; if (pending) task.completionPending = true; task.stateError = String(error.message || error); throw error; }
+    if (item) {
+      try { this.onEvent(item); } catch (error) { task.notificationError = String(error); }
+      void Promise.resolve().then(() => this.notify(item.title, item.body)).catch((error) => { task.notificationError = String(error); });
+    }
   }
 
   // Snapshot descendants, validate each process identity, then terminate children before the runner.
@@ -345,7 +434,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
     try { const result = (await this.exec(task.serverId, command, 15000)).trim(); if (result !== '__STOPPED__') throw new Error('Task stop was not acknowledged'); }
     catch (error) { task.status = 'unknown'; task.error = String(error); this.persist(); throw error; }
     delete task.error;
-    task.status = 'stopped'; task.finishedAt = Date.now(); this.persist();
+    task.status = 'stopped'; task.finishedAt = Date.now(); await this.syncTaskRun(task); this.persist();
     this.event('task-stopped', task.serverId, task.name + ' · ' + reason, '', { taskId: task.id });
     return clone(task);
   }
@@ -462,7 +551,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       "meta=$(stat -Lc '%d:%i:%s' /proc/$$/fd/3) || exit 1",
       'size=${meta##*:}; identity=${meta%:*}',
       'start=' + previousOffset,
-      cursor ? 'if test "$identity" != ' + quote(cursor.identity) + ' || test "$size" -lt "$start"; then start=0; fi' : 'start=$((size > 262144 ? size - 262144 : 0))',
+      cursor ? 'if test "$identity" != ' + quote(cursor.identity) + ' || test "$size" -lt "$start"; then start=0; fi' : log.runId ? 'start=0' : 'start=$((size > 262144 ? size - 262144 : 0))',
       'count=$((size-start)); test "$count" -le 262144 || count=262144',
       'printf "__SC_LOG__ %s %s %s %s\\n" "$identity" "$size" "$start" "$count"',
       'dd bs=65536 skip="$start" count="$count" iflag=skip_bytes,count_bytes status=none <&3 | base64',
@@ -476,6 +565,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       if (![size, start, expected].every(Number.isSafeInteger) || expected > 262144 || start > size) throw new Error('Invalid log cursor');
       const bytes = Buffer.from(output.slice(header[0].length).replace(/\s/g, ''), 'base64');
       if (bytes.length !== expected) throw new Error('Log read incomplete; file may have changed during collection');
+      if (bytes.includes(0)) throw new Error('Binary content cannot be parsed as a training log');
       const continuous = cursor && cursor.identity === identity && start === cursor.offset;
       const decoder = new StringDecoder('utf8');
       const input = continuous && cursor.byteRemainder ? Buffer.concat([Buffer.from(cursor.byteRemainder, 'base64'), bytes]) : bytes;
@@ -486,11 +576,20 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       const remainderBytes = tail >= 0 && input.length - tail < expectedWidth ? input.subarray(tail).toString('base64') : '';
       const content = (continuous ? cursor.partial || '' : '') + decoded;
       const parts = content.split(/\r?\n/), partial = parts.pop() || '';
-      const fresh = cursor ? parts : [];
+      const fresh = cursor || log.runId ? parts : [];
       log.lastLines = [...(continuous ? log.lastLines || [] : []), ...parts].slice(-60).map((line) => line.slice(0, 65536));
       log.cursor = { path: log.path, identity, offset: start + bytes.length, partial: partial.slice(-65536), byteRemainder: remainderBytes };
       log.backlogBytes = Math.max(0, size - log.cursor.offset); log.lastPollAt = Date.now();
-      const parsed = await parseLogInWorker(fresh, (log.patterns || []).filter((pattern) => !(log.disabledPatterns || []).includes(pattern)), log.patternMode || 'regex', log.trackLoss);
+      let trainingContext = null;
+      if (log.runId && this.researchRequest) {
+        const run = await this.researchRequest('runGet', { id: log.runId });
+        if (run.serverId !== log.serverId) throw new Error('Log belongs to a different server');
+        trainingContext = { raw: content, identity, base: start - (continuous ? Buffer.byteLength(cursor.partial || '', 'utf8') + Buffer.from(cursor.byteRemainder || '', 'base64').length : 0), source: 'log:' + crypto.createHash('sha256').update(log.path).digest('hex').slice(0, 24) };
+      }
+      const parsed = await parseLogInWorker(fresh, (log.patterns || []).filter((pattern) => !(log.disabledPatterns || []).includes(pattern)), log.patternMode || 'regex', log.trackLoss || Boolean(log.runId), trainingContext, trainingContext ? async (batch) => {
+        if (this.closed || !this.data.logs.includes(original)) throw new Error('Log watcher changed during training commit');
+        await this.researchRequest('runAppend', { runId: log.runId, points: batch.points, events: batch.events });
+      } : null);
       if (this.closed || !this.data.logs.includes(original)) throw new Error('Log watcher changed during parsing');
       if (parsed.timedOut) {
         log.enabled = false; log.lastError = 'Log matching timed out; watcher paused'; log.lastErrorAt = Date.now();
@@ -511,6 +610,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
         if (loss !== null || step !== null || epoch !== null) log.progressPoints = [...(log.progressPoints || []), { at: Date.now(), loss, step, epoch }].slice(-120);
       }
       const item = hits.length ? { id: crypto.randomUUID(), type: 'log-hit', serverId: log.serverId, title: log.name + ' · pattern matched', body: hits.slice(0, 3).join(' | ').slice(0, 400), at: Date.now(), logId: log.id } : null;
+
       const previousLogs = this.data.logs, previousEvents = this.data.events;
       this.data.logs = previousLogs.map((entry) => entry === original ? log : entry);
       if (item) this.data.events = [item, ...previousEvents].slice(0, 1000);
@@ -527,6 +627,7 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
       }
       return clone(log);
     } catch (error) {
+      if (error.code === 'RUN_DELETED') { this.detachDeletedRun(log.runId); try { this.persist(); } catch { /* The database tombstone remains authoritative. */ } return clone(original); }
       if (this.data.logs.includes(original)) {
         original.lastError = String(error); original.lastErrorAt = Date.now();
         try { this.persist(); } catch { /* Keep the old cursor and the visible in-memory error for retry. */ }
@@ -536,14 +637,16 @@ if (r.metric === 'occupiedIdle' ? +r.recovery < +r.threshold : direction === 'ab
   }
 
   async tickLogs() {
-    if (this.closed) return;
-    for (const log of (this.data.logs || []).filter((l) => l.enabled !== false)) {
+    if (this.closed || this.logTicking) return;
+    this.logTicking = true;
+    try { for (const log of (this.data.logs || []).filter((l) => l.enabled !== false)) {
+      if (this.closed) break;
       const lock = 'log:' + log.id;
       if (this.running.has(lock)) continue;
       this.running.add(lock);
       try { await this.pollLog(log.id); } catch { /* pollLog persists the error for the next UI refresh. */ }
       finally { this.running.delete(lock); }
-    }
+    } } finally { this.logTicking = false; }
   }
 
   // ===== 环境一致性 =====

@@ -64,6 +64,9 @@ jobs:
       - name: New workbench integration journeys
         run: node scripts/workbench-v18-ui.cjs
 
+      - name: Training runs, curves and multilingual experiment journeys
+        run: npm run test:research
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -76,4 +79,5 @@ jobs:
             test-artifacts/navigation
             test-artifacts/monitor
             test-artifacts/workbench-v18
+            test-artifacts/research
           if-no-files-found: ignore

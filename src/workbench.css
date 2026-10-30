@@ -122,3 +122,6 @@ button.group-head { width: 100%; border: 0; background: transparent; text-align:
 .monitor-panel .note { display: block; line-height: 1.7; white-space: normal; }.history-dialog { width: 1050px; }
 .tabs { flex-wrap: wrap; }.tabs .note { min-width: 0; white-space: normal; }
 @media (max-width: 1050px) { .monitor-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }.monitor-panel { padding: 14px; }.monitor-toolbar label { flex-wrap: wrap; } }
+
+.home-view-switch { display: flex; gap: 8px; margin-block: 12px; }
+.home-view-switch button.on { color: var(--accent); background: var(--bg-2); }
