@@ -161,7 +161,7 @@ async function main() {
       const marker = 'crash-' + boundary.replace('.json', ''), backup = exported.data;
       backup.servers.push({ id: marker, name: marker, host: '127.0.0.1', port: sshd.address().port, username: 'fixture', authType: 'password' });
       backup.workspaces.push({ id: marker, serverId: marker, name: marker, cwd: '/crash-fixture' });
-      await page.evaluate((id) => { localStorage.setItem('sc.lang', 'en'); localStorage.setItem('sc.pendingImport.' + id, JSON.stringify({ 'sc.lang': 'fr' })); }, marker);
+      await page.evaluate(async (id) => { await window.api.setAppLanguage('en'); localStorage.setItem('sc.lang', 'en'); localStorage.setItem('sc.pendingImport.' + id, JSON.stringify({ 'sc.lang': 'fr' })); }, marker);
       await application.evaluate((_electron, target) => {
         const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path'), rename = fs.renameSync;
         fs.renameSync = function (from, to) { const result = rename.call(this, from, to); if (path.basename(String(to)) === target) process.kill(process.pid, 'SIGKILL'); return result; };
